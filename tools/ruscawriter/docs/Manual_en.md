@@ -106,6 +106,8 @@ A project is a `.rwr` file: a `tar.gz` archive holding one Markdown file per cha
 
 **Reflow paragraphs** (main menu) joins lines that were broken by hand, for example in text pasted from a PDF.
 
+Markdown follows the CommonMark standard, as in RuscaMark and RuscaLLama: preview, highlighting and exports all read it the same way. Besides headings, bold, italic, lists, quotes, links, images and tables you can use code blocks between three backticks, task lists (`- [x]`), footnotes (`text[^1]` and, further down, `[^1]: the note`, which end up at the bottom of the chapter) and formulas (`$x^2$`, which become symbols). One rule differs from CommonMark, because it is more natural in a book: **every line break is a line break in the book too**, and lines written one under the other are not merged into a single paragraph. A blank line separates blocks of text. When exporting to Markdown, RuscaWriter adds the blank lines needed for the file to read the same in any program that follows CommonMark.
+
 ---
 
 ## 6. View and appearance

@@ -558,7 +558,10 @@ def test_link_markdown():
         pagine = b"".join(z.read(n) for n in z.namelist()
                           if n.endswith(("xhtml", "html")))
         check("EPUB: l'indirizzo c'e'", b"esempio.org/t/x" in pagine)
-        check("EPUB: nessun link cliccabile", b"<a href" not in pagine)
+        # l'indice del libro porta ai capitoli: quello è navigazione, non un
+        # link dell'autore, e resta cliccabile
+        check("EPUB: il link dell'autore non è cliccabile",
+              b'href="https://esempio.org' not in pagine)
 
 
 def test_markdown_stessi_esiti_fra_formati():
@@ -598,6 +601,66 @@ def test_markdown_stessi_esiti_fra_formati():
                        if pw_model.classify_md_line(r)[0] == "heading")
     check("un titolo solo, e tutti d'accordo",
           titoli_class == 1 == html.count("<h1>") == tipi.count("h1"))
+
+
+def test_motore_comune():
+    print("markdown: il motore comune, con la regola degli a capo di RuscaWriter")
+    from ruscawriter.model import (book_blocks, commonmark_paragraphs,
+                                   highlight_spans, Project)
+
+    # --- ogni a capo va a capo anche nel libro -----------------------------
+    blocchi = book_blocks("Una riga\nun'altra  \nla terza\n\nNuovo blocco")
+    check("tre righe nello stesso blocco", len(blocchi[0][1]) == 3)
+    check("la riga vuota separa i blocchi", len(blocchi) == 2)
+
+    # --- difetti del vecchio parser riga per riga ---------------------------
+    b = book_blocks("```bash\nsudo apt install ./ruscawriter-ruscalinux_1.99.2_all.deb\n```")
+    check("il blocco di codice è codice, senza corsivi nel nome del file",
+          b == [("code", "bash", "sudo apt install ./ruscawriter-ruscalinux_1.99.2_all.deb")])
+    check("titolo sottolineato", book_blocks("Titolo\n===")[0][:2] == ("heading", 1))
+    check("l'escape toglie la formattazione",
+          book_blocks("\\*non corsivo\\*") == [("p", [[("*non corsivo*", "regular")]])])
+    check("barrato ed evidenziato senza marcatori",
+          book_blocks("~~a~~ ==b==") == [("p", [[("a b", "regular")]])])
+    check("una formula nel codice resta codice",
+          book_blocks("`$x$`") == [("p", [[("$x$", "code")]])])
+    check("i prezzi non sono formule",
+          book_blocks("da $5 a $10") == [("p", [[("da $5 a $10", "regular")]])])
+    check("nota numerata in fondo, dopo un filetto",
+          book_blocks("Testo[^n].\n\n[^n]: La nota.")[-2:]
+          == [("rule",), ("p", [[("[1] La nota.", "regular")]])])
+    check("elenco annidato",
+          book_blocks("- a\n  - b")[0][3][0][1][1][0] == "list")
+    check("lista di attività",
+          [t for t, _sub in book_blocks("- [x] fatta\n- [ ] da fare")[0][3]] == [True, False])
+
+    # --- tutti i formati partono dagli stessi blocchi -----------------------
+    p = Project()
+    p.new("prova")
+    testo = "Riga uno\nriga due\n\n```\ncodice *non corsivo*\n```\n\n- [x] fatto"
+    html = "".join(p._blocks_to_html(testo))
+    check("HTML: le righe vanno a capo", "Riga uno<br/>riga due" in html)
+    check("HTML: codice", "<pre><code>codice *non corsivo*</code></pre>" in html)
+    check("HTML: casella della lista di attività", "<li>☑ fatto</li>" in html)
+    doc = p._doc_blocks(testo)
+    check("ODT/DOCX: una riga, un paragrafo", ("p", "Riga uno") in doc and ("p", "riga due") in doc)
+    check("ODT/DOCX: codice letterale", ("p", "codice *non corsivo*") in doc)
+    check("ODT/DOCX: casella della lista di attività", ("bullet", "☑ fatto") in doc)
+
+    # --- evidenziazione nell'editor ------------------------------------------
+    spans = highlight_spans("# Titolo\n\nUn **grassetto\nsu due righe** e `co**de`")
+    check("evidenziazione: titolo", spans[0][2] == "h1")
+    check("evidenziazione: grassetto su due righe",
+          any(st == "bold" and z - a == len("**grassetto\nsu due righe**") for a, z, st in spans))
+    check("evidenziazione: nessun grassetto dentro il codice",
+          [st for _a, _z, st in spans].count("bold") == 1)
+
+    # --- export Markdown leggibile da CommonMark ------------------------------
+    cm = commonmark_paragraphs("Riga uno\nriga due  \nverso\n\n> a\n> b\n\n- x\n  y")
+    check("export Markdown: riga vuota fra i paragrafi",
+          cm.startswith("Riga uno\n\nriga due  \nverso"))
+    check("export Markdown: anche nelle citazioni", "> a\n>\n> b" in cm)
+    check("export Markdown: gli elenchi restano come sono", cm.endswith("- x\n  y"))
 
 
 def test_font_di_sistema():
@@ -831,8 +894,10 @@ def test_lingue_non_tradotte():
         check("alcune lingue non tradotte guadagnano la sillabazione",
               len(con) > 0)
         check("altre no, e l'etichetta deve distinguerle", len(senza) > 0)
-    else:
+    elif not HAVE_PYPHEN:
         print("     (Pyphen assente: salto il conteggio dei dizionari)")
+    else:
+        print("     (tutte le lingue sono tradotte: nessun dizionario da contare)")
 
     # RTL_LANGUAGES non e' piu' dichiarato e basta: l'editor lo usa
     with open(os.path.join(ROOT, "src", "ruscawriter", "editor.py"),
@@ -1678,9 +1743,17 @@ def test_export_pdf_typography():
     # fallire e resta valido (l'opzione viene semplicemente ignorata).
     hy = gen("hyph.pdf", justify=True, hyphenate=True, hyphen_lang="it")
     check("PDF con sillabazione valido", hy.startswith(b"%PDF"))
-    check("get_hyphenator coerente con HAVE_PYPHEN",
-          (pw_model.get_hyphenator("it") is not None) or
-          (not pw_model.HAVE_PYPHEN))
+    # Pyphen di Debian non ha dizionari suoi: li prende dai pacchetti
+    # hyphen-* di sistema. Il sillabatore italiano c'è se e solo se c'è
+    # Pyphen e c'è il suo dizionario; il test non deve dipendere da cosa è
+    # installato sul computer, ma dalla promessa.
+    if pw_model.HAVE_PYPHEN:
+        import pyphen
+        ha_dizionario = pyphen.language_fallback("it") is not None
+    else:
+        ha_dizionario = False
+    check("get_hyphenator coerente con Pyphen e dizionario",
+          (pw_model.get_hyphenator("it") is not None) == ha_dizionario)
     # hyphenation_available implica sempre HAVE_PYPHEN, mai il contrario da solo
     check("available implica HAVE_PYPHEN",
           (not pw_model.hyphenation_available("it")) or pw_model.HAVE_PYPHEN)
@@ -1815,6 +1888,7 @@ def main():
                test_export_epub, test_word_count,
                test_themes, test_theme_families,
                test_markdown_coerente, test_markdown_stessi_esiti_fra_formati,
+               test_link_markdown, test_motore_comune,
                test_font_di_sistema,
                test_icona_unica,
                test_margini_pagina,

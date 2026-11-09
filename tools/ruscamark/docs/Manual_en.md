@@ -68,7 +68,7 @@ You can also drag a `.md` file into the window.
 
 ## 4. Two ways to view your text
 
-**Live rendering (Ctrl+L)** — the default mode. Headings, bold, italic, code, links, quotes and lists take on their final look immediately and the markers (`**`, `#`, `>`…) are hidden. When you move the cursor onto an element, its syntax reappears so you can edit it. Tables stay in a monospaced font, so aligned columns remain aligned. Live rendering reads Markdown exactly as the preview and the exports do, even when bold or italic text continues on the next line.
+**Live rendering (Ctrl+L)** — the default mode. Headings, bold, italic, code, links, quotes and lists take on their final look immediately and the markers (`**`, `#`, `>`…) are hidden. When you move the cursor onto an element, its syntax reappears so you can edit it. Tables stay in a monospaced font, so aligned columns remain aligned. Live rendering reads Markdown exactly as the preview and the exports do, even when bold or italic text continues on the next line. `$…$` formulas appear in italics, with real superscripts and subscripts (`x^2`, `a_{i}`); the `$$` lines of multi-line formulas disappear and the formula is centred; the backslashes of escapes (`\*`) and of forced line breaks are hidden; `---` becomes a line. List dashes stay dashes: a text editor cannot show a character other than the one written in the file.
 
 **Classic preview (Ctrl+P)** — splits the window: source with syntax colouring on the left, the laid-out document on the right. Only the preview shows real images, tables drawn as grids and footnotes collected at the end. With the light style the preview uses the same colours as the PDF and HTML exports; with the dark style it stays plum.
 

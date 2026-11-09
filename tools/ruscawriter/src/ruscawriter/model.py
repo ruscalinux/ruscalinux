@@ -44,11 +44,14 @@ import shutil
 import tarfile
 import tempfile
 
-# EN: formulas and tables, shared with RuscaLLama and RuscaMark (identical
-#     file in the three programs).
-# IT: formule e tabelle, in comune con RuscaLLama e RuscaMark (file identico
-#     nei tre programmi).
-from .rusca_markdown import math_to_text as render_math, table_at
+# EN: the common Markdown engine of the RuscaLinux OS Tools (CommonMark,
+#     specifications section 1.2), identical in RuscaLLama, RuscaMark and
+#     RuscaWriter.
+# IT: il motore Markdown comune dei RuscaLinux OS Tools (CommonMark,
+#     specifiche sezione 1.2), identico in RuscaLLama, RuscaMark e RuscaWriter.
+from markdown_it.tree import SyntaxTreeNode
+from .rusca_markdown import (parser as md_parser, parse_source, inline_mapper,
+                             latex_to_text, math_to_text as render_math, table_at)
 
 # EN: optional hyphenation support via Pyphen. Two things are needed and both
 #     are OPTIONAL: (1) the Pyphen library (Debian "python3-pyphen") and (2) a
@@ -906,53 +909,35 @@ def _winansi_to_unicode(code):
 
 # ---------------------------------------------------------------------------
 # EN: THE MARKDOWN RULES, IN ONE PLACE.
-#     Every part of the program that reads Markdown — the PDF typesetter, the
-#     HTML and EPUB exports, the ODT and DOCX exports, the on-screen preview
-#     and the live highlighting in the editor — asks these two functions:
-#
-#       classify_md_line(line)  what kind of line is this? (block level)
-#       parse_inline(text)      where are bold, italic and code? (inline level)
-#
-#     Before, each of those six places carried its own copy of the rules, and
-#     the copies had drifted apart: "#Title" without a space was a heading in
-#     the PDF and a paragraph everywhere else, and "_italic_" was formatted on
-#     export but not highlighted while typing. One source, one behaviour.
+#     Markdown is read by the common engine (rusca_markdown: CommonMark with
+#     the extensions of the specifications, section 1.2). book_blocks() turns
+#     a chapter into the blocks of the book, and every part of the program
+#     that shows a chapter — the PDF typesetter, the HTML and EPUB exports,
+#     the ODT and DOCX exports, the on-screen preview — starts from there;
+#     the live highlighting asks highlight_spans(), from the same engine.
+#     One rule is RuscaWriter's own: every line break in the text is a line
+#     break in the book (lines written one under the other are not merged
+#     into one paragraph, as CommonMark would do).
 #
 # IT: LE REGOLE DEL MARKDOWN, IN UN POSTO SOLO.
-#     Ogni parte del programma che legge Markdown — l'impaginatore PDF, gli
-#     export HTML ed EPUB, quelli ODT e DOCX, l'anteprima e l'evidenziazione
-#     dal vivo nell'editor — interroga queste due funzioni:
-#
-#       classify_md_line(riga)  che tipo di riga e'? (livello blocco)
-#       parse_inline(testo)     dove sono grassetto, corsivo e codice? (inline)
-#
-#     Prima ognuno di quei sei punti aveva la sua copia delle regole, e le
-#     copie erano divergute: "#Titolo" senza spazio era un titolo nel PDF e un
-#     paragrafo altrove, e "_corsivo_" veniva formattato in esportazione ma non
-#     evidenziato mentre si scrive. Una fonte, un comportamento.
+#     Il Markdown lo legge il motore comune (rusca_markdown: CommonMark con le
+#     estensioni delle specifiche, sezione 1.2). book_blocks() trasforma un
+#     capitolo nei blocchi del libro, e ogni parte del programma che mostra
+#     un capitolo — l'impaginatore PDF, gli export HTML ed EPUB, quelli ODT e
+#     DOCX, l'anteprima — parte da lì; l'evidenziazione dal vivo chiede
+#     highlight_spans(), dallo stesso motore. Una regola è solo di
+#     RuscaWriter: ogni a capo del testo va a capo anche nel libro (le righe
+#     scritte una sotto l'altra non si fondono in un paragrafo, come farebbe
+#     CommonMark).
 # ---------------------------------------------------------------------------
 
-# Marcatori inline. Ogni alternativa richiede la coppia (apertura e chiusura):
-# un asterisco solitario, come in "3 * 4", resta un asterisco e non fa
-# scivolare in corsivo tutto il resto della riga.
-_INLINE_RE = re.compile(
-    r"(?P<bi>\*\*\*|___)(?P<bi_t>.+?)(?P=bi)"
-    r"|(?P<b>\*\*|__)(?P<b_t>.+?)(?P=b)"
-    r"|(?P<i>\*|_)(?P<i_t>.+?)(?P=i)"
-    r"|`(?P<c_t>.+?)`"
-)
-
-# Link markdown [testo](indirizzo): del testo resta solo la parte leggibile.
-_LINK_RE = re.compile(r"\[(.+?)\]\((.+?)\)")
-
-# Regole di blocco: una riga per volta.
-_HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)$")
-_NUMBER_RE = re.compile(r"^(\d+)\.\s+(.*)$")
-_BULLET_PREFIXES = ("- ", "* ", "+ ")
-
-# Stili inline possibili. 'code' e' un caso a se': dentro i backtick il testo
-# resta letterale, senza altra formattazione.
+# Stili dei tratti di testo. 'code' e' un caso a se': dentro i backtick il
+# testo resta letterale, senza altra formattazione.
 INLINE_STYLES = ("regular", "bold", "italic", "bolditalic", "code")
+
+# Interruzioni dentro un paragrafo del motore: due «stili» speciali che i
+# tratti usano solo per dividere il testo in righe (vedi book_blocks).
+_SOFT, _HARD = "\x00soft", "\x00hard"
 
 
 def _style_name(bold, italic):
@@ -963,29 +948,6 @@ def _style_name(bold, italic):
     if italic:
         return "italic"
     return "regular"
-
-
-def _inline_tokens(s, bold=False, italic=False):
-    """Percorre una stringa e produce i tratti formattati come (stile, testo),
-    senza marcatori. La formattazione annidata funziona
-    ("**grassetto con *corsivo* dentro**") perche' la funzione richiama se
-    stessa sul contenuto."""
-    pos = 0
-    for m in _INLINE_RE.finditer(s):
-        if m.start() > pos:
-            yield (_style_name(bold, italic), s[pos:m.start()])
-        if m.group("bi_t") is not None:
-            yield from _inline_tokens(m.group("bi_t"), True, True)
-        elif m.group("b_t") is not None:
-            yield from _inline_tokens(m.group("b_t"), True, italic)
-        elif m.group("i_t") is not None:
-            yield from _inline_tokens(m.group("i_t"), bold, True)
-        else:
-            # codice: contenuto letterale, nessuna ricorsione
-            yield ("code", m.group("c_t"))
-        pos = m.end()
-    if pos < len(s):
-        yield (_style_name(bold, italic), s[pos:])
 
 
 def link_display(etichetta, indirizzo):
@@ -1014,41 +976,168 @@ def link_display(etichetta, indirizzo):
     return f"{etichetta} ({indirizzo})"
 
 
+def _plain(nodes):
+    """Testo semplice di nodi in linea (etichette di link e immagini)."""
+    return "".join(t for t, st in _runs(nodes) if st not in (_SOFT, _HARD, "image")) \
+        if nodes else ""
+
+
+def _runs(nodes, bold=False, italic=False, out=None):
+    """Nodi in linea del motore -> tratti (testo, stile). Le formule diventano
+    simboli Unicode, i link «testo (indirizzo)» (vedi link_display), i
+    riferimenti alle note «[1]». Barrato ed evidenziato non hanno uno stile
+    proprio nei formati del libro: resta il testo, senza marcatori. Un'immagine
+    diventa il tratto speciale ((didascalia, nome), "image")."""
+    if out is None:
+        out = []
+    style = _style_name(bold, italic)
+    after_box = False
+    for n in nodes:
+        t = n.type
+        if t == "text":
+            out.append((n.content.lstrip(" ") if after_box else n.content, style))
+        elif t == "softbreak":
+            out.append(("", _SOFT))
+        elif t == "hardbreak":
+            out.append(("", _HARD))
+        elif t == "code_inline":
+            out.append((n.content, "code"))
+        elif t == "strong":
+            _runs(n.children, True, italic, out)
+        elif t == "em":
+            _runs(n.children, bold, True, out)
+        elif t in ("math_inline", "math_inline_double"):
+            out.append((latex_to_text(n.content), style))
+        elif t == "link":
+            label = _plain(n.children)
+            shown = link_display(label, str(n.attrs.get("href", "")))
+            if shown.startswith(label):
+                _runs(n.children, bold, italic, out)
+                if shown != label:
+                    out.append((shown[len(label):], style))
+            else:
+                out.append((shown, style))
+        elif t == "image":
+            out.append(((_plain(n.children),
+                         md_parser().normalizeLinkText(str(n.attrs.get("src", "")))), "image"))
+        elif t == "footnote_ref":
+            out.append((f"[{n.meta['id'] + 1}]", style))
+        elif t in ("html_inline", "footnote_anchor"):
+            pass                      # casella delle liste di attività; ritorno dalla nota
+        elif n.children:
+            _runs(n.children, bold, italic, out)
+        else:
+            out.append((n.content, style))
+        after_box = t == "html_inline"
+    return out
+
+
+def _merge(runs):
+    """Tratti consecutivi dello stesso stile in uno solo; via quelli vuoti."""
+    out = []
+    for text, style in runs:
+        if style == "image":
+            out.append((text, style))
+        elif not text:
+            continue
+        elif out and out[-1][1] == style:
+            out[-1] = (out[-1][0] + text, style)
+        else:
+            out.append((text, style))
+    return out
+
+
+def _inline_nodes(text):
+    """Nodi in linea di un testo di una riga (cella, titolo, didascalia)."""
+    tokens = md_parser().parseInline(text)
+    return SyntaxTreeNode(tokens).children[0].children if tokens else []
+
+
 def parse_inline(text):
     """Spezza il testo in segmenti (testo, stile), stile in INLINE_STYLES.
 
-    I link [testo](indirizzo) diventano "testo (indirizzo)": vedi
-    link_display. Restituisce sempre almeno un segmento, così chi impagina non
-    deve gestire la lista vuota."""
-    text = _LINK_RE.sub(lambda m: link_display(m.group(1), m.group(2)), text)
-    segments = [(t, st) for st, t in _inline_tokens(text) if t]
+    L'analisi e' quella del motore comune (CommonMark). I link
+    [testo](indirizzo) diventano "testo (indirizzo)": vedi link_display.
+    Restituisce sempre almeno un segmento, così chi impagina non deve
+    gestire la lista vuota."""
+    runs = []
+    for t, st in _runs(_inline_nodes(text)):
+        if st == "image":
+            runs.append((t[0], "regular"))
+        elif st in (_SOFT, _HARD):
+            runs.append((" " if st == _SOFT else "\n", "regular"))
+        else:
+            runs.append((t, st))
+    segments = _merge(runs)
     return segments or [("", "regular")]
 
 
-def inline_spans(text, base=0, bold=False, italic=False):
-    """Posizioni dei tratti formattati nella riga così com'è scritta, marcatori
-    compresi: (inizio, fine, stile).
+def _emphasis_spans(token, to_doc):
+    """Tratti di grassetto, corsivo e codice di un token «inline» di
+    parse_source(), marcatori compresi: (inizio, fine, stile), il tratto
+    esterno prima di quello interno. Lo stile tiene conto di quelli che lo
+    contengono: un corsivo dentro un grassetto e' «bolditalic»."""
+    spans, stack = [], []
+    for c in token.children or []:
+        src = c.meta.get("src")
+        if c.type in ("strong_open", "em_open"):
+            stack.append(c)
+        elif c.type in ("strong_close", "em_close") and stack:
+            o = stack.pop()
+            if "src" not in o.meta or src is None:
+                continue
+            n = len(c.markup)
+            kinds = {x.type for x in stack} | {o.type}
+            spans.append((to_doc(o.meta["src"][1] - n), to_doc(src[0] + n),
+                          _style_name("strong_open" in kinds, "em_open" in kinds)))
+        elif c.type == "code_inline" and src is not None:
+            spans.append((to_doc(src[0]), to_doc(src[1]), "code"))
+    return sorted(spans, key=lambda x: (x[0], -x[1]))
 
-    Serve all'evidenziazione nell'editor, che colora il testo sul posto e
-    quindi ha bisogno delle posizioni vere, delimitatori inclusi: chi scrive
-    "**forte**" si aspetta di vedere evidenziati anche gli asterischi. Un
-    tratto annidato produce una voce propria, con lo stile combinato: chi
-    colora sovrappone le due e ottiene, ad esempio, grassetto-corsivo."""
-    spans = []
-    for m in _INLINE_RE.finditer(text):
-        if m.group("bi_t") is not None:
-            inner, opener, nb, ni = m.group("bi_t"), m.group("bi"), True, True
-        elif m.group("b_t") is not None:
-            inner, opener, nb, ni = m.group("b_t"), m.group("b"), True, italic
-        elif m.group("i_t") is not None:
-            inner, opener, nb, ni = m.group("i_t"), m.group("i"), bold, True
-        else:
-            # codice: nessun annidamento da esplorare
-            spans.append((base + m.start(), base + m.end(), "code"))
-            continue
-        spans.append((base + m.start(), base + m.end(), _style_name(nb, ni)))
-        spans.extend(inline_spans(inner, base + m.start() + len(opener), nb, ni))
-    return spans
+
+def inline_spans(text, base=0):
+    """Posizioni dei tratti formattati nella riga così com'è scritta, marcatori
+    compresi: (inizio, fine, stile). Un tratto annidato produce una voce
+    propria, con lo stile combinato: chi colora sovrappone le due e ottiene,
+    ad esempio, grassetto-corsivo."""
+    tokens = parse_source(text)
+    lines = text.split("\n")
+    starts, o = [], 0
+    for line in lines:
+        starts.append(o)
+        o += len(line) + 1
+    out = []
+    for tok in tokens:
+        if tok.type == "inline":
+            to_doc = inline_mapper(lines, starts, tok)
+            if to_doc is not None:
+                out += [(base + a, base + z, st) for a, z, st in _emphasis_spans(tok, to_doc)]
+    return out
+
+
+def highlight_spans(text):
+    """Cosa colorare nell'editor, per tutto il capitolo: i titoli per intero
+    (h1, h2, h3) e i tratti di inline_spans. Viene dal motore comune, come gli
+    export: ciò che qui appare in grassetto uscirà in grassetto."""
+    tokens = parse_source(text)
+    lines = text.split("\n")
+    starts, o = [], 0
+    for line in lines:
+        starts.append(o)
+        o += len(line) + 1
+    out, heading = [], None
+    for tok in tokens:
+        if tok.type == "heading_open" and tok.map:
+            heading = tok
+            for i in range(tok.map[0], min(tok.map[1], len(lines))):
+                out.append((starts[i], starts[i] + len(lines[i]), f"h{min(3, int(tok.tag[1]))}"))
+        elif tok.type == "heading_close":
+            heading = None
+        elif tok.type == "inline" and heading is None:
+            to_doc = inline_mapper(lines, starts, tok)
+            if to_doc is not None:
+                out += _emphasis_spans(tok, to_doc)
+    return out
 
 
 def _parse_inline_md(text):
@@ -1063,7 +1152,7 @@ def _strip_inline_md(text):
 
 
 def classify_md_line(raw_line):
-    """Riconosce il tipo di una riga di Markdown.
+    """Riconosce il tipo di una riga di Markdown, presa da sola.
 
     Restituisce (tipo, corpo, extra):
 
@@ -1071,30 +1160,253 @@ def classify_md_line(raw_line):
         ("image",   didascalia,  nome)      ![didascalia](nome)
         ("heading", testo,       livello)   # ... ###### (lo spazio e' d'obbligo)
         ("bullet",  testo,       None)      - * +
-        ("number",  testo,       "3")       3. testo
+        ("number",  testo,       "3")       3. testo  oppure  3) testo
         ("quote",   testo,       None)      > testo
+        ("rule",    riga,        None)      --- *** ___
         ("text",    testo,       None)      tutto il resto
 
-    Lo spazio dopo il cancelletto e' richiesto, come vuole il Markdown
-    standard: senza, "#3 note a piè di pagina" diventerebbe un titolo.
-    """
+    Il riconoscimento e' quello del motore comune: "#3 note" non e' un
+    titolo, come vuole CommonMark. Serve a chi ragiona riga per riga (la
+    ricucitura dei paragrafi spezzati); gli export usano book_blocks."""
     s = raw_line.strip()
     if not s:
         return ("blank", "", None)
-    mi = _IMG_LINE_RE.match(s)
-    if mi:
-        return ("image", mi.group("alt"), mi.group("src"))
-    m = _HEADING_RE.match(s)
-    if m:
-        return ("heading", m.group(2), len(m.group(1)))
-    if s[:2] in _BULLET_PREFIXES:
-        return ("bullet", s[2:], None)
-    m = _NUMBER_RE.match(s)
-    if m:
-        return ("number", m.group(2), m.group(1))
-    if s.startswith(">"):
-        return ("quote", s.lstrip(">").strip(), None)
+    tokens = parse_source(s)
+    first = tokens[0].type if tokens else ""
+    inline = next((t for t in tokens if t.type == "inline"), None)
+    body = inline.meta.get("src_content", inline.content) if inline is not None else s
+    if first == "heading_open":
+        return ("heading", body, int(tokens[0].tag[1]))
+    if first == "hr":
+        return ("rule", s, None)
+    if first == "bullet_list_open":
+        return ("bullet", body, None)
+    if first == "ordered_list_open":
+        item = tokens[1]
+        return ("number", body, item.info or str(tokens[0].attrs.get("start", 1)))
+    if first == "blockquote_open":
+        return ("quote", body, None)
+    if first == "paragraph_open" and inline is not None:
+        kids = [c for c in inline.children if not (c.type == "text" and not c.content.strip())]
+        if len(kids) == 1 and kids[0].type == "image":
+            img = kids[0]
+            return ("image", img.content,
+                    md_parser().normalizeLinkText(str(img.attrs.get("src", ""))))
     return ("text", s, None)
+
+
+# ---------------------------------------------------------------------------
+# I blocchi del libro
+# ---------------------------------------------------------------------------
+def _lines(runs):
+    """Tratti di un paragrafo del motore -> righe. In RuscaWriter ogni a capo
+    va a capo anche nel libro (specifiche, sezione 1.2): le righe scritte una
+    sotto l'altra non si fondono in un paragrafo solo, come in CommonMark."""
+    lines = [[]]
+    for text, style in runs:
+        if style in (_SOFT, _HARD):
+            lines.append([])
+        else:
+            lines[-1].append((text, style))
+    return [_merge(line) for line in lines]
+
+
+def _is_image_line(line):
+    real = [r for r in line if not (r[1] != "image" and not r[0].strip())]
+    return len(real) == 1 and real[0][1] == "image"
+
+
+def _text_runs(line):
+    """Una riga di tratti senza immagini: un'immagine dentro il testo diventa
+    la sua didascalia."""
+    return _merge([(t[0], "regular") if st == "image" else (t, st) for t, st in line])
+
+
+def _book_paragraph(node, out):
+    """Un paragrafo del motore: righe di testo e figure (una riga che è solo
+    un'immagine)."""
+    inline = node.children[0].children if node.children else []
+    lines = []
+    for line in _lines(_runs(inline)):
+        if _is_image_line(line):
+            if lines:
+                out.append(("p", lines))
+                lines = []
+            caption, name = next(r[0] for r in line if r[1] == "image")
+            out.append(("image", caption, name))
+        else:
+            lines.append(_text_runs(line))
+    if lines:
+        out.append(("p", lines))
+
+
+def _book_list(node):
+    ordered = node.type == "ordered_list"
+    start = int(node.attrs.get("start", 1)) if ordered else 1
+    items = []
+    for item in node.children:
+        task = None
+        if "task-list-item" in str(item.attrs.get("class", "")):
+            first = item.children[0] if item.children else None
+            inline = first.children[0].children if first is not None and first.children else []
+            box = next((x for x in inline if x.type == "html_inline"), None)
+            task = box is not None and "checked" in box.content
+        items.append((task, _book_blocks(item.children)))
+    return ("list", ordered, start, items)
+
+
+def _book_blocks(nodes):
+    out = []
+    for n in nodes:
+        t = n.type
+        if t == "paragraph":
+            _book_paragraph(n, out)
+        elif t == "heading":
+            inline = n.children[0].children if n.children else []
+            runs = [r for line in _lines(_runs(inline)) for r in _text_runs(line)]
+            out.append(("heading", int(n.tag[1]), _merge(runs)))
+        elif t in ("bullet_list", "ordered_list"):
+            out.append(_book_list(n))
+        elif t == "blockquote":
+            out.append(("quote", _book_blocks(n.children)))
+        elif t == "table":
+            aligns, header, rows = [], [], []
+            for section in n.children:
+                for tr in section.children:
+                    cells = []
+                    for cell in tr.children:
+                        inline = cell.children[0].children if cell.children else []
+                        cells.append(_text_runs([r for line in _lines(_runs(inline)) for r in line]))
+                        if section.type == "thead":
+                            style = str(cell.attrs.get("style", ""))
+                            aligns.append(style.split(":", 1)[1] if ":" in style else "left")
+                    if section.type == "thead":
+                        header = cells
+                    else:
+                        rows.append(cells)
+            out.append(("table", aligns, header, rows))
+        elif t == "hr":
+            out.append(("rule",))
+        elif t in ("fence", "code_block"):
+            lang = n.info.split()[0] if t == "fence" and n.info.strip() else ""
+            body = n.content[:-1] if n.content.endswith("\n") else n.content
+            out.append(("code", lang, body))
+        elif t.startswith("math_block"):
+            out.append(("math", latex_to_text(n.content.strip())))
+        elif t == "footnote_block":
+            out.append(("rule",))
+            for note in n.children:
+                sub = _book_blocks(note.children)
+                label = f"[{note.meta['id'] + 1}] "
+                if sub and sub[0][0] == "p":
+                    first = sub[0][1]
+                    sub[0] = ("p", [_merge([(label, "regular")] + first[0])] + first[1:])
+                else:
+                    sub.insert(0, ("p", [[(label, "regular")]]))
+                out.extend(sub)
+        elif n.children:
+            out.extend(_book_blocks(n.children))
+    return out
+
+
+def book_blocks(text):
+    """Il Markdown di un capitolo come blocchi del libro, dal motore comune
+    (CommonMark con le estensioni delle specifiche, sezione 1.2). Tutti gli
+    export e l'anteprima partono da qui, quindi mostrano la stessa cosa.
+
+        ("heading", livello, tratti)
+        ("p", righe)                       righe = [tratti, ...]: ogni a capo
+                                           del testo va a capo anche nel libro
+        ("image", didascalia, nome)        una riga che è solo un'immagine
+        ("list", numerato, inizio, voci)   voci = [(attività, blocchi), ...];
+                                           attività None, True (fatta), False
+        ("quote", blocchi)
+        ("table", allineamenti, intestazione, righe)   celle = tratti
+        ("rule",)
+        ("code", lingua, testo)
+        ("math", testo)                    formula su righe proprie, in simboli
+
+    tratti = [(testo, stile)], stile in INLINE_STYLES. Le note a piè di
+    pagina del Markdown ([^1]) finiscono in fondo, dopo un filetto."""
+    tree = SyntaxTreeNode(md_parser().parse((text or "").replace("\r\n", "\n")))
+    return _book_blocks(tree.children)
+
+
+def list_lines(block, depth=0):
+    """Le voci di un elenco come righe da impaginare una sotto l'altra:
+    (profondità, segno, tratti, blocco) dove segno è «•», «3.», «☐» o «☑»
+    sulla prima riga di ogni voce e "" sulle righe che la continuano; blocco
+    è None per le righe di testo, o un blocco non testuale (immagine,
+    tabella, codice…) dentro la voce."""
+    _kind, ordered, start, items = block
+    for k, (task, blocks) in enumerate(items):
+        mark = ("☑" if task else "☐") if task is not None else (f"{start + k}." if ordered else "•")
+        first = True
+        for b in blocks:
+            if b[0] == "p":
+                for line in b[1]:
+                    yield depth, mark if first else "", line, None
+                    first = False
+            elif b[0] == "list":
+                yield from list_lines(b, depth + 1)
+            else:
+                yield depth, mark if first else "", [], b
+                first = False
+        if first:
+            yield depth, mark, [], None
+
+
+def plain_runs(runs):
+    """Testo semplice di una riga di tratti."""
+    return "".join(t for t, _st in runs)
+
+
+def block_images(blocks):
+    """Nomi delle immagini (righe ![didascalia](nome)) nei blocchi, in ordine."""
+    for b in blocks:
+        if b[0] == "image":
+            yield b[2]
+        elif b[0] == "quote":
+            yield from block_images(b[1])
+        elif b[0] == "list":
+            for _task, sub in b[3]:
+                yield from block_images(sub)
+
+
+_RE_QUOTE_PREFIX = re.compile(r"^[ \t]*(?:>[ \t]?)+")
+
+
+def commonmark_paragraphs(text):
+    """Il testo di un capitolo scritto per CommonMark: una riga vuota fra le
+    righe che in RuscaWriter vanno a capo e per CommonMark sarebbero un
+    paragrafo solo (non dopo un a capo forzato, che CommonMark conosce già).
+    Serve all'export Markdown: chi apre il file con RuscaMark, o su GitHub,
+    vede gli stessi paragrafi del libro. Le righe dentro gli elenchi restano
+    come sono: lì una riga vuota cambierebbe l'elenco."""
+    lines = text.split("\n")
+    insert = {}                            # riga -> riga vuota (con i «>») dopo
+    in_list = 0
+    for tok in parse_source(text):
+        if tok.type in ("bullet_list_open", "ordered_list_open"):
+            in_list += 1
+        elif tok.type in ("bullet_list_close", "ordered_list_close"):
+            in_list -= 1
+        elif tok.type == "paragraph_open" and tok.map and not in_list:
+            l0, l1 = tok.map
+            m = _RE_QUOTE_PREFIX.match(lines[l0])
+            prefix = m.group(0).rstrip() if m else ""
+            for i in range(l0, min(l1, len(lines)) - 1):
+                if lines[i].endswith("  ") or lines[i].rstrip().endswith("\\"):
+                    continue
+                insert[i] = prefix
+    out = []
+    for i, line in enumerate(lines):
+        if i - 1 in insert and insert[i - 1] and not line.lstrip().startswith(">"):
+            line = insert[i - 1] + " " + line.lstrip()      # riga «pigra» di citazione
+        out.append(line)
+        if i in insert:
+            out.append(insert[i])
+    return "\n".join(out)
 
 
 # EN/IT: the two machine-written lines Project Gutenberg wraps every book in.
@@ -1842,7 +2154,8 @@ def write_pdf(path, chapters, title="",
     #        font del libro non ha
     fb_use, fb_fonts, fb_drop = {}, [], set()
     if reg and reg.get("uni2gid"):
-        texts = [title or ""] + [t for t in (chapter_titles or []) if isinstance(t, str)]
+        # i segni degli elenchi non sono nel sorgente (lì c'è «- [x]»)
+        texts = [title or "", "•☐☑"] + [t for t in (chapter_titles or []) if isinstance(t, str)]
         for ch_paras in chapters:
             for para in ch_paras:
                 if isinstance(para, str):
@@ -2228,7 +2541,9 @@ def write_pdf(path, chapters, title="",
         ncol = len(header)
 
         def segs_of(text, head):
-            segs = _parse_inline_md(text)
+            # celle già analizzate (book_blocks) o testo Markdown
+            segs = (_parse_inline_md(text) if isinstance(text, str) else
+                    [(t, "regular" if st == "code" else st) for t, st in text] or [("", "regular")])
             if head:
                 segs = [(t, "bolditalic" if "italic" in st else "bold") for t, st in segs]
             return segs
@@ -2294,91 +2609,131 @@ def write_pdf(path, chapters, title="",
             pages_so_far += 1
         # all'inizio del capitolo, la sua prima pagina e' (pagine_finora + 1)
         chapter_start_page.append(pages_so_far + 1)
-        for para in paragraphs:
-            para_lines = para.split("\n")
-            li_para = 0
-            while li_para < len(para_lines):
-                raw_line = para_lines[li_para]
-                li_para += 1
-                # EN: a Markdown table: laid out as a real table.
-                # IT: una tabella Markdown: impaginata come tabella vera.
-                if _HR_RE.match(raw_line):
-                    # EN/IT: a short centred rule, as in books / un filetto
-                    #        corto e centrato, come nei libri
-                    if y - leading < bottom_y and cur_lines:
-                        flush_page()
-                        pages_so_far += 1
-                    mid = left_margin + usable_w / 2.0
-                    cur_lines.append(("rule", mid - usable_w * 0.15, y + leading * 0.3,
-                                      mid + usable_w * 0.15, 0.5))
-                    y -= leading
-                    continue
-                tbl = table_at(para_lines, li_para - 1)
-                if tbl:
-                    pages_so_far += layout_table(*tbl[:3])
-                    li_para = tbl[3]
-                    continue
-                # EN: a line that is ONLY ![caption](name) places the
-                #     attached image, centered and scaled to the text width
-                #     (never upscaled), followed by an italic caption. If the
-                #     image does not fit the remaining space, it moves to a
-                #     new page first.
-                # IT: una riga che e' SOLO ![didascalia](nome) colloca
-                #     l'immagine allegata, centrata e scalata alla larghezza
-                #     del testo (mai ingrandita), seguita dalla didascalia in
-                #     corsivo. Se l'immagine non entra nello spazio rimasto,
-                #     passa prima a una pagina nuova.
-                mimg = _IMG_LINE_RE.match(raw_line.strip())
-                if mimg and mimg.group("src") in chapter_images:
-                    _jpg, iw, ih = chapter_images[mimg.group("src")]
-                    max_h = (content_top_y - bottom_y) * 0.60
-                    scale = min(usable_w / iw, max_h / ih, 1.0)
-                    draw_w, draw_h = iw * scale, ih * scale
-                    if y - draw_h < bottom_y and cur_lines:
-                        flush_page()
-                        pages_so_far += 1
-                    ix = left_margin + (usable_w - draw_w) / 2.0
-                    # EN/IT: special entry, handled at page-emission time /
-                    # voce speciale, gestita al momento dell'emissione pagina
-                    cur_lines.append(("img", mimg.group("src"),
-                                      ix, y - draw_h, draw_w, draw_h))
-                    y -= draw_h + leading * 0.5
-                    alt = mimg.group("alt").strip()
-                    if alt:
-                        cap_sz = font_size * 0.85
-                        for row in _wrap_centered(alt, cap_sz):
-                            if y < bottom_y:
-                                flush_page()
-                                pages_so_far += 1
-                            lw = seg_w(row, cap_sz)
-                            # centrata sulla gabbia, non sulla pagina: il
-                            # blocco viene poi spostato per la rilegatura
-                            cur_lines.append((left_margin + (usable_w - lw) / 2.0,
-                                              y, [(row, "italic")], cap_sz))
-                            y -= cap_sz * 1.4
-                        y -= leading * 0.3
-                    continue
-                segments, sz, indent, extra, _force = parse_md_line(raw_line, font_size)
-                line_leading = leading * (sz / font_size)
-                avail = usable_w - indent
-                # EN: the LAST wrapped line of a paragraph line is never
-                #     justified (it would look stretched); headings (_force ==
-                #     "bold") are never justified either.
-                # IT: l'ULTIMA riga spezzata di una riga-paragrafo non si
-                #     giustifica mai (apparirebbe dilatata); nemmeno le
-                #     intestazioni (_force == "bold") si giustificano.
-                wrapped = wrap_segments(segments, sz, avail)
-                can_justify = justify and _force != "bold"
-                for li, run_line in enumerate(wrapped):
+        def pdf_runs(runs, force=None):
+            """Tratti -> segmenti del PDF: il codice in tondo, perché
+            l'impaginatore conosce solo tondo, grassetto, corsivo e
+            grassetto-corsivo; force impone uno stile (titoli, citazioni)."""
+            segs = []
+            for t, st in runs:
+                st = "regular" if st == "code" else st
+                if force == "italic":
+                    st = "italic" if st == "regular" else st
+                elif force:
+                    st = force
+                segs.append((t, st))
+            return segs or [("", "regular")]
+
+        def text_line(segments, sz, indent, extra=0.0, force=None, centered=False):
+            """Una riga del testo, che va a capo nella gabbia. L'ULTIMA riga
+            spezzata non si giustifica mai (apparirebbe dilatata), e nemmeno
+            i titoli (force == "bold")."""
+            nonlocal y, pages_so_far
+            line_leading = leading * (sz / font_size)
+            avail = usable_w - indent
+            wrapped = wrap_segments(segments, sz, avail)
+            can_justify = justify and force != "bold" and not centered
+            for li, run_line in enumerate(wrapped):
+                if y < bottom_y:
+                    flush_page()
+                    pages_so_far += 1
+                is_last = (li == len(wrapped) - 1)
+                jw = avail if (can_justify and not is_last) else None
+                x = left_margin + indent
+                if centered:
+                    x = left_margin + (usable_w - sum(seg_w(t, sz) for t, _s in run_line)) / 2.0
+                cur_lines.append((x, y, run_line, sz, jw))
+                y -= line_leading
+            if extra:
+                y -= extra
+
+        def rule_line():
+            """Un filetto corto e centrato, come nei libri."""
+            nonlocal y, pages_so_far
+            if y - leading < bottom_y and cur_lines:
+                flush_page()
+                pages_so_far += 1
+            mid = left_margin + usable_w / 2.0
+            cur_lines.append(("rule", mid - usable_w * 0.15, y + leading * 0.3,
+                              mid + usable_w * 0.15, 0.5))
+            y -= leading
+
+        def image_block(caption, name):
+            """Una riga che è solo ![didascalia](nome) colloca l'immagine
+            allegata, centrata e scalata alla larghezza del testo (mai
+            ingrandita), seguita dalla didascalia in corsivo. Se non entra
+            nello spazio rimasto, passa prima a una pagina nuova. Un'immagine
+            che non è nel progetto lascia la sola didascalia."""
+            nonlocal y, pages_so_far
+            if name not in chapter_images:
+                text_line(pdf_runs([(caption, "italic")]), font_size, 0.0)
+                return
+            _jpg, iw, ih = chapter_images[name]
+            max_h = (content_top_y - bottom_y) * 0.60
+            scale = min(usable_w / iw, max_h / ih, 1.0)
+            draw_w, draw_h = iw * scale, ih * scale
+            if y - draw_h < bottom_y and cur_lines:
+                flush_page()
+                pages_so_far += 1
+            ix = left_margin + (usable_w - draw_w) / 2.0
+            # voce speciale, gestita al momento dell'emissione pagina
+            cur_lines.append(("img", name, ix, y - draw_h, draw_w, draw_h))
+            y -= draw_h + leading * 0.5
+            alt = caption.strip()
+            if alt:
+                cap_sz = font_size * 0.85
+                for row in _wrap_centered(alt, cap_sz):
                     if y < bottom_y:
                         flush_page()
                         pages_so_far += 1
-                    is_last = (li == len(wrapped) - 1)
-                    jw = avail if (can_justify and not is_last) else None
-                    cur_lines.append((left_margin + indent, y, run_line, sz, jw))
-                    y -= line_leading
-                if extra:
-                    y -= extra
+                    lw = seg_w(row, cap_sz)
+                    # centrata sulla gabbia, non sulla pagina: il blocco
+                    # viene poi spostato per la rilegatura
+                    cur_lines.append((left_margin + (usable_w - lw) / 2.0,
+                                      y, [(row, "italic")], cap_sz))
+                    y -= cap_sz * 1.4
+                y -= leading * 0.3
+
+        def blocks_out(blocks, indent=0.0, quote=False):
+            nonlocal pages_so_far
+            force = "italic" if quote else None
+            for b in blocks:
+                kind = b[0]
+                if kind == "heading":
+                    lvl = b[1]
+                    sz = font_size * _HEADING_SCALE[lvl]
+                    text_line([(plain_runs(b[2]), "bold")], sz, indent, font_size * 0.4, "bold")
+                elif kind == "p":
+                    for line in b[1]:
+                        text_line(pdf_runs(line, force), font_size, indent, force=force)
+                elif kind == "list":
+                    for depth, mark, line, inner in list_lines(b):
+                        ind = indent + font_size * 1.2 * (depth + 1)
+                        if inner is not None:
+                            blocks_out([inner], ind, quote)
+                            continue
+                        if reg is None:     # caratteri standard del PDF: solo Latin-1
+                            mark = {"☑": "[x]", "☐": "[ ]"}.get(mark, mark)
+                        segs = ([(mark + " ", "regular")] if mark else []) + pdf_runs(line, force)
+                        text_line(segs, font_size, ind, force=force)
+                elif kind == "quote":
+                    blocks_out(b[1], indent + font_size * 1.2, True)
+                elif kind == "image":
+                    image_block(b[1], b[2])
+                elif kind == "table":
+                    pages_so_far += layout_table(b[1], b[2], b[3])
+                elif kind == "rule":
+                    rule_line()
+                elif kind == "code":
+                    for code_line in b[2].split("\n"):
+                        text_line([(code_line, "regular")], font_size, indent + font_size * 1.2)
+                elif kind == "math":
+                    text_line([(b[1], "regular")], font_size, indent, centered=True)
+
+        # Il capitolo arriva come paragrafi separati da righe vuote; il
+        # motore lo legge tutto insieme (book_blocks) e dopo ogni blocco
+        # resta mezza interlinea, come fra i paragrafi di prima.
+        for block in book_blocks("\n\n".join(paragraphs)):
+            blocks_out([block])
             y -= leading * 0.5
     flush_page()
     pages_so_far += 1
@@ -3679,11 +4034,9 @@ class Project:
         solo queste)."""
         seen = []
         for ch in self.chapters:
-            for line in ch.text.split("\n"):
-                m = _IMG_LINE_RE.match(line.strip())
-                if m and m.group("src") in self.images \
-                        and m.group("src") not in seen:
-                    seen.append(m.group("src"))
+            for name in block_images(book_blocks(ch.text)):
+                if name in self.images and name not in seen:
+                    seen.append(name)
         return seen
 
     # ---- creazione / caricamento -------------------------------------------
@@ -4220,7 +4573,8 @@ class Project:
                         out.write(f"*{ln}*\n\n")
                 out.write("---\n\n")
             for ch_title, text in self._ordered_chapters():
-                body = rewrite_refs(text.rstrip("\n"))
+                # ogni a capo di RuscaWriter è un paragrafo anche per CommonMark
+                body = rewrite_refs(commonmark_paragraphs(text.rstrip("\n")))
                 # EN: if the text already opens with a Markdown heading we do
                 #     not add a duplicate title.
                 # IT: se il testo inizia già con un'intestazione markdown, non
@@ -4287,50 +4641,55 @@ class Project:
 
     def _doc_blocks(self, text):
         """EN: Turn a chapter's Markdown into a list of (kind, content)
-        blocks shared by the ODT and DOCX exports. Kinds: h1/h2/h3, bullet,
-        quote, p, image (content = (caption, internal_name)) and table
-        (content = (alignments, header, rows)). Inline
-        formatting is stripped (plain text) to stay simple and robust.
+        blocks shared by the ODT and DOCX exports, from book_blocks. Kinds:
+        h1/h2/h3, bullet, quote, p, rule, image (content = (caption,
+        internal_name)) and table (content = (alignments, header, rows)).
+        Inline formatting is stripped (plain text) to stay simple and robust.
         IT: Trasforma il markdown di un capitolo in una lista di blocchi
-        (tipo, contenuto) usata sia da ODT sia da DOCX. Tipi: h1/h2/h3,
-        bullet, quote, p e image (contenuto = (didascalia, nome_interno)).
-        La formattazione inline viene rimossa (testo piano) per restare
-        semplice e robusta."""
-        blocks = []
-        lines = render_math(text).split("\n")
-        i = 0
-        while i < len(lines):
-            raw = lines[i]
-            tbl = table_at(lines, i)
-            if tbl:
-                # EN/IT: ("table", (alignments, header, rows)), plain cells
-                aligns, header, rows, i = tbl
-                blocks.append(("table", (aligns, [_strip_inline_md(c) for c in header],
-                                         [[_strip_inline_md(c) for c in r] for r in rows])))
-                continue
-            i += 1
-            if _HR_RE.match(raw):
-                blocks.append(("rule", None))     # EN/IT: separator / separatore
-                continue
-            kind, body, extra = classify_md_line(raw)
-            if kind == "blank":
-                continue
-            if kind == "image":
-                # un riferimento rotto (immagine non piu' nel progetto) non e'
-                # una figura: resta un paragrafo con la sola didascalia
-                if extra in self.images:
-                    blocks.append(("image", (body, extra)))
-                else:
-                    blocks.append(("p", _strip_inline_md(body)))
-            elif kind == "heading":
-                blocks.append((f"h{min(3, extra)}", _strip_inline_md(body)))
-            elif kind in ("bullet", "number"):
-                blocks.append(("bullet", _strip_inline_md(body)))
-            elif kind == "quote":
-                blocks.append(("quote", _strip_inline_md(body)))
-            else:
-                blocks.append(("p", _strip_inline_md(body)))
-        return blocks
+        (tipo, contenuto) usata sia da ODT sia da DOCX, a partire da
+        book_blocks. Tipi: h1/h2/h3, bullet, quote, p, rule, image
+        (contenuto = (didascalia, nome_interno)) e table (contenuto =
+        (allineamenti, intestazione, righe)). La formattazione inline viene
+        rimossa (testo piano) per restare semplice e robusta."""
+        out = []
+
+        def walk(blocks, quote=False):
+            para = "quote" if quote else "p"
+            for b in blocks:
+                kind = b[0]
+                if kind == "heading":
+                    out.append((f"h{min(3, b[1])}", plain_runs(b[2])))
+                elif kind == "p":
+                    out.extend((para, plain_runs(line)) for line in b[1])
+                elif kind == "list":
+                    for _depth, mark, line, inner in list_lines(b):
+                        if inner is not None:
+                            walk([inner], quote)
+                        elif mark:
+                            prefix = "" if mark in ("•",) or mark[0].isdigit() else mark + " "
+                            out.append(("bullet", prefix + plain_runs(line)))
+                        else:
+                            out.append((para, plain_runs(line)))
+                elif kind == "quote":
+                    walk(b[1], True)
+                elif kind == "image":
+                    # un riferimento rotto (immagine non piu' nel progetto)
+                    # non e' una figura: resta un paragrafo con la didascalia
+                    if b[2] in self.images:
+                        out.append(("image", (b[1], b[2])))
+                    else:
+                        out.append(("p", b[1]))
+                elif kind == "table":
+                    out.append(("table", (b[1], [plain_runs(c) for c in b[2]],
+                                          [[plain_runs(c) for c in r] for r in b[3]])))
+                elif kind == "rule":
+                    out.append(("rule", None))
+                elif kind == "code":
+                    out.extend((para, ln) for ln in b[2].split("\n"))
+                elif kind == "math":
+                    out.append((para, b[1]))
+        walk(book_blocks(text))
+        return out
 
     def _blocks_to_html(self, text, image_html=None):
         """EN: Convert a chapter's Markdown to HTML (list of strings),
@@ -4369,12 +4728,8 @@ class Project:
             "regular": ("", ""),
         }
 
-        def inline(s):
-            parts = []
-            for seg, style in parse_inline(s):
-                open_t, close_t = _WRAP[style]
-                parts.append(f"{open_t}{esc(seg)}{close_t}")
-            return "".join(parts)
+        def inline(runs):
+            return "".join(f"{_WRAP[st][0]}{esc(seg)}{_WRAP[st][1]}" for seg, st in runs)
 
         def table_html(aligns, header, rows):
             def cells(tag, values):
@@ -4387,59 +4742,45 @@ class Project:
             return (f"<table><thead><tr>{cells('th', header)}</tr></thead>"
                     f"<tbody>{body_rows}</tbody></table>")
 
-        out = []
-        lines = render_math(text).split("\n")
-        kinds = [classify_md_line(ln) for ln in lines]
-        i = 0
-        while i < len(lines):
-            kind, body, extra = kinds[i]
-            tbl = table_at(lines, i)
-            if tbl:
-                out.append(table_html(*tbl[:3]))
-                i = tbl[3]
-                continue
-            if _HR_RE.match(lines[i]):
-                out.append("<hr/>")
-                i += 1
-                continue
-            if kind == "blank":
-                i += 1
-                continue
-            if kind == "image":
-                # EN: attached image; if the reference is broken (image not in
-                #     the project) fall back to showing the caption only.
-                # IT: immagine allegata; se il riferimento e' rotto (immagine
-                #     assente dal progetto) ripiega sulla sola didascalia.
-                fig = figure(body, extra) if extra in self.images else None
-                out.append(fig if fig else f"<p><em>{esc(body)}</em></p>")
-                i += 1
-            elif kind == "heading":
-                out.append(f"<h{extra}>{inline(body)}</h{extra}>")
-                i += 1
-            elif kind in ("bullet", "number"):
-                # elenco: accorpa le righe contigue dello stesso tipo
-                tag = "ul" if kind == "bullet" else "ol"
-                items = []
-                while i < len(lines) and kinds[i][0] == kind:
-                    items.append(f"<li>{inline(kinds[i][1])}</li>")
-                    i += 1
-                out.append(f"<{tag}>" + "".join(items) + f"</{tag}>")
-            elif kind == "quote":
-                out.append(f"<blockquote>{inline(body)}</blockquote>")
-                i += 1
-            else:
-                # EN: plain paragraph: merge contiguous lines, but stop at any
-                #     block starter (heading, list, quote, attached image).
-                # IT: paragrafo semplice: accorpa righe contigue, ma si ferma
-                #     a ogni inizio blocco (titolo, elenco, citazione,
-                #     immagine allegata).
-                buf = []
-                while (i < len(lines) and kinds[i][0] == "text"
-                       and not (buf and (table_at(lines, i) or _HR_RE.match(lines[i])))):
-                    buf.append(inline(kinds[i][1]))
-                    i += 1
-                out.append("<p>" + "<br/>".join(buf) + "</p>")
-        return out
+        def lines_html(lines):
+            # ogni a capo del testo va a capo anche qui, come nel PDF
+            return "<br/>".join(inline(line) for line in lines)
+
+        def blocks_html(blocks, tight=False):
+            out = []
+            for b in blocks:
+                kind = b[0]
+                if kind == "heading":
+                    out.append(f"<h{b[1]}>{inline(b[2])}</h{b[1]}>")
+                elif kind == "p":
+                    out.append(lines_html(b[1]) if tight else f"<p>{lines_html(b[1])}</p>")
+                elif kind == "list":
+                    _k, ordered, start, items = b
+                    tag = "ol" if ordered else "ul"
+                    attr = f' start="{start}"' if ordered and start != 1 else ""
+                    lis = []
+                    for task, sub in items:
+                        box = ("☑ " if task else "☐ ") if task is not None else ""
+                        lis.append(f"<li>{box}{''.join(blocks_html(sub, tight=True))}</li>")
+                    out.append(f"<{tag}{attr}>" + "".join(lis) + f"</{tag}>")
+                elif kind == "quote":
+                    out.append("<blockquote>" + "".join(blocks_html(b[1])) + "</blockquote>")
+                elif kind == "image":
+                    # immagine allegata; se il riferimento e' rotto (immagine
+                    # assente dal progetto) ripiega sulla sola didascalia
+                    fig = figure(b[1], b[2]) if b[2] in self.images else None
+                    out.append(fig if fig else f"<p><em>{esc(b[1])}</em></p>")
+                elif kind == "table":
+                    out.append(table_html(b[1], b[2], b[3]))
+                elif kind == "rule":
+                    out.append("<hr/>")
+                elif kind == "code":
+                    out.append(f"<pre><code>{esc(b[2])}</code></pre>")
+                elif kind == "math":
+                    out.append(f'<p class="math">{esc(b[1])}</p>')
+            return out
+
+        return blocks_html(book_blocks(text))
 
     # foglio di stile condiviso dalle pagine HTML esportate
     _HTML_CSS = (

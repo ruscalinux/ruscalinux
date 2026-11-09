@@ -106,6 +106,8 @@ Un progetto è un file `.rwr`: un archivio `tar.gz` che contiene un file Markdow
 
 **Ricuci i paragrafi** (menu principale) unisce le righe spezzate a mano, per esempio nei testi incollati da un PDF.
 
+Il Markdown segue lo standard CommonMark, come in RuscaMark e RuscaLLama: anteprima, evidenziazione ed export lo leggono tutti allo stesso modo. Oltre a titoli, grassetto, corsivo, elenchi, citazioni, link, immagini e tabelle si possono usare blocchi di codice tra tre apici, liste di attività (`- [x]`), note a piè di pagina (`testo[^1]` e, più sotto, `[^1]: la nota`, che finiscono in fondo al capitolo) e formule (`$x^2$`, che diventano simboli). Una sola regola è diversa da CommonMark, perché in un libro è più naturale: **ogni a capo va a capo anche nel libro**, e le righe scritte una sotto l'altra non si fondono in un unico paragrafo. Una riga vuota separa i blocchi di testo. Esportando in Markdown, RuscaWriter aggiunge le righe vuote che servono perché il file si legga allo stesso modo con qualunque programma che segue CommonMark.
+
 ---
 
 ## 6. Vista e aspetto

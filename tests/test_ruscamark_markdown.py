@@ -127,7 +127,7 @@ class Live(unittest.TestCase):
         out = []
         for _a, _z, styles, hides in rm.live_elements(text):
             out += [(name, text[x:y]) for name, x, y in styles if name != "block"]
-            out += [("hide", text[x:y]) for x, y in hides]
+            out += [(h[2] if len(h) > 2 else "hide", text[h[0]:h[1]]) for h in hides]
         return out
 
     def test_inline_like_the_preview(self):
@@ -171,6 +171,37 @@ class Live(unittest.TestCase):
         self.assertIn(("fnref", "[^n]"), got)
         self.assertIn(("fndef", "[^n]: La **nota**."), got)
         self.assertIn(("bold", "nota"), got)
+
+    def conditional(self, text):
+        """Marcatori nascosti e stili che valgono col cursore lontano."""
+        out = []
+        for _a, _z, _styles, hides in rm.live_elements(text):
+            out += [(h[2] if len(h) > 2 else "hide", text[h[0]:h[1]]) for h in hides]
+        return out
+
+    def test_math(self):
+        got = self.styled("$E=mc^2$, $x_{i+1}$, \\(a^b\\) e $5 e $10.")
+        self.assertIn(("math", "E=mc^2"), got)
+        self.assertNotIn("math", [n for n, t in got if "5" in t])   # prezzi, non formule
+        cond = self.conditional("$E=mc^2$ e $x_{i+1}$")
+        self.assertIn(("hide", "$"), cond)
+        self.assertIn(("hide", "^"), cond)
+        self.assertIn(("sup", "2"), cond)
+        self.assertIn(("hide", "_{"), cond)
+        self.assertIn(("sub", "i+1"), cond)
+
+    def test_display_math(self):
+        cond = self.conditional("$$\n\\frac{a}{b}\n$$\n\n$$ y $$ (1)")
+        self.assertEqual([t for n, t in cond if n == "hide"], ["$$", "$$", "$$", "$$"])
+        got = self.styled("$$\nx\n$$")
+        self.assertIn(("math_block", "x\n"), got)
+
+    def test_backslashes(self):
+        cond = self.conditional("\\*non corsivo\\* e a capo\\\nqui")
+        self.assertEqual(cond, [("hide", "\\"), ("hide", "\\"), ("hide", "\\")])
+
+    def test_horizontal_rule(self):
+        self.assertIn(("hr_bar", "***\n"), self.conditional("a\n\n***\n\nb"))
 
     def test_table_keeps_markers(self):
         got = self.styled("| a | *b* |\n|---|---|\n| 1 | 2 |")

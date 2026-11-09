@@ -189,18 +189,6 @@ def save_settings(cfg):
         pass
 
 
-def split_code(text):
-    """Divide una risposta in parti di testo e blocchi ```lingua ... ```."""
-    parts = []
-    for chunk in re.split(r"(```[^\n`]*\n.*?```)", text, flags=re.S):
-        if chunk.startswith("```") and chunk.endswith("```"):
-            first, _sep, rest = chunk[3:-3].partition("\n")
-            parts.append(("code", first.strip().lower(), rest.rstrip("\n")))
-        elif chunk.strip():
-            parts.append(("text", "", chunk.strip("\n")))
-    return parts
-
-
 def strip_think(text):
     """Toglie i blocchi <think> dei modelli che non usano reasoning_content."""
     think = "\n".join(m.strip() for m in re.findall(r"<think>(.*?)</think>", text, re.S))
@@ -1363,15 +1351,10 @@ class RuscaLLamaWindow(FontSizeMixin, Adw.ApplicationWindow):
             if fmt == "md":
                 rows.append(f"**{who}:**\n\n{text}\n")
             else:
-                body = []
-                for kind, lang, part in split_code(text):
-                    esc = html.escape(part)
-                    body.append(f"<pre><code class=\"language-{html.escape(lang)}\">{esc}</code></pre>"
-                                if kind == "code" else
-                                "".join(f"<p>{p.replace(chr(10), '<br>')}</p>"
-                                        for p in esc.split("\n\n")))
+                # Markdown reso dal motore comune, come nella chat: grassetti,
+                # elenchi, tabelle e formule, non i loro marcatori.
                 rows.append(f"<section class=\"{m['role']}\"><h2>{html.escape(who)}</h2>"
-                            + "".join(body) + "</section>")
+                            + md.render_html(text) + "</section>")
         title = _("conversation_title")
         if fmt == "md":
             return f"# {APP_NAME} — {title}\n\n" + "\n".join(rows)
@@ -1381,7 +1364,10 @@ class RuscaLLamaWindow(FontSizeMixin, Adw.ApplicationWindow):
                 "line-height:1.5;color:#2d0a1d;background:#fbf4f7}"
                 "h2{font-size:1em;color:#7a2357}section{margin-bottom:1.5em}"
                 "pre{background:#fff;border:1px solid #e6cbd8;border-radius:6px;"
-                "padding:.75em;overflow:auto}</style></head><body>"
+                "padding:.75em;overflow:auto}"
+                "table{border-collapse:collapse}th,td{border:1px solid #e6cbd8;padding:.3em .6em}"
+                "blockquote{border-left:3px solid #7a2357;margin-left:0;padding-left:1em}"
+                ".math{font-style:italic}</style></head><body>"
                 f"<h1>{APP_NAME} — {html.escape(title)}</h1>" + "".join(rows)
                 + "</body></html>\n")
 
@@ -1431,8 +1417,7 @@ class RuscaLLamaWindow(FontSizeMixin, Adw.ApplicationWindow):
 
     def save_code(self):
         msg = self._target_message()
-        blocks = [(lang, body) for kind, lang, body in split_code(msg.text if msg else "")
-                  if kind == "code"]
+        blocks = md.code_blocks(msg.text if msg else "")
         if not blocks:
             self.toasts.add_toast(Adw.Toast(title=_("no_code")))
             return

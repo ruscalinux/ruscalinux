@@ -39,7 +39,7 @@ from gi.repository import Adw, Gtk, Gdk, Gio, GLib, Pango, GdkPixbuf
 # una volta e si copia. Formule LaTeX -> simboli Unicode (E = mc², ≈, √…).
 from markdown_it.tree import SyntaxTreeNode
 from rusca_markdown import parser as md_parser, latex_to_pango, plain_text as _pango_plain
-from rusca_markdown import parse_source, link_label_end
+from rusca_markdown import parse_source, link_label_end, inline_mapper
 # Export PDF: GtkPrintOperation + PangoCairo (pacchetto python3-gi-cairo).
 try:
     gi.require_foreign("cairo")
@@ -838,43 +838,31 @@ _RE_QUOTE_MARKS = re.compile(r"^[ \t]*(?:>[ \t]?)+")
 _RE_REF_LINE = re.compile(r"^ {0,3}\[[^\]]+\]:")
 
 
-def _inline_mapper(lines, starts, token):
-    """Funzione posizione-nel-contenuto -> offset nel documento per un token
-    «inline» (le righe del contenuto sono le righe del sorgente senza i
-    prefissi di citazioni, elenchi e titoli), o None se non si ritrovano."""
-    if not token.map:
-        return None
-    parts = token.meta.get("src_content", token.content).split("\n")
-    first = token.map[0]
-    if first + len(parts) > len(lines):
-        return None
-    table = []                                   # (inizio nel contenuto, offset nel documento)
-    pos = 0
-    for i, part in enumerate(parts):
-        line = lines[first + i]
-        if line.endswith(part):
-            off = len(line) - len(part)
-        elif line.rstrip().endswith(part):
-            off = len(line.rstrip()) - len(part)
-        else:
-            off = line.find(part)                # titolo con # di chiusura
-            if off < 0:
-                return None
-        table.append((pos, len(part), starts[first + i] + off))
-        pos += len(part) + 1
+_RE_TEX_SCRIPT = re.compile(r"([\^_])(\{([^{}]*)\}|\\[A-Za-z]+|[^\s{}\\])")
 
-    def to_doc(p):
-        for cstart, length, doc in table:
-            if p <= cstart + length:
-                return doc + max(0, p - cstart)
-        cstart, length, doc = table[-1]
-        return doc + length
-    return to_doc
+
+def _live_math(a, z, to_doc, src, out):
+    """Formula fra a e z (delimitatori esclusi): stile da formula; ^ e _
+    diventano esponenti e pedici (x^2, x_{i+1}), come in TeX."""
+    styles = [("math", to_doc(a), to_doc(z))]
+    marks = []
+    for m in _RE_TEX_SCRIPT.finditer(src, a, z):
+        tag = "sup" if m.group(1) == "^" else "sub"
+        if m.group(3) is not None:                       # ^{…}
+            body_a, body_z = m.start(3), m.end(3)
+            marks += [(to_doc(m.start()), to_doc(body_a)), (to_doc(body_z), to_doc(m.end()))]
+        else:                                            # ^2, ^\alpha
+            body_a, body_z = m.start(2), m.end(2)
+            marks.append((to_doc(m.start()), to_doc(body_a)))
+        marks.append((to_doc(body_a), to_doc(body_z), tag))
+    return styles, marks
 
 
 def _live_inline(token, to_doc, out):
     """Elementi in linea di un paragrafo o titolo."""
     content = token.meta.get("src_content", token.content)
+    for a, z in token.meta.get("escapes", []):          # \* \_ …: via la barra
+        out.append((to_doc(a), to_doc(z), [], [(to_doc(a), to_doc(a + 1))]))
     stack, last = [], 0
     kinds = {"strong": "bold", "em": "italic", "s": "strike", "mark": "mark"}
     children = token.children or []
@@ -937,14 +925,23 @@ def _live_inline(token, to_doc, out):
                         [(to_doc(a), to_doc(a + n)), (to_doc(z - n), to_doc(z))]))
         elif t == "footnote_ref":
             out.append((to_doc(a), to_doc(z), [("fnref", to_doc(a), to_doc(z))], []))
+        elif t in ("math_inline", "math_inline_double"):          # $…$ $$…$$ \(…\)
+            n = len(c.markup) if c.markup else 1
+            styles, marks = _live_math(a + n, z - n, to_doc, content, out)
+            out.append((to_doc(a), to_doc(z), styles,
+                        [(to_doc(a), to_doc(a + n)), (to_doc(z - n), to_doc(z))] + marks))
+        elif t == "hardbreak" and content[a:a + 1] == "\\":    # a capo con «\»
+            out.append((to_doc(a), to_doc(z), [], [(to_doc(a), to_doc(a + 1))]))
         last = max(last, z)
 
 
 def live_elements(text):
     """Elementi della resa live: (inizio, fine, stili, da_nascondere), con
-    stili = [(nome, a, z)] e da_nascondere = [(a, z)], in offset di carattere
-    (come Gtk.TextBuffer). I marcatori si nascondono solo quando il cursore o
-    la selezione non toccano (inizio, fine)."""
+    stili = [(nome, a, z)] e da_nascondere = [(a, z)] o [(a, z, nome)], in
+    offset di carattere (come Gtk.TextBuffer). Gli stili valgono sempre; i
+    marcatori si nascondono (o prendono lo stile «nome», come esponenti e
+    linea orizzontale) solo quando il cursore o la selezione non toccano
+    (inizio, fine): lì riappare il sorgente da modificare."""
     lines = text.split("\n")
     starts, o = [], 0
     for line in lines:
@@ -982,7 +979,7 @@ def live_elements(text):
         elif t == "heading_close":
             heading = None
         elif t == "inline" and table_depth == 0:
-            to_doc = _inline_mapper(lines, starts, tok)
+            to_doc = inline_mapper(lines, starts, tok)
             if to_doc is None:
                 continue
             if heading is not None:
@@ -1008,7 +1005,30 @@ def live_elements(text):
                     out.append((starts[u], starts[u] + len(lines[u]),
                                 [("setext", starts[u], starts[u] + len(lines[u]))], []))
             _live_inline(tok, to_doc, out)
-        elif t in ("fence", "code_block") or t.startswith("math_block"):
+        elif t.startswith("math_block"):                       # $$ … $$
+            l0, l1 = tok.map
+            l1 = min(l1, len(lines))
+            A, Z = starts[l0], starts[l1 - 1] + len(lines[l1 - 1])
+            styles, marks = [], []
+            for i in range(l0, l1):
+                styles.append(("math_block", *span(i)))
+            if l1 - l0 == 1:                                     # $$ x $$ (1)
+                line, a0 = lines[l0], starts[l0]
+                open_ = line.index("$$") + 2 if "$$" in line else 0
+                close = line.rindex("$$") if line.count("$$") >= 2 else len(line)
+                # Solo i $$: il numero dell'equazione, $$ … $$ (1), resta.
+                marks += [(a0, a0 + open_), (a0 + close, a0 + min(close + 2, len(line)))]
+                body = [(a0 + open_, a0 + close)]
+            else:
+                marks += [(starts[l0], starts[l0] + len(lines[l0])),
+                          (starts[l1 - 1], starts[l1 - 1] + len(lines[l1 - 1]))]
+                body = [(starts[i], starts[i] + len(lines[i])) for i in range(l0 + 1, l1 - 1)]
+            for a, z in body:
+                st, mk = _live_math(0, z - a, lambda p, a=a: a + p, text[a:z], out)
+                styles += st
+                marks += mk
+            out.append((A, Z, styles, marks))
+        elif t in ("fence", "code_block"):
             l0, l1 = tok.map
             l1 = min(l1, len(lines))
             A, Z = starts[l0], starts[l1 - 1] + len(lines[l1 - 1])
@@ -1027,7 +1047,8 @@ def live_elements(text):
         elif t == "hr":
             i = tok.map[0]
             out.append((starts[i], starts[i] + len(lines[i]),
-                        [("hr", starts[i], starts[i] + len(lines[i]))], []))
+                        [("hr", starts[i], starts[i] + len(lines[i]))],
+                        [(*span(i), "hr_bar")]))
         elif t == "blockquote_open":
             for i in range(*tok.map):
                 if i >= len(lines) or i in quoted:
@@ -3764,6 +3785,13 @@ class RuscaWindow(Adw.ApplicationWindow):
         mk("fnref", foreground=c["accent"], rise=4 * Pango.SCALE, scale=0.8)
         mk("fndef", foreground=c["subtle"], scale=0.92)
         mk("mark", background=c["selection"], foreground=c["sel_fg"])
+        mk("math", style=Pango.Style.ITALIC, foreground=c["accent2"])
+        mk("math_block", justification=Gtk.Justification.CENTER)
+        mk("sup", rise=5 * Pango.SCALE, scale=0.75)
+        mk("sub", rise=-3 * Pango.SCALE, scale=0.75)
+        # Linea orizzontale: riga bassissima colorata da un bordo all'altro;
+        # il testo «---» prende lo stesso colore e sparisce.
+        mk("hr_bar", scale=0.25, foreground=c["border"], paragraph_background=c["border"])
         mk("setext", foreground=c["subtle"])
         mk("hide", invisible=True)
         # Blocchi di codice e tabelle: interlinea minima (righe compatte).
@@ -3820,8 +3848,8 @@ class RuscaWindow(Adw.ApplicationWindow):
             for name, x, y in styles:
                 apply(name, x, y)
             if hides and not touched(a, z):
-                for x, y in hides:
-                    apply("hide", x, y)
+                for h in hides:
+                    apply(h[2] if len(h) > 2 else "hide", h[0], h[1])
 
     # ------------------------------------------------------- comandi di scrittura
     def _toggle_wrap(self, marker):

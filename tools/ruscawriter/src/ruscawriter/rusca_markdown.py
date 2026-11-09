@@ -19,7 +19,7 @@ Sintassi riconosciuta (parser(), sempre la stessa in tutti i programmi):
     o «debian.org» (libreria linkify-it, vedi _GfmLinkify)
     ==evidenziato== (estensione «mark» di Pandoc; la regola è quella del
     plugin markdown-it-mark, vedi _mark_plugin)
-    note a piè di pagina [^1]
+    note a piè di pagina [^1] e [^1]: testo (non le note in linea ^[testo])
     formule $…$, $$…$$ (regole di Pandoc: dopo il $ di apertura e prima di
     quello di chiusura non c'è uno spazio, e il $ di chiusura non è seguito
     da una cifra, così «da $5 a $10» resta testo), \\(…\\) e \\[…\\]
@@ -39,10 +39,19 @@ Per chi non usa Pango (RuscaWriter: PDF, EPUB, ODT, DOCX, testo):
     math_to_text(markdown)   sostituisce le formule $…$, $$…$$, \\(…\\), \\[…\\]
                              in un testo Markdown, fuori dal codice
 
+Altri usi del parser, uguali in tutti i programmi:
+    render_html(testo)       HTML (conversazione salvata di RuscaLLama)
+    code_blocks(testo)       i blocchi di codice: [(lingua, codice)]
+    block_ranges(testo)      le righe dei blocchi di primo livello, per
+                             dividere un documento senza spezzare un blocco
+                             (RuscaTranslator)
+
 Posizioni nel sorgente, per gli editor (resa live di RuscaMark):
     parse_source(testo)      i token di parser(), con in più la posizione di
                              ogni elemento in linea (vedi parse_source)
     link_label_end(src, i)   fine dell'etichetta [..] di un link
+    inline_mapper(righe, inizi, token)   posizione nel testo in linea ->
+                             offset nel documento
 
 Strumenti per riga, usati dagli editor per evidenziare il sorgente:
     table_at(righe, i), display_math_at(righe, i), has_inline_math(riga),
@@ -61,6 +70,7 @@ import re
 from markdown_it import MarkdownIt
 from markdown_it.helpers import parseLinkLabel
 from markdown_it.rules_inline.state_inline import Delimiter, StateInline
+from markdown_it.token import Token
 from markdown_it.tree import SyntaxTreeNode
 from linkify_it import LinkifyIt
 from mdit_py_plugins.dollarmath import dollarmath_plugin
@@ -68,7 +78,8 @@ from mdit_py_plugins.footnote import footnote_plugin
 from mdit_py_plugins.tasklists import tasklists_plugin
 from mdit_py_plugins.texmath import texmath_plugin
 
-__all__ = ["parser", "parse_source", "link_label_end", "parse_blocks", "inline_to_pango", "latex_to_pango", "escape",
+__all__ = ["parser", "render_html", "code_blocks", "block_ranges",
+           "parse_source", "link_label_end", "inline_mapper", "parse_blocks", "inline_to_pango", "latex_to_pango", "escape",
            "plain_text", "latex_to_text", "math_to_text", "table_at", "display_math_at",
            "has_inline_math", "sub_inline_math"]
 
@@ -469,10 +480,74 @@ class _GfmLinkify(LinkifyIt):
         return m if m is not None and self._gfm(m) else None
 
 
+def _guard_block_rule(fn):
+    """Protezione per la regola di blocco \\[…\\] di texmath (mdit-py-plugins
+    0.4.2): cerca la chiusura nell'intero documento, anche oltre la fine di
+    una citazione, e allora dichiara un blocco senza consumare righe. Il
+    parser riproverebbe all'infinito sulla stessa riga (bastano tre righe:
+    «>\\[», una vuota, «\\]»). Inoltre legge il sorgente grezzo: dentro una
+    citazione o un elenco, una formula su più righe prenderebbe anche i «>»
+    e i rientri. Qui valgono solo i blocchi che consumano righe, e dentro
+    citazioni ed elenchi solo quelli di una riga; il resto resta testo. Il
+    blocco riconosciuto riceve token.map, che la regola non scrive."""
+    def rule(state, begin, end, silent):
+        count, line = len(state.tokens), state.line
+        ok = fn(state, begin, end, False)
+        # Su più righe vale solo se ogni riga comincia all'inizio della riga
+        # vera del sorgente: niente «>» di citazione né rientro di elenco,
+        # cioè texmath legge proprio il testo della formula. (Non si guarda
+        # state.parentType: in markdown-it-py 3.0 la regola dei titoli
+        # sottolineati lo lascia a «paragraph» dopo un paragrafo.)
+        consumed = ok and begin < state.line <= end and (
+            state.line == begin + 1 or (state.blkIndent == 0 and all(
+                state.bMarks[i] == state.src.rfind("\n", 0, state.bMarks[i]) + 1
+                for i in range(begin, state.line))))
+        if consumed and not silent:
+            for token in state.tokens[count:]:
+                token.map = [begin, state.line]
+            return True
+        del state.tokens[count:]
+        state.line = line
+        return consumed
+    return rule
+
+
+def _balance(tokens):
+    """Annidamento corretto: chiusure senza apertura scartate, aperture
+    rimaste aperte chiuse in fondo. Sui testi validi non cambia nulla."""
+    out, stack = [], []
+    for token in tokens:
+        if token.nesting == 1:
+            stack.append(token)
+        elif token.nesting == -1:
+            base = token.type[:-6] if token.type.endswith("_close") else token.type
+            if not any(o.type[:-5] == base for o in stack):
+                continue                                 # chiusura orfana
+            while stack[-1].type[:-5] != base:           # aperture interne rimaste
+                o = stack.pop()
+                out.append(Token(o.type[:-5] + "_close", o.tag, -1))
+            stack.pop()
+        if token.children:
+            token.children = _balance(token.children)
+        out.append(token)
+    while stack:
+        o = stack.pop()
+        out.append(Token(o.type[:-5] + "_close", o.tag, -1))
+    return out
+
+
+def _balance_rule(state):
+    """Ultima regola: il plugin delle note, con una nota definita dentro la
+    definizione di una nota con la stessa etichetta («[^1]:- [^1]:»), perde
+    delle aperture; l'albero dei token (SyntaxTreeNode) non si potrebbe
+    costruire e l'anteprima fallirebbe."""
+    state.tokens = _balance(state.tokens)
+
+
 def _make_parser():
     md = MarkdownIt("commonmark", {"html": False, "linkify": True})
     md.linkify = _GfmLinkify()
-    return (md
+    md = (md
             .enable(["table", "strikethrough", "linkify"])
             .use(_mark_plugin)
             .use(dollarmath_plugin, allow_space=False, allow_digits=False,
@@ -480,6 +555,16 @@ def _make_parser():
             .use(texmath_plugin, delimiters="brackets")
             .use(tasklists_plugin)
             .use(footnote_plugin))
+    for rule in md.block.ruler.__rules__:
+        if rule.fn.__module__.startswith("mdit_py_plugins.texmath"):
+            rule.fn = _guard_block_rule(rule.fn)
+    md.block.ruler.__cache__ = None
+    md.core.ruler.push("rusca_balance", _balance_rule)
+    # Le note in linea ^[testo] non sono nella sintassi scelta (specifiche,
+    # sezione 1.2) e nel plugin 0.4.2 fanno fallire l'analisi quando
+    # contengono un riferimento a una nota: «^[[^1]]» con «[^1]: …».
+    md.disable("footnote_inline")
+    return md
 
 
 _PARSER = _make_parser()
@@ -490,6 +575,70 @@ def parser():
     programmi. parser().parse(testo) dà i token (con token.map, le righe del
     sorgente); parser().render(testo) dà l'HTML."""
     return _PARSER
+
+
+# ── HTML, blocchi di codice, blocchi di primo livello ───────────────────────
+def _math_html(_renderer, tokens, idx, _options, _env):
+    token = tokens[idx]
+    text = escape(latex_to_text(token.content.strip()))
+    if token.block:
+        return f'<p class="math">{text}</p>\n'
+    return f'<span class="math">{text}</span>'
+
+
+_HTML_PARSER = None
+
+
+def render_html(text):
+    """HTML del testo Markdown, come lo mostra la chat: formule in simboli
+    Unicode (non in LaTeX), a capo dove va a capo il testo, HTML grezzo
+    come testo. I link sono quelli che markdown-it accetta (niente
+    javascript: né file:)."""
+    global _HTML_PARSER
+    if _HTML_PARSER is None:
+        md = _make_parser()
+        md.options["breaks"] = True
+        for name in [n for n in md.renderer.rules if n.startswith("math_")]:
+            md.add_render_rule(name, _math_html)
+        _HTML_PARSER = md
+    return _HTML_PARSER.render(text)
+
+
+def code_blocks(text):
+    """I blocchi di codice del testo, in ordine: [(lingua, codice)], con la
+    lingua in minuscolo ("" se manca). Tutti quelli di CommonMark: fra ```
+    o ~~~ (anche annidati con più apici) e rientrati di quattro spazi,
+    anche dentro elenchi e citazioni."""
+    out = []
+    for token in _PARSER.parse(text):
+        if token.type in ("fence", "code_block"):
+            lang = token.info.split()[0].lower() if token.type == "fence" and token.info.strip() else ""
+            out.append((lang, token.content[:-1] if token.content.endswith("\n") else token.content))
+    return out
+
+
+def block_ranges(text):
+    """Righe dei blocchi di primo livello del documento: [(prima, dopo)],
+    in ordine, come per range(). Un elenco, una citazione, una tabella o un
+    blocco di codice sono un blocco solo, anche con righe vuote dentro. Le
+    righe che nessun blocco copre e non sono vuote (definizioni di
+    riferimento [x]: indirizzo, note [^1]: testo) formano blocchi a sé:
+    ogni riga del documento non vuota sta in un blocco."""
+    lines = text.split("\n")
+    ranges, covered = [], set()
+    for token in _PARSER.parse(text):
+        if token.level == 0 and token.map and token.nesting >= 0:
+            a, b = token.map
+            ranges.append((a, b))
+            covered.update(range(a, b))
+    start = None
+    for i, line in enumerate(lines + [""]):
+        if i < len(lines) and i not in covered and line.strip():
+            start = i if start is None else start
+        elif start is not None:
+            ranges.append((start, i))
+            start = None
+    return sorted(ranges)
 
 
 # ── Posizioni nel sorgente ──────────────────────────────────────────────────
@@ -535,7 +684,8 @@ def parse_source(text):
     linea: per i figli di ogni token «inline», token.meta["src"] = (inizio,
     fine) nel testo inline.meta["src_content"], cioè token.content com'era
     durante l'analisi in linea (i plugin possono accorciarlo dopo: quello
-    delle liste di attività toglie «[x] »). Le aperture e chiusure di grassetto, corsivo,
+    delle liste di attività toglie «[x] »). inline.meta["escapes"] elenca i
+    tratti degli escape (\\*, \\_ …), che markdown-it fonde poi nel testo. Le aperture e chiusure di grassetto, corsivo,
     barrato ed evidenziato coprono il loro marcatore (per ** il secondo
     asterisco dell'apertura e il primo della chiusura: si usa token.markup per
     la lunghezza); link, immagini, codice, note e formule coprono l'elemento
@@ -557,8 +707,52 @@ def parse_source(text):
                 if token.type == "inline":
                     token.meta["src_content"] = token.content
         md.core.ruler.after("block", "rusca_src_content", keep_content)
+
+        def keep_escapes(state):
+            for token in state.tokens:
+                if token.type == "inline":
+                    token.meta["escapes"] = [
+                        c.meta["src"] for c in token.children or []
+                        if c.type == "text_special" and c.info == "escape" and "src" in c.meta]
+        md.core.ruler.after("inline", "rusca_escapes", keep_escapes)
         _SOURCE_PARSER = md
     return _SOURCE_PARSER.parse(text)
+
+
+def inline_mapper(lines, starts, token):
+    """Funzione posizione-nel-testo-in-linea -> offset nel documento, per un
+    token «inline» di parse_source(); lines sono le righe del documento,
+    starts i loro offset. Le righe del testo in linea sono le righe del
+    sorgente senza i prefissi di citazioni, elenchi e titoli. None se non si
+    ritrovano (per esempio un tab espanso in spazi)."""
+    if not token.map:
+        return None
+    parts = token.meta.get("src_content", token.content).split("\n")
+    first = token.map[0]
+    if first + len(parts) > len(lines):
+        return None
+    table = []                          # (inizio nel testo in linea, lunghezza, offset)
+    pos = 0
+    for i, part in enumerate(parts):
+        line = lines[first + i]
+        if line.endswith(part):
+            off = len(line) - len(part)
+        elif line.rstrip().endswith(part):
+            off = len(line.rstrip()) - len(part)
+        else:
+            off = line.find(part)            # titolo con # di chiusura
+            if off < 0:
+                return None
+        table.append((pos, len(part), starts[first + i] + off))
+        pos += len(part) + 1
+
+    def to_doc(p):
+        for cstart, length, doc in table:
+            if p <= cstart + length:
+                return doc + max(0, p - cstart)
+        cstart, length, doc = table[-1]
+        return doc + length
+    return to_doc
 
 
 def link_label_end(src, start):
@@ -893,5 +1087,3 @@ def _display_math(lines, i):
                 return " ".join([rest] + lines[i + 1:j] + [tail]), j + 1
         return None
     return None
-
-

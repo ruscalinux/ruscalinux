@@ -17,7 +17,8 @@ import unittest
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TOOLS = os.path.join(REPO, "tools")
 COPIES = ["ruscallama/rusca_markdown.py", "ruscamark/rusca_markdown.py",
-          "ruscawriter/src/ruscawriter/rusca_markdown.py"]
+          "ruscawriter/src/ruscawriter/rusca_markdown.py",
+          "ruscatranslator/rusca_markdown.py"]
 sys.path.insert(0, os.path.join(TOOLS, "ruscallama"))
 import rusca_markdown as md  # noqa: E402
 
@@ -184,6 +185,71 @@ class SourcePositions(unittest.TestCase):
         self.assertEqual(src[md.link_label_end(src, 0)], "]")
         self.assertEqual(md.link_label_end(src, 0), 12)
         self.assertEqual(md.link_label_end("[aperta", 0), -1)
+
+
+class Robustness(unittest.TestCase):
+    """Testi trovati con prove casuali che bloccavano o facevano fallire
+    l'analisi (plugin di mdit-py-plugins 0.4.2). Anche un modello in
+    RuscaLLama, o chi scrive nella resa live di RuscaMark, può produrli."""
+
+    def parse_within(self, src, seconds=3):
+        import signal
+
+        def timeout(*_):
+            raise TimeoutError(repr(src))
+        old = signal.signal(signal.SIGALRM, timeout)
+        signal.alarm(seconds)
+        try:
+            return md.parse_blocks(src), md.parse_source(src)
+        finally:
+            signal.alarm(0)
+            signal.signal(signal.SIGALRM, old)
+
+    def test_texmath_block_never_loops(self):
+        self.parse_within(">\\[\n\n\\]")                    # ciclo infinito
+        self.assertEqual(md.parse_blocks("\\[\nx^2\n\\]"), [("math", "x²")])
+        # Dentro una citazione texmath leggerebbe anche i «>»: resta testo.
+        self.assertNotIn("math", [b[0] for b in md.parse_blocks("> \\[\n> x\n> \\]")])
+
+    def test_texmath_block_after_paragraph(self):
+        # In markdown-it-py 3.0 la regola dei titoli sottolineati lascia
+        # state.parentType a «paragraph» dopo un paragrafo: la protezione
+        # non deve fidarsene.
+        self.assertEqual(md.parse_blocks("testo\n\n\\[\nq\n\\]"),
+                         [("text", "testo"), ("math", "q")])
+
+    def test_nested_footnote_definitions(self):
+        self.parse_within("[^1]:- [^1]:")                     # token sbilanciati
+
+    def test_inline_footnotes_are_text(self):
+        self.parse_within("^[[^1]]\n[^1]:[^1]")              # KeyError nel plugin
+        self.assertEqual(md.parse_blocks("a^[nota] b"), [("text", "a^[nota] b")])
+
+
+class OtherUses(unittest.TestCase):
+    def test_render_html(self):
+        self.assertEqual(md.render_html("**a**\nb $x^2$ <i>c</i>"),
+                         '<p><strong>a</strong><br />\nb <span class="math">x²</span> '
+                         '&lt;i&gt;c&lt;/i&gt;</p>\n')
+        self.assertIn('<pre><code class="language-py">print(1)\n</code></pre>',
+                      md.render_html("```py\nprint(1)\n```"))
+        self.assertIn('<p class="math">a⁄b</p>', md.render_html("$$\n\\frac{a}{b}\n$$"))
+
+    def test_code_blocks(self):
+        self.assertEqual(
+            md.code_blocks("```PY\na\n```\n\n~~~\nb\n\n~~~\n\n    c\n\n"
+                           "````md\n```js\nd\n```\n````\n\n> ```sh\n> e\n> ```"),
+            [("py", "a"), ("", "b\n"), ("", "c"), ("md", "```js\nd\n```"), ("sh", "e")])
+
+    def test_block_ranges(self):
+        doc = ("# T\n\n- a\n\n- b\n\n````\n```\n\nx\n```\n````\n\n"
+               "[r]: https://x.it\n[^1]: nota\n\n> q\n>\n> q2")
+        lines = doc.split("\n")
+        self.assertEqual([lines[a:b][0] for a, b in md.block_ranges(doc)],
+                         ["# T", "- a", "````", "[r]: https://x.it", "> q"])
+        # ogni riga non vuota sta in un blocco
+        inside = {i for a, b in md.block_ranges(doc) for i in range(a, b)}
+        self.assertTrue(all(i in inside for i, ln in enumerate(lines) if ln.strip()))
 
 
 class Math(unittest.TestCase):

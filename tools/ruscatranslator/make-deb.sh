@@ -24,7 +24,7 @@ HOMEPAGE="https://www.ruscalinux.org/"
 # predefiniti di menu e metainfo).
 LANGS="en $(cd lang && ls -1 -- *.json | sed 's/\.json$//' | grep -vx en | sort | tr '\n' ' ')"
 SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-$(date +%s)}"
-FILES="ruscatranslator.py rusca_engine.py raglin.py rag"
+FILES="ruscatranslator.py rusca_engine.py rusca_markdown.py raglin.py rag"
 
 die() { echo "ERRORE: $*" >&2; exit 1; }
 for l in en it; do [ -f "lang/$l.json" ] || die "manca lang/$l.json"; done
@@ -221,7 +221,7 @@ Version: $VER
 Section: text
 Priority: optional
 Architecture: $ARCH
-Depends: python3 (>= 3.10), python3-gi, gir1.2-gtk-4.0 (>= 4.18), gir1.2-adw-1 (>= 1.7), gir1.2-gtksource-5, ruscallama-engine (>= $VER)
+Depends: python3 (>= 3.10), python3-gi, gir1.2-gtk-4.0 (>= 4.18), gir1.2-adw-1 (>= 1.7), gir1.2-gtksource-5, python3-markdown-it (>= 3.0), python3-mdit-py-plugins (>= 0.4), python3-linkify-it (>= 2.0), ruscallama-engine (>= $VER)
 Maintainer: $MAINT
 Homepage: $HOMEPAGE
 Installed-Size: $(du -sk "$ROOT/usr" | cut -f1)

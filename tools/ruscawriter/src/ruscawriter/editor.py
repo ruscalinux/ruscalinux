@@ -164,11 +164,10 @@ from .model import (
 # live highlighting must show what the exports will produce.
 # Le regole del Markdown, in comune con tutti gli export: anteprima ed
 # evidenziazione devono mostrare cio' che gli export produrranno.
-from .model import render_math, table_at, _HR_RE
 # EN/IT: picture boxes for the preview / riquadri delle immagini nell'anteprima
 from . import rusca_liveblocks
-from .model import (classify_md_line, parse_inline, inline_spans,
-                    wrapped_runs, unwrap_hard_breaks)
+from .model import (classify_md_line, book_blocks, highlight_spans, list_lines,
+                    plain_runs, wrapped_runs, unwrap_hard_breaks)
 from .i18n import apply_toolkit_language
 from .i18n import (Translator, LANGUAGES, LOCALE_ALIASES, available_languages,
                    spell_locale_for,
@@ -2814,9 +2813,9 @@ class RuscaWriterWindow(Adw.ApplicationWindow):
                                self.t("filter_image"), on_path)
 
     def _highlight_markdown(self):
-        """Colora il Markdown mentre si scrive. Usa le stesse regole degli
-        export (model.classify_md_line / model.inline_spans): ciò che qui
-        appare in grassetto uscirà in grassetto anche nel PDF."""
+        """Colora il Markdown mentre si scrive. Usa lo stesso motore degli
+        export (model.highlight_spans): ciò che qui appare in grassetto
+        uscirà in grassetto anche nel PDF."""
         buf = self.text_buffer
         start, end = buf.get_bounds()
         for tag in self._md_tags.values():
@@ -2835,13 +2834,12 @@ class RuscaWriterWindow(Adw.ApplicationWindow):
         starts = []
         for line in lines:
             starts.append(offset)
-            kind, _body, extra = classify_md_line(line)
-            if kind == "heading":
-                apply(f"h{min(3, extra)}", offset, offset + len(line))
-            else:
-                for a, b, style in inline_spans(line):
-                    apply(style, offset + a, offset + b)
             offset += len(line) + 1
+        try:
+            for a, b, style in highlight_spans(text):
+                apply(style, a, b)
+        except Exception as err:            # mai bloccare la scrittura
+            print(f"[ruscawriter] evidenziazione: {err}", file=sys.stderr)
 
         # Vista "Mostra le interruzioni": tinge i gruppi di righe che il
         # comando di ricucitura unirebbe. Sono decisi da model.wrapped_runs,
@@ -4799,9 +4797,9 @@ class RuscaWriterWindow(Adw.ApplicationWindow):
                 "bolditalic": ("<b><i>", "</i></b>"), "code": ("<tt>", "</tt>"),
                 "regular": ("", "")}
 
-        def markup(text, head):
+        def markup(runs, head):
             m = "".join(f"{wrap[st][0]}{GLib.markup_escape_text(t)}{wrap[st][1]}"
-                        for t, st in parse_inline(text))
+                        for t, st in runs)
             return f"<b>{m}</b>" if head else m
         grid = Gtk.Grid(hexpand=True)
         xalign = {"right": 1.0, "center": 0.5}
@@ -4814,7 +4812,7 @@ class RuscaWriterWindow(Adw.ApplicationWindow):
                                   xalign=xalign.get(aligns[c], 0.0))
                 # larghezza naturale = contenuto (al massimo 50 caratteri):
                 # le colonne si dividono lo spazio in proporzione al testo
-                label.set_max_width_chars(min(max(len(cell), 4), 50))
+                label.set_max_width_chars(min(max(len(plain_runs(cell)), 4), 50))
                 label.set_markup(markup(cell, r == 0))
                 grid.attach(label, c, 2 * r, 1, 1)
             if r < len(rows):
@@ -4827,75 +4825,78 @@ class RuscaWriterWindow(Adw.ApplicationWindow):
         return card
 
     def _render_markdown_into(self, text):
-        """Riversa il Markdown nel buffer dell'anteprima. Riconoscimento delle
-        righe e della formattazione inline: entrambi dal parser condiviso in
-        model.py, così l'anteprima mostra esattamente ciò che finirà negli
-        export. Formule e tabelle come negli export: formule in simboli
-        Unicode, tabelle come griglia vera."""
+        """Riversa il Markdown nel buffer dell'anteprima, dai blocchi del
+        libro (model.book_blocks): l'anteprima mostra esattamente ciò che
+        finirà negli export. Formule in simboli Unicode, tabelle come griglia
+        vera, immagini come figure."""
         buf = self.preview_buffer
         self._pv_width = self._preview_text_width()
+        end = buf.get_end_iter
 
-        def insert_inline(line, base_tags):
-            for seg, style in parse_inline(line):
+        def insert_runs(runs, base_tags=()):
+            for seg, style in runs:
                 tag = self._pv_tags.get(style)
                 tags = ([tag] if tag is not None else []) + list(base_tags)
-                buf.insert_with_tags(buf.get_end_iter(), seg, *tags)
+                buf.insert_with_tags(end(), seg, *tags)
 
-        lines = render_math(text).split("\n")
-        i = 0
-        while i < len(lines):
-            tbl = table_at(lines, i)
-            if tbl:
-                anchor = buf.create_child_anchor(buf.get_end_iter())
-                self.preview_view.add_child_at_anchor(self._preview_table(*tbl[:3]), anchor)
-                buf.insert(buf.get_end_iter(), "\n")
-                self._pv_has_table = True
-                i = tbl[3]
-                continue
-            raw = lines[i]
-            i += 1
-            if _HR_RE.match(raw):
-                # separatore: filetto corto e centrato, come nei libri
-                width = self._preview_text_width()
-                row = Gtk.Box(halign=Gtk.Align.START)
-                row.set_size_request(width, 24)
-                sep = Gtk.Separator(hexpand=True, valign=Gtk.Align.CENTER,
-                                    margin_start=int(width * 0.35), margin_end=int(width * 0.35))
-                row.append(sep)
-                anchor = buf.create_child_anchor(buf.get_end_iter())
-                self.preview_view.add_child_at_anchor(row, anchor)
-                buf.insert(buf.get_end_iter(), "\n")
-                self._pv_has_table = True
-                continue
-            kind, body, extra = classify_md_line(raw)
-            end = buf.get_end_iter
-            if kind == "heading":
-                buf.insert_with_tags(end(), body + "\n",
-                                     self._pv_tags[f"h{min(3, extra)}"])
-            elif kind == "bullet":
-                buf.insert(end(), "  \u2022  ")
-                insert_inline(body, [])
+        def widget(child):
+            anchor = buf.create_child_anchor(end())
+            self.preview_view.add_child_at_anchor(child, anchor)
+            buf.insert(end(), "\n")
+            self._pv_has_table = True        # segue la larghezza della finestra
+
+        def rule():
+            # separatore: filetto corto e centrato, come nei libri
+            width = self._preview_text_width()
+            row = Gtk.Box(halign=Gtk.Align.START)
+            row.set_size_request(width, 24)
+            row.append(Gtk.Separator(hexpand=True, valign=Gtk.Align.CENTER,
+                                     margin_start=int(width * 0.35),
+                                     margin_end=int(width * 0.35)))
+            widget(row)
+
+        def blocks_into(blocks, base_tags=()):
+            for b in blocks:
+                kind = b[0]
+                if kind == "heading":
+                    buf.insert_with_tags(end(), plain_runs(b[2]) + "\n",
+                                         self._pv_tags[f"h{min(3, b[1])}"])
+                elif kind == "p":
+                    for line in b[1]:
+                        insert_runs(line, base_tags)
+                        buf.insert(end(), "\n")
+                elif kind == "list":
+                    for depth, mark, line, inner in list_lines(b):
+                        if inner is not None:
+                            blocks_into([inner], base_tags)
+                            continue
+                        pad = "    " * depth
+                        buf.insert(end(), f"{pad}  {mark}  " if mark else f"{pad}       ")
+                        insert_runs(line, base_tags)
+                        buf.insert(end(), "\n")
+                elif kind == "quote":
+                    blocks_into(b[1], tuple(base_tags) + (self._pv_tags["quote"],))
+                elif kind == "image":
+                    # figura vera con la didascalia; se il file non è nel
+                    # progetto, un riquadro offre di sceglierlo
+                    pal = self.palette()
+                    widget(self._image_widget(b[2], b[1], self._preview_text_width(),
+                                              pal["editor_fg"], pal["marker"]))
+                elif kind == "table":
+                    widget(self._preview_table(b[1], b[2], b[3]))
+                elif kind == "rule":
+                    rule()
+                elif kind == "code":
+                    for code_line in b[2].split("\n"):
+                        buf.insert_with_tags(end(), code_line + "\n", self._pv_tags["code"])
+                elif kind == "math":
+                    buf.insert_with_tags(end(), b[1] + "\n", self._pv_tags["sep"])
+
+        # una riga vuota fra i blocchi, come nel testo
+        for i, block in enumerate(book_blocks(text)):
+            if i:
                 buf.insert(end(), "\n")
-            elif kind == "number":
-                buf.insert(end(), f"  {extra}.  ")
-                insert_inline(body, [])
-                buf.insert(end(), "\n")
-            elif kind == "quote":
-                insert_inline(body, [self._pv_tags["quote"]])
-                buf.insert(end(), "\n")
-            elif kind == "image":
-                # figura vera con la didascalia; se il file non è nel
-                # progetto, un riquadro offre di sceglierlo
-                pal = self.palette()
-                anchor = buf.create_child_anchor(end())
-                self.preview_view.add_child_at_anchor(
-                    self._image_widget(extra, body, self._preview_text_width(),
-                                       pal["editor_fg"], pal["marker"]), anchor)
-                buf.insert(end(), "\n")
-                self._pv_has_table = True     # anche le figure seguono la larghezza
-            else:
-                insert_inline(raw.rstrip("\n"), [])
-                buf.insert(end(), "\n")
+            blocks_into([block])
 
     # ---- informazioni -------------------------------------------------------
     def _cover_generator_dialog(self, on_done, parent=None):

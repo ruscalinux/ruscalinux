@@ -34,6 +34,7 @@ except (ValueError, ImportError):
 BASE_DIR = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, BASE_DIR)
 import rusca_engine as engine  # noqa: E402
+import rusca_markdown as md  # noqa: E402
 try:
     import raglin
 except ImportError:
@@ -318,32 +319,24 @@ def build_prompt(src, tgt, domain):
 
 
 def split_markdown(text, max_chars=CHUNK_CHAR):
-    """Blocchi di al massimo max_chars caratteri, tagliati tra i paragrafi e
-    mai dentro un blocco di codice."""
-    blocks, cur, in_fence = [], [], False
-    for line in text.split("\n"):
-        s = line.strip()
-        if s.startswith("```"):
-            in_fence = not in_fence
-            cur.append(line)
-            continue
-        if not in_fence and s == "":
-            if cur:
-                blocks.append("\n".join(cur))
-                cur = []
-            continue
-        cur.append(line)
-    if cur:
-        blocks.append("\n".join(cur))
-    chunks, cur, size = [], [], 0
-    for b in blocks:
-        if size + len(b) + 2 > max_chars and cur:
-            chunks.append("\n\n".join(cur))
-            cur, size = [], 0
-        cur.append(b)
-        size += len(b) + 2
-    if cur:
-        chunks.append("\n\n".join(cur))
+    """Blocchi di al massimo max_chars caratteri, tagliati solo fra un blocco
+    Markdown e l'altro: un elenco, una tabella, una citazione o un blocco di
+    codice non si spezzano mai, anche se contengono righe vuote (righe dei
+    blocchi dal motore comune, rusca_markdown.block_ranges). Un blocco più
+    lungo di max_chars resta intero. Dentro ogni pezzo il testo è quello
+    originale, righe vuote comprese."""
+    lines = text.split("\n")
+    chunks, first, last, size = [], None, None, 0
+    for a, b in md.block_ranges(text):
+        length = sum(len(line) + 1 for line in lines[a:b])
+        if first is not None and size + length > max_chars:
+            chunks.append("\n".join(lines[first:last]).strip("\n"))
+            first, size = None, 0
+        if first is None:
+            first = a
+        last, size = b, size + length
+    if first is not None:
+        chunks.append("\n".join(lines[first:last]).strip("\n"))
     return [c for c in chunks if c.strip()]
 
 
