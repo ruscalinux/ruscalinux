@@ -264,7 +264,7 @@ Version: $VER
 Section: editors
 Priority: optional
 Architecture: $ARCH
-Depends: python3 (>= 3.10), python3-gi, gir1.2-gtk-4.0 (>= 4.18), gir1.2-adw-1 (>= 1.7), librsvg2-common
+Depends: python3 (>= 3.10), python3-gi, gir1.2-gtk-4.0 (>= 4.18), gir1.2-adw-1 (>= 1.7), librsvg2-common, python3-markdown-it (>= 3.0), python3-mdit-py-plugins (>= 0.4)
 Recommends: gir1.2-gtksource-5, gir1.2-spelling-1, python3-pyphen, hunspell-en-gb, hyphen-en-gb, python3-pil
 Suggests: calibre, hyphen-it, hyphen-en-us, hunspell-it, hunspell-en-us
 Replaces: $OLD_PKG

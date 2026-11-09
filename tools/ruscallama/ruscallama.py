@@ -37,6 +37,8 @@ sys.path.insert(0, BASE_DIR)
 import rusca_engine as engine  # noqa: E402
 import rusca_markdown as md  # noqa: E402
 
+_RE_LINK_TAG = re.compile(r"</?a\b[^>]*>")
+
 APP_ID = "org.ruscalinux.RuscaLLama"
 APP_NAME = "RuscaLLama"
 APP_VERSION = "1.99.2"
@@ -431,10 +433,12 @@ class Message(Gtk.Box):
     @staticmethod
     def _set_label(label, text, markup=True):
         """Markup non valido (tag accavallati, testo a metà durante lo
-        streaming) farebbe sparire l'intera etichetta: si mostra il testo."""
+        streaming) farebbe sparire l'intera etichetta: si mostra il testo.
+        I link <a href> li gestisce Gtk.Label e Pango non li conosce: si
+        tolgono solo per il controllo."""
         if markup:
             try:
-                Pango.parse_markup(text, -1, "\0")
+                Pango.parse_markup(_RE_LINK_TAG.sub("", text), -1, "\0")
                 label.set_markup(text)
                 return
             except GLib.Error:

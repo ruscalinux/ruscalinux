@@ -1,14 +1,30 @@
 """RuscaLinux OS Tools — rusca_markdown.py — 1.99.2 — GPL-3.0
 
-Markdown delle risposte dei modelli -> blocchi con markup Pango.
-Modulo puro, senza GTK: si può provare con python3 da solo.
+Motore Markdown comune dei RuscaLinux OS Tools.
+
+Il Markdown segue la specifica CommonMark (https://spec.commonmark.org/),
+con le estensioni di GitHub Flavored Markdown per tabelle, barrato e liste di
+attività, le note a piè di pagina e le formule LaTeX. L'analisi non è scritta
+qui: la fa markdown-it-py (pacchetto Debian python3-markdown-it), che
+implementa CommonMark, con i plugin di python3-mdit-py-plugins. Questo modulo
+configura il parser una volta per tutti i programmi e traduce il suo albero
+nei formati che servono all'interfaccia.
+
+Sintassi riconosciuta (parser(), sempre la stessa in tutti i programmi):
+    CommonMark completo, senza HTML grezzo (resta testo: più sicuro, e le
+    risposte dei modelli non possono inserire markup)
+    tabelle e ~~barrato~~ (GFM), liste di attività - [ ] / - [x] (GFM)
+    note a piè di pagina [^1]
+    formule $…$, $$…$$ (regole di Pandoc: dopo il $ di apertura e prima di
+    quello di chiusura non c'è uno spazio, e il $ di chiusura non è seguito
+    da una cifra, così «da $5 a $10» resta testo), \\(…\\) e \\[…\\]
 
 Blocchi restituiti da parse_blocks():
     ("text", markup)                         paragrafo, titolo, elenco, citazione
-    ("code", lingua, sorgente)               blocco ``` (anche non chiuso)
-    ("math", markup)                         formula su riga propria: $$…$$ o \\[…\\]
+    ("code", lingua, sorgente)               blocco di codice (anche non chiuso)
+    ("math", markup)                         formula su riga propria
     ("table", allineamenti, intestazione, righe)   celle già in markup
-    ("hr",)                                  linea orizzontale --- *** ___
+    ("hr",)                                  linea orizzontale
 
 Le formule LaTeX diventano testo Unicode (², ≈, √, α, ⁄ …) con <sup>/<sub>
 di Pango dove Unicode non basta: nessuna dipendenza in più.
@@ -17,22 +33,31 @@ Per chi non usa Pango (RuscaWriter: PDF, EPUB, ODT, DOCX, testo):
     latex_to_text(formula)   formula -> testo Unicode senza markup
     math_to_text(markdown)   sostituisce le formule $…$, $$…$$, \\(…\\), \\[…\\]
                              in un testo Markdown, fuori dal codice
-    table_at(righe, i)       tabella che comincia alla riga i, o None
-    display_math_at(righe, i)  formula su riga propria che comincia alla riga i
-    has_inline_math(riga)    True se la riga contiene una formula nella frase
-    sub_inline_math(testo, f)  sostituisce ogni formula nella frase con
-                             f(sorgente, in_evidenza)
 
+Strumenti per riga, usati dagli editor per evidenziare il sorgente:
+    table_at(righe, i), display_math_at(righe, i), has_inline_math(riga),
+    sub_inline_math(testo, f)
+Lavorano sulle singole righe e non sono un parser Markdown: si
+sostituiranno con le posizioni dei token di parser() quando RuscaMark e
+RuscaWriter useranno questo motore anche per anteprime ed esportazioni.
+
+Modulo puro, senza GTK: si può provare con python3 da solo.
 File identico in RuscaLLama, RuscaMark e RuscaWriter: si modifica una volta e
 si copia.
 """
 
 import re
 
-__all__ = ["parse_blocks", "inline_to_pango", "latex_to_pango", "escape", "plain_text",
-           "latex_to_text", "math_to_text", "table_at", "display_math_at",
-           "has_inline_math", "sub_inline_math"]
+from markdown_it import MarkdownIt
+from markdown_it.tree import SyntaxTreeNode
+from mdit_py_plugins.dollarmath import dollarmath_plugin
+from mdit_py_plugins.footnote import footnote_plugin
+from mdit_py_plugins.tasklists import tasklists_plugin
+from mdit_py_plugins.texmath import texmath_plugin
 
+__all__ = ["parser", "parse_blocks", "inline_to_pango", "latex_to_pango", "escape",
+           "plain_text", "latex_to_text", "math_to_text", "table_at", "display_math_at",
+           "has_inline_math", "sub_inline_math"]
 
 def escape(s):
     return (s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
@@ -320,6 +345,215 @@ def latex_to_text(src):
     return re.sub(r"[ \u00a0]{2,}", " ", text).strip()
 
 
+
+
+# ── Parser ──────────────────────────────────────────────────────────────────
+def _make_parser():
+    return (MarkdownIt("commonmark", {"html": False})
+            .enable(["table", "strikethrough"])
+            .use(dollarmath_plugin, allow_space=False, allow_digits=False,
+                 double_inline=True)
+            .use(texmath_plugin, delimiters="brackets")
+            .use(tasklists_plugin)
+            .use(footnote_plugin))
+
+
+_PARSER = _make_parser()
+
+
+def parser():
+    """Il parser markdown-it configurato come sopra, uguale in tutti i
+    programmi. parser().parse(testo) dà i token (con token.map, le righe del
+    sorgente); parser().render(testo) dà l'HTML."""
+    return _PARSER
+
+
+# ── Testo in linea -> Pango ─────────────────────────────────────────────────
+# Pango apre i link con il gestore di sistema: solo indirizzi web e posta.
+_SAFE_LINK = ("http://", "https://", "mailto:")
+_HEADING_SIZE = ("xx-large", "x-large", "large", "large", "medium", "medium")
+
+
+def _link(href, body):
+    if href.lower().startswith(_SAFE_LINK):
+        return f'<a href="{escape(href)}">{body}</a>'
+    return body
+
+
+def _inline(nodes):
+    out = []
+    for n in nodes:
+        t = n.type
+        if t == "text":
+            out.append(escape(n.content))
+        elif t in ("softbreak", "hardbreak"):
+            # CommonMark lascia al programma la resa dell'a capo morbido:
+            # nella chat e nelle anteprime si va a capo come nel sorgente.
+            out.append("\n")
+        elif t == "code_inline":
+            out.append(f"<tt>{escape(n.content)}</tt>")
+        elif t in ("math_inline", "math_inline_double"):
+            out.append(latex_to_pango(n.content))
+        elif t == "strong":
+            out.append(f"<b>{_inline(n.children)}</b>")
+        elif t == "em":
+            out.append(f"<i>{_inline(n.children)}</i>")
+        elif t == "s":
+            out.append(f"<s>{_inline(n.children)}</s>")
+        elif t == "link":
+            out.append(_link(n.attrs.get("href", ""), _inline(n.children)))
+        elif t == "image":
+            src = str(n.attrs.get("src", ""))
+            out.append(_link(src, escape(n.content or src)))
+        elif t == "footnote_ref":
+            out.append(f"<sup>[{n.meta['id'] + 1}]</sup>")
+        elif t in ("html_inline", "footnote_anchor"):
+            pass            # casella delle liste di attività; ritorno dalla nota
+        elif n.children:
+            out.append(_inline(n.children))
+        else:
+            out.append(escape(n.content))
+    return "".join(out)
+
+
+def inline_to_pango(text):
+    """Testo in linea (una riga, una cella) -> markup Pango."""
+    tokens = _PARSER.parseInline(text.strip())
+    if not tokens:
+        return ""
+    return _inline(SyntaxTreeNode(tokens).children[0].children)
+
+
+# ── Blocchi ─────────────────────────────────────────────────────────────────
+def _prefix(markup, first, rest):
+    """Mette first davanti alla prima riga del markup e rest davanti alle
+    altre (rientri di elenchi e citazioni)."""
+    lines = markup.split("\n")
+    return "\n".join([first + lines[0]] + [rest + line for line in lines[1:]])
+
+
+def _strip_newline(src):
+    return src[:-1] if src.endswith("\n") else src
+
+
+def _table(node):
+    aligns, header, rows = [], [], []
+    for section in node.children:                  # thead, tbody
+        for tr in section.children:
+            cells = []
+            for cell in tr.children:
+                cells.append(_inline(cell.children[0].children) if cell.children else "")
+                if section.type == "thead":
+                    style = str(cell.attrs.get("style", ""))
+                    aligns.append(style.split(":", 1)[1] if ":" in style else "left")
+            if section.type == "thead":
+                header = cells
+            else:
+                rows.append(cells)
+    return ("table", aligns, header, rows)
+
+
+def _paragraph(node):
+    inline = node.children[0].children if node.children else []
+    real = [c for c in inline if not (c.type == "text" and not c.content.strip())]
+    if len(real) == 1 and real[0].type == "math_inline_double":
+        return ("math", latex_to_pango(real[0].content))   # $$…$$ da sola
+    return ("text", _inline(inline))
+
+
+def _list(node, out):
+    ordered = node.type == "ordered_list"
+    number = int(node.attrs.get("start", 1)) if ordered else 1
+    items = []
+    tight = True
+    for item in node.children:
+        sub = []
+        _walk(item.children, sub)
+        tight = tight and all(c.hidden for c in item.children if c.type == "paragraph")
+        if "task-list-item" in str(item.attrs.get("class", "")):
+            first = item.children[0] if item.children else None
+            box = first.children[0].children[0] if first and first.children and \
+                first.children[0].children else None
+            mark = "☑" if box is not None and "checked" in box.content else "☐"
+        else:
+            mark = f"{number}." if ordered else "•"
+        number += 1
+        if not sub or sub[0][0] != "text":
+            sub.insert(0, ("text", ""))
+        head = sub[0][1].lstrip(" ")
+        sub[0] = ("text", _prefix(head, f"{mark}  ", "    "))
+        sub[1:] = [("text", _prefix(b[1], "    ", "    ")) if b[0] == "text" else b
+                   for b in sub[1:]]
+        items.extend(sub)
+    # Elenco «stretto» (voci senza righe vuote fra loro): un solo blocco,
+    # come nel sorgente; elenco «largo»: un blocco per paragrafo.
+    merged = []
+    for block in items:
+        if tight and block[0] == "text" and merged and merged[-1][0] == "text":
+            merged[-1] = ("text", merged[-1][1] + "\n" + block[1])
+        else:
+            merged.append(block)
+    out.extend(merged)
+
+def _walk(nodes, out):
+    for n in nodes:
+        t = n.type
+        if t == "paragraph":
+            out.append(_paragraph(n))
+        elif t == "heading":
+            size = _HEADING_SIZE[int(n.tag[1]) - 1]
+            body = _inline(n.children[0].children) if n.children else ""
+            out.append(("text", f'<span size="{size}" weight="bold">{body}</span>'))
+        elif t == "fence":
+            lang = n.info.split()[0].lower() if n.info.strip() else ""
+            out.append(("code", lang, _strip_newline(n.content)))
+        elif t == "code_block":
+            out.append(("code", "", _strip_newline(n.content)))
+        elif t.startswith("math_block"):
+            out.append(("math", latex_to_pango(n.content)))
+        elif t == "table":
+            out.append(_table(n))
+        elif t == "hr":
+            out.append(("hr",))
+        elif t in ("bullet_list", "ordered_list"):
+            _list(n, out)
+        elif t == "blockquote":
+            sub = []
+            _walk(n.children, sub)
+            # «┃ » davanti a ogni riga, testo in corsivo.
+            out.extend(("text", "┃ <i>" + _prefix(b[1], "", "┃ ") + "</i>")
+                       if b[0] == "text" else b for b in sub)
+        elif t == "footnote_block":
+            out.append(("hr",))
+            for note in n.children:
+                sub = []
+                _walk(note.children, sub)
+                if not sub or sub[0][0] != "text":
+                    sub.insert(0, ("text", ""))
+                label = f"<sup>[{note.meta['id'] + 1}]</sup> "
+                sub[0] = ("text", _prefix(sub[0][1], label, ""))
+                out.extend(sub)
+        elif n.children:
+            _walk(n.children, out)
+
+
+def parse_blocks(text):
+    """Divide il testo in blocchi (vedi l'intestazione del modulo).
+
+    Funziona anche su testo incompleto, durante lo streaming: per CommonMark
+    un blocco di codice non chiuso arriva fino alla fine, e una formula $$
+    non chiusa resta testo finché non si chiude."""
+    tree = SyntaxTreeNode(_PARSER.parse(text.replace("\r\n", "\n")))
+    blocks = []
+    _walk(tree.children, blocks)
+    return blocks
+
+
+# ── Strumenti per riga (editor) ─────────────────────────────────────────────
+# Usati da math_to_text, table_at, display_math_at e has_inline_math.
+_RE_CODE_SPAN = re.compile(r"(`+)(.+?)\1")
+_RE_TABLE_SEP = re.compile(r"^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$")
+
 _RE_FENCE_LINE = re.compile(r"^\s{0,3}(`{3,}|~{3,})")
 
 def math_to_text(text):
@@ -393,50 +627,6 @@ def has_inline_math(line):
     sub_inline_math(_RE_CODE_SPAN.sub("", line), lambda src, _big: found.append(src) or "")
     return bool(found)
 
-
-# ── Testo in linea ──────────────────────────────────────────────────────────
-_RE_CODE_SPAN = re.compile(r"(`+)(.+?)\1")
-_RE_ESCAPED = re.compile(r"\\([\\`*_{}\[\]()#+\-.!|>~$])")
-
-
-def inline_to_pango(text):
-    """Grassetto, corsivo, barrato, codice, link e formule in linea.
-
-    Codice e formule sono messi da parte prima dell'escape, così gli
-    asterischi di a*b o di \\text{…} non diventano corsivo."""
-    keep = []
-
-    def stash(markup):
-        keep.append(markup)
-        return f"\x00{len(keep) - 1}\x00"
-
-    text = _RE_CODE_SPAN.sub(lambda m: stash(f"<tt>{escape(m.group(2).strip())}</tt>"), text)
-    text = sub_inline_math(text, lambda src, _big: stash(latex_to_pango(src)))
-    text = _RE_ESCAPED.sub(lambda m: stash(escape(m.group(1))), text)
-    s = escape(text)
-    s = re.sub(r"\*\*\*(?=\S)(.+?)(?<=\S)\*\*\*", r"<b><i>\1</i></b>", s)
-    s = re.sub(r"\*\*(?=\S)(.+?)(?<=\S)\*\*", r"<b>\1</b>", s)
-    s = re.sub(r"(?<!\w)__(?=\S)(.+?)(?<=\S)__(?!\w)", r"<b>\1</b>", s)
-    s = re.sub(r"(?<![\w*])\*(?=[^\s*])([^*]+?)(?<=[^\s*])\*(?![\w*])", r"<i>\1</i>", s)
-    s = re.sub(r"(?<![\w_])_(?=[^\s_])([^_]+?)(?<=[^\s_])_(?![\w_])", r"<i>\1</i>", s)
-    s = re.sub(r"~~(?=\S)(.+?)(?<=\S)~~", r"<s>\1</s>", s)
-    s = re.sub(r"\[([^\]]+)\]\((https?://[^)\s]+)\)",
-               lambda m: f'<a href="{m.group(2)}">{m.group(1)}</a>', s)
-    for _ in range(3):                              # segnaposto annidati
-        s = re.sub(r"\x00(\d+)\x00", lambda m: keep[int(m.group(1))], s)
-    return s
-
-
-# ── Blocchi ─────────────────────────────────────────────────────────────────
-_RE_FENCE = re.compile(r"^\s{0,3}(`{3,}|~{3,})\s*([^\s`]*)")
-_RE_HR = re.compile(r"^\s{0,3}([-*_])(?:\s*\1){2,}\s*$")
-_RE_HEADING = re.compile(r"^\s{0,3}(#{1,6})\s+(.*?)\s*#*\s*$")
-_RE_TABLE_SEP = re.compile(r"^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$")
-_RE_BULLET = re.compile(r"^(\s*)[-*+]\s+(\[[ xX]\]\s+)?(.*)$")
-_RE_NUMBER = re.compile(r"^(\s*)(\d+)[.)]\s+(.*)$")
-_HEADING_SIZE = ("xx-large", "x-large", "large", "large", "medium", "medium")
-
-
 def _split_row(line):
     s = line.strip()
     if s.startswith("|"):
@@ -479,27 +669,6 @@ def _aligns(sep):
     return out
 
 
-def _line_markup(line):
-    m = _RE_HEADING.match(line)
-    if m:
-        size = _HEADING_SIZE[len(m.group(1)) - 1]
-        return f'<span size="{size}" weight="bold">{inline_to_pango(m.group(2))}</span>'
-    m = _RE_BULLET.match(line)
-    if m:
-        indent = "    " * (len(m.group(1).expandtabs(4)) // 2)
-        task = m.group(2)
-        mark = ("☑" if task.strip()[1] in "xX" else "☐") if task else "•"
-        return f"{indent}{mark}  {inline_to_pango(m.group(3))}"
-    m = _RE_NUMBER.match(line)
-    if m:
-        indent = "    " * (len(m.group(1).expandtabs(4)) // 2)
-        return f"{indent}{m.group(2)}.  {inline_to_pango(m.group(3))}"
-    if line.lstrip().startswith(">"):
-        body = re.sub(r"^\s*(>\s?)+", "", line)
-        return f"┃ <i>{inline_to_pango(body)}</i>"
-    return inline_to_pango(line)
-
-
 def _display_math(lines, i):
     """Formula su riga propria ($$…$$ o \\[…\\], anche su più righe):
     (sorgente, indice della riga dopo) oppure None se non c'è o non è chiusa."""
@@ -521,70 +690,3 @@ def _display_math(lines, i):
     return None
 
 
-def parse_blocks(text):
-    """Divide il testo in blocchi (vedi l'intestazione del modulo).
-
-    Funziona anche su testo incompleto, durante lo streaming: un blocco di
-    codice non chiuso arriva fino alla fine, una formula $$ non chiusa resta
-    testo finché non si chiude."""
-    lines = text.replace("\r\n", "\n").split("\n")
-    blocks, para = [], []
-
-    def flush():
-        if para:
-            blocks.append(("text", "\n".join(_line_markup(l) for l in para)))
-            para.clear()
-
-    i, n = 0, len(lines)
-    while i < n:
-        line = lines[i]
-        stripped = line.strip()
-        fence = _RE_FENCE.match(line)
-        if fence:
-            flush()
-            mark = fence.group(1)
-            body, i = [], i + 1
-            while i < n and not (lines[i].strip().startswith(mark[0] * len(mark))
-                                 and set(lines[i].strip()) <= {mark[0]}):
-                body.append(lines[i])
-                i += 1
-            blocks.append(("code", fence.group(2).lower(), "\n".join(body)))
-            i += 1
-            continue
-        math = _display_math(lines, i)
-        if math:
-            flush()
-            blocks.append(("math", latex_to_pango(math[0])))
-            i = math[1]
-            continue
-        if _is_table(lines, i):
-            flush()
-            header = _split_row(line)
-            ncol = len(header)
-            aligns = (_aligns(lines[i + 1]) + ["left"] * ncol)[:ncol]
-            rows, i = [], i + 2
-            while i < n and lines[i].strip() and "|" in lines[i]:
-                rows.append((_split_row(lines[i]) + [""] * ncol)[:ncol])
-                i += 1
-            blocks.append(("table", aligns, [inline_to_pango(h) for h in header],
-                           [[inline_to_pango(c) for c in r] for r in rows]))
-            continue
-        if _RE_HR.match(line):
-            flush()
-            blocks.append(("hr",))
-            i += 1
-            continue
-        if not stripped:
-            flush()
-            i += 1
-            continue
-        if _RE_HEADING.match(line):                 # un titolo è sempre un blocco
-            flush()
-            para.append(line)
-            flush()
-            i += 1
-            continue
-        para.append(line)
-        i += 1
-    flush()
-    return blocks

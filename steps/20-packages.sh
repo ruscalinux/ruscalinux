@@ -101,6 +101,8 @@ python3-fonttools
 lintian
 qemu-utils
 ovmf
+# Test dei tool: rilettura dei PDF prodotti da RuscaWriter
+python3-pypdf
 
 # Compilare ruscallama-engine (llama.cpp con il backend Vulkan):
 # vedi tools/ruscallama-engine/README.md
@@ -114,6 +116,15 @@ spirv-headers
 # LIBS SUPPORT
 # ===========================================================================
 python3-gi-cairo
+
+# Motore Markdown comune di RuscaLLama, RuscaMark e RuscaWriter
+# (tools/*/rusca_markdown.py, CommonMark)
+python3-markdown-it
+python3-mdit-py-plugins
+
+# RuscaWriter: sillabazione del PDF (Pyphen) e generatore di copertine (Pillow)
+python3-pyphen
+python3-pil
 
 # Google Chrome - https://www.google.com/
 # Nessuna libreria in più: il pacchetto .deb ha già tutto

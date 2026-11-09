@@ -67,8 +67,43 @@ RuscaLLama e RuscaTranslator usano modelli linguistici in formato GGUF che giran
 - Il pacchetto del motore non ha interfaccia, quindi non ha traduzioni, icona né finestra Informazioni: lo dichiarano le finestre Informazioni di RuscaLLama e RuscaTranslator, nel gruppo “Componenti esterni”.
 - I modelli non fanno parte dei pacchetti: l’utente li copia in `~/.local/share/ruscallama/models/` o l’amministratore in `/usr/share/ruscallama/models/`. Ogni modello ha la propria licenza, che l’utente deve rispettare.
 - Il modulo `rusca_engine.py`, che avvia e interroga il motore, è identico nei due programmi, come `style.css` (si modifica una volta e si copia).
-- Il modulo `rusca_markdown.py` (Markdown, formule LaTeX e tabelle, senza GTK) è identico in RuscaLLama, RuscaMark e RuscaWriter (`src/ruscawriter/`), con la stessa regola.
+- Il modulo `rusca_markdown.py`, motore Markdown comune (sezione 1.2), è identico in RuscaLLama, RuscaMark e RuscaWriter (`src/ruscawriter/`), con la stessa regola. RuscaTranslator non lo include: mostra il Markdown come sorgente e non lo rende.
 - Gli editor di RuscaMark e RuscaWriter mostrano tabelle, formule e immagini come Markdown sorgente; la resa completa è nell’anteprima. RuscaWriter usa il modulo `rusca_liveblocks.py` per i riquadri delle immagini dell’anteprima.
+
+### 1.2 Il motore Markdown
+
+Il Markdown di tutti i tool segue la specifica **CommonMark 0.30** (<https://spec.commonmark.org/0.30/>), con queste estensioni e nessun’altra:
+
+| Estensione | Sintassi | Riferimento |
+|---|---|---|
+| Tabelle | `\| a \| b \|` seguita dalla riga `\|---\|---\|` | GitHub Flavored Markdown (GFM) |
+| Barrato | `~~testo~~` | GFM |
+| Liste di attività | `- [ ] da fare`, `- [x] fatto` | GFM |
+| Note a piè di pagina | `testo[^1]` e `[^1]: nota` | Pandoc e GitHub |
+| Formule nella frase | `$…$`, `\(…\)` | Pandoc (`tex_math_dollars`) |
+| Formule su riga propria | `$$…$$`, `\[…\]` | Pandoc |
+
+Per le formule con il dollaro valgono le regole di Pandoc: il `$` di apertura è seguito da un carattere che non è uno spazio, quello di chiusura è preceduto da un carattere che non è uno spazio e non è seguito da una cifra. Così «da $5 a $10» resta testo.
+
+L’analisi del Markdown non si scrive a mano: la fa **markdown-it-py** (pacchetto `python3-markdown-it`, >= 3.0, che implementa CommonMark 0.30), con i plugin di `python3-mdit-py-plugins` (>= 0.4). Entrambi sono in Debian Stable. `rusca_markdown.py` configura il parser una volta sola per tutti i programmi (`parser()`) e ne traduce l’albero nei formati che servono all’interfaccia, come i blocchi con markup Pango di `parse_blocks()`. La conversione delle formule LaTeX in testo Unicode (`latex_to_pango()`, `latex_to_text()`) è invece codice di RuscaLinux, perché in Debian non c’è una libreria equivalente.
+
+Regole:
+
+1. Nessun programma interpreta il Markdown con espressioni regolari o con un parser proprio: usa `rusca_markdown.py`. Fanno eccezione, per ora, gli strumenti per riga con cui gli editor evidenziano il sorgente (`table_at()`, `display_math_at()`, `has_inline_math()`, `sub_inline_math()`), da sostituire con le posizioni dei token di `parser()` (`token.map`).
+2. L’HTML grezzo scritto nel Markdown resta testo (opzione `html` disattivata): le risposte dei modelli e i documenti aperti non possono inserire markup.
+3. I programmi aprono solo link `http://`, `https://` e `mailto:`. markdown-it scarta già `javascript:`, `vbscript:`, `file:` e `data:` (salvo le immagini GIF, PNG, JPEG e WebP).
+4. Una riga che continua il paragrafo (a capo morbido) si mostra andando a capo, come nel sorgente: CommonMark lascia questa scelta al programma.
+5. Un blocco di codice non chiuso arriva fino alla fine del testo, e una formula `$$` non chiusa resta testo: la resa resta stabile mentre RuscaLLama riceve la risposta.
+6. Le estensioni non alterano nessun esempio della specifica CommonMark.
+7. Quando un programma divide un documento Markdown in parti (come RuscaTranslator per la traduzione), usa le posizioni dei token di `parser()`, così non taglia mai un elenco, una tabella, una nota o un blocco di codice.
+
+**Test.** `tests/test_rusca_markdown.py` controlla che le tre copie del modulo siano identiche, che la configurazione superi tutti i 652 esempi ufficiali di CommonMark 0.30 (`tests/data/commonmark-0.30-spec.json`), la resa dei blocchi, le regole delle formule e la validità del markup per Pango. La cartella `tests/` sta nella radice del repository, non in `tools/`, che contiene solo programmi da impacchettare. Il test si esegue dalla radice del repository dopo ogni modifica del modulo:
+
+```bash
+python3 -m unittest tests/test_rusca_markdown.py
+```
+
+**Stato nella versione 1.99.2.** RuscaLLama usa il motore comune per la chat. Restano da portare sul motore comune, uno alla volta: il convertitore HTML di RuscaMark (`markdown_to_html()`), quelli di RuscaWriter (`_blocks_to_html()` per HTML ed EPUB e `_render_markdown_into()` per l’anteprima), `split_code()` di RuscaLLama (conversazione in HTML e salvataggio dei blocchi di codice) e `split_markdown()` di RuscaTranslator.
 
 Gli identificatori di ogni tool devono coincidere tra loro (vedi sezione 5.2).
 
@@ -84,6 +119,7 @@ Fino alla versione 1.99.1 RuscaMark usava l’App ID `org.ruscalinux.ruscamark`.
 | Binding | PyGObject (`python3-gi`) |
 | Toolkit grafico | GTK 4 (>= 4.18) |
 | Libreria GNOME | libadwaita (>= 1.7) |
+| Markdown | CommonMark 0.30 con le estensioni della sezione 1.2, tramite `python3-markdown-it` (>= 3.0) e `python3-mdit-py-plugins` (>= 0.4) |
 | Distro base | Debian Stable |
 | Formato pacchetti | deb, `Architecture: all` (`amd64` per ruscallama-engine, che è compilato) |
 | Versione tool | 1.99.2 |
@@ -579,6 +615,9 @@ Componenti esterni in uso:
 |---|---|---|---|---|
 | EB Garamond e Courier Prime (caratteri tipografici) | inclusi nei sorgenti | SIL Open Font License 1.1 | `tools/ruscawriter/assets/`, installati in `/usr/share/ruscawriter/assets/` con il testo della licenza | RuscaWriter |
 | llama.cpp (con ggml e le librerie che include: nlohmann/json e cpp-httplib MIT, xxHash BSD-2-Clause, stb, miniaudio, sha1 e sha256 di pubblico dominio) | ultima release stabile al momento della build (1.99.2: 0.9.0), scritta nella descrizione del pacchetto e in `/usr/share/doc/ruscallama-engine/README.md.gz` | MIT | Compilato nel pacchetto `ruscallama-engine`, in `/usr/lib/ruscallama-engine/` | RuscaLLama, RuscaTranslator |
+| Esempi della specifica CommonMark (© John MacFarlane) | 0.30 | CC BY-SA 4.0 | `tests/data/commonmark-0.30-spec.json`, con `README.md`; solo per i test, non installati da nessun pacchetto | Test di `rusca_markdown.py` |
+
+markdown-it-py e mdit-py-plugins (licenza MIT) non sono inclusi: sono dipendenze dei pacchetti, installate da Debian.
 
 Il file `copyright` di `ruscallama-engine` riporta tutte queste licenze; solo lo script di costruzione e il profilo AppArmor sono di RuscaLinux (GPL-3.0).
 
@@ -639,6 +678,14 @@ Description: Short description in English
 ```
 
 Per RuscaMark, se include il controllo ortografico, aggiungere la riga `Recommends` della sezione 10.
+
+RuscaLLama, RuscaMark e RuscaWriter, che includono `rusca_markdown.py` (sezione 1.2), aggiungono a `Depends`:
+
+```text
+python3-markdown-it (>= 3.0), python3-mdit-py-plugins (>= 0.4)
+```
+
+Le stesse librerie sono nell’elenco dei pacchetti della ISO (`steps/20-packages.sh`, sezione “LIBS SUPPORT”): ogni dipendenza nuova di un tool va aggiunta anche lì.
 
 Costruzione e checksum (all’interno di `make-deb.sh`):
 
@@ -866,6 +913,7 @@ Un tool è pronto quando:
 15. Ha la versione uguale a `VERSION` di `release.conf`.
 16. È licenziato GPL-3.0, con componenti esterni dichiarati.
 17. Non usa rete, telemetria o comandi pericolosi (per RuscaLLama e RuscaTranslator: rete solo verso 127.0.0.1, sezione 11).
+18. Se mostra, converte o divide Markdown, usa `rusca_markdown.py` (sezione 1.2), e i test di `tests/test_rusca_markdown.py` passano.
 
 ---
 

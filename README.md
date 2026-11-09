@@ -33,6 +33,7 @@ line propagates it to the ISO name, the volume label, `/etc/os-release`,
 | `steps/` | The three scripts that determine what goes into the ISO. |
 | `branding/` | Design sources: logos, icon theme, wallpapers, fonts, generators. |
 | `tools/` | First-party applications, one directory each. |
+| `tests/` | Tests shared by several applications, such as the common Markdown engine. |
 | `local/` | Files `live-build` consumes directly: splash images, vendor logo. |
 | `dist/` | Templates for the README and INSTALL published next to the ISO. |
 

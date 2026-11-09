@@ -101,7 +101,8 @@ PYCHECK
 [ -f docs/Manual_it.md ] && [ -f docs/Manual_en.md ] || \
     echo "AVVISO: docs/Manual_it.md o docs/Manual_en.md mancanti: manuali non inclusi."
 
-# Il motore Markdown è integrato: python3-markdown non è più necessario.
+# Markdown: motore comune rusca_markdown.py, basato su markdown-it-py
+# (CommonMark); python3-markdown non serve.
 RECOMMENDS="gir1.2-spelling-1, gir1.2-gtksource-5, hunspell-it, hunspell-en-gb"
 SUGGESTS="xdg-utils, hunspell-en-us"
 
@@ -329,7 +330,7 @@ SIZE_KB=$(du -sk "${ROOT}/usr" | cut -f1)
     echo "Version: ${VER}"
     echo "Architecture: ${ARCH}"
     echo "Maintainer: ${MAINT}"
-    echo "Depends: python3 (>= 3.10), python3-gi, python3-gi-cairo, gir1.2-gtk-4.0 (>= 4.18), gir1.2-adw-1 (>= 1.7), librsvg2-common, fonts-dejavu-core"
+    echo "Depends: python3 (>= 3.10), python3-gi, python3-gi-cairo, gir1.2-gtk-4.0 (>= 4.18), gir1.2-adw-1 (>= 1.7), librsvg2-common, fonts-dejavu-core, python3-markdown-it (>= 3.0), python3-mdit-py-plugins (>= 0.4)"
     echo "Recommends: ${RECOMMENDS}"
     echo "Suggests: ${SUGGESTS}"
     # Le build precedenti si chiamavano "ruscamark-ruscalinux" e installavano
