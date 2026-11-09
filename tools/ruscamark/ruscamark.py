@@ -2478,8 +2478,8 @@ def ensure_icon():
 
 # Componenti esterni inclusi (specifiche, sezioni 3.10 e 6)
 COMPONENTS = (
-    # Regola dell'evidenziato ==testo== nel motore comune rusca_markdown.py
-    ("markdown-it-mark", "MIT — Vitaly Puzrin, Alex Kocharin",
+    # Regola dell'evidenziato ==testo==, nel file a sé markdown_it_mark.py
+    ("markdown-it-mark", "MIT — Vitaly Puzrin, Alex Kocharin; ExecutableBookProject",
      "https://github.com/markdown-it/markdown-it-mark"),
 )
 

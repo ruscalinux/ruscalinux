@@ -285,7 +285,7 @@ Il codice è distribuito con licenza GPL-3.0 o successiva: https://www.gnu.org/l
 |---|---|---|
 | EB Garamond (font) | SIL OFL 1.1 | `assets/EBGaramond-*.ttf`, `assets/EBGaramond-OFL.txt` |
 | Courier Prime (font) | SIL OFL 1.1 | `assets/CourierPrime-*.ttf`, `assets/CourierPrime-OFL.txt` |
-| Regola dell'evidenziato `==testo==` (porting di markdown-it-mark) | MIT | `src/ruscawriter/rusca_markdown.py` |
+| Regola dell'evidenziato `==testo==` (porting di markdown-it-mark, struttura da markdown-it-py) | MIT | `src/ruscawriter/markdown_it_mark.py` |
 
 Il lettore MDict, i decompressori e i cifrari sono scritti da zero per questo progetto e ricadono sotto la GPL-3.0.
 

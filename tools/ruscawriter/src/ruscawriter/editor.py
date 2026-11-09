@@ -193,8 +193,8 @@ COMPONENTS = (
      "https://github.com/octaviopardo/EBGaramond12"),
     ("Courier Prime", "SIL Open Font License 1.1",
      "https://github.com/quoteunquoteapps/CourierPrime"),
-    # Regola dell'evidenziato ==testo== nel motore comune rusca_markdown.py
-    ("markdown-it-mark", "MIT — Vitaly Puzrin, Alex Kocharin",
+    # Regola dell'evidenziato ==testo==, nel file a sé markdown_it_mark.py
+    ("markdown-it-mark", "MIT — Vitaly Puzrin, Alex Kocharin; ExecutableBookProject",
      "https://github.com/markdown-it/markdown-it-mark"),
 )
 

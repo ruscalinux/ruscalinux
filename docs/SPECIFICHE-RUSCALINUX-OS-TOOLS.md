@@ -67,7 +67,7 @@ RuscaLLama e RuscaTranslator usano modelli linguistici in formato GGUF che giran
 - Il pacchetto del motore non ha interfaccia, quindi non ha traduzioni, icona né finestra Informazioni: lo dichiarano le finestre Informazioni di RuscaLLama e RuscaTranslator, nel gruppo “Componenti esterni”.
 - I modelli non fanno parte dei pacchetti: l’utente li copia in `~/.local/share/ruscallama/models/` o l’amministratore in `/usr/share/ruscallama/models/`. Ogni modello ha la propria licenza, che l’utente deve rispettare.
 - Il modulo `rusca_engine.py`, che avvia e interroga il motore, è identico nei due programmi, come `style.css` (si modifica una volta e si copia).
-- Il modulo `rusca_markdown.py`, motore Markdown comune (sezione 1.2), è identico in RuscaLLama, RuscaMark, RuscaWriter (`src/ruscawriter/`) e RuscaTranslator, con la stessa regola. RuscaTranslator mostra il Markdown come sorgente: il motore gli serve per dividere i documenti da tradurre senza spezzare un blocco.
+- Il modulo `rusca_markdown.py`, motore Markdown comune (sezione 1.2), è identico in RuscaLLama, RuscaMark, RuscaWriter (`src/ruscawriter/`) e RuscaTranslator, con la stessa regola; accanto c’è `markdown_it_mark.py`, componente esterno usato dal motore (sezione 6), anch’esso identico nei quattro programmi. RuscaTranslator mostra il Markdown come sorgente: il motore gli serve per dividere i documenti da tradurre senza spezzare un blocco.
 - Gli editor di RuscaMark e RuscaWriter mostrano tabelle, formule e immagini come Markdown sorgente; la resa completa è nell’anteprima. RuscaWriter usa il modulo `rusca_liveblocks.py` per i riquadri delle immagini dell’anteprima.
 
 ### 1.2 Il motore Markdown
@@ -89,7 +89,7 @@ Per le formule con il dollaro valgono le regole di Pandoc: il `$` di apertura è
 
 Per i link automatici valgono le regole di GFM: diventano link solo gli indirizzi con `http://` o `https://`, quelli che cominciano con `www.` e gli indirizzi email. «build.sh», «raglin.py» o «debian.org» restano testo, anche se `.sh`, `.py` e `.md` sono domini nazionali.
 
-L’analisi del Markdown non si scrive a mano: la fa **markdown-it-py** (pacchetto `python3-markdown-it`, >= 3.0, che implementa CommonMark 0.30), con i plugin di `python3-mdit-py-plugins` (>= 0.4) e, per i link automatici, `python3-linkify-it` (>= 2.0), ristretto alle regole di GFM. Sono tutti in Debian Stable. L’evidenziato usa la regola del plugin `markdown-it-mark`, che Debian non pacchettizza: è un porting di poche righe dentro `rusca_markdown.py` (sezione 6). `rusca_markdown.py` configura il parser una volta sola per tutti i programmi (`parser()`) e ne traduce l’albero nei formati che servono all’interfaccia, come i blocchi con markup Pango di `parse_blocks()`. La conversione delle formule LaTeX in testo Unicode (`latex_to_pango()`, `latex_to_text()`) è invece codice di RuscaLinux, perché in Debian non c’è una libreria equivalente.
+L’analisi del Markdown non si scrive a mano: la fa **markdown-it-py** (pacchetto `python3-markdown-it`, >= 3.0, che implementa CommonMark 0.30), con i plugin di `python3-mdit-py-plugins` (>= 0.4) e, per i link automatici, `python3-linkify-it` (>= 2.0), ristretto alle regole di GFM. Sono tutti in Debian Stable. L’evidenziato usa la regola del plugin `markdown-it-mark`, che Debian non pacchettizza: è un porting di poche righe nel file a sé `markdown_it_mark.py`, componente esterno (sezione 6). `rusca_markdown.py` configura il parser una volta sola per tutti i programmi (`parser()`) e ne traduce l’albero nei formati che servono all’interfaccia, come i blocchi con markup Pango di `parse_blocks()`. La conversione delle formule LaTeX in testo Unicode (`latex_to_pango()`, `latex_to_text()`) è invece codice di RuscaLinux, perché in Debian non c’è una libreria equivalente.
 
 Regole:
 
@@ -614,6 +614,7 @@ Regole:
 3. Ogni componente esterno incluso va indicato con nome, versione, licenza e percorso nel progetto, sia nella documentazione del tool sia nella finestra “Informazioni” (sezione 3.10, gruppo “Componenti esterni”).
 4. Rispettare legalmente tutte le licenze dei componenti usati.
 5. Il nome RuscaLinux, il logo e l’emblema non sono coperti dalla GPL: vedi `TRADEMARK.md` del repository.
+6. Il codice esterno incluso sta sempre in **file separati**, con la provenienza e il testo della sua licenza in testa, e il file `copyright` del pacchetto lo dichiara con un blocco `Files:` proprio. Nessun file mescola codice di RuscaLinux e codice esterno: chi apre un file sa subito di chi è e con quale licenza.
 
 Componenti esterni in uso:
 
@@ -621,7 +622,7 @@ Componenti esterni in uso:
 |---|---|---|---|---|
 | EB Garamond e Courier Prime (caratteri tipografici) | inclusi nei sorgenti | SIL Open Font License 1.1 | `tools/ruscawriter/assets/`, installati in `/usr/share/ruscawriter/assets/` con il testo della licenza | RuscaWriter |
 | llama.cpp (con ggml e le librerie che include: nlohmann/json e cpp-httplib MIT, xxHash BSD-2-Clause, stb, miniaudio, sha1 e sha256 di pubblico dominio) | ultima release stabile al momento della build (1.99.2: 0.9.0), scritta nella descrizione del pacchetto e in `/usr/share/doc/ruscallama-engine/README.md.gz` | MIT | Compilato nel pacchetto `ruscallama-engine`, in `/usr/lib/ruscallama-engine/` | RuscaLLama, RuscaTranslator |
-| Regola dell’evidenziato, porting del plugin markdown-it-mark (© Vitaly Puzrin e Alex Kocharin) | — | MIT | `_mark_plugin` in `rusca_markdown.py`; indicato nella finestra Informazioni e nei manuali dei quattro programmi | RuscaLLama, RuscaMark, RuscaWriter, RuscaTranslator |
+| Regola dell’evidenziato, porting del plugin markdown-it-mark (© Vitaly Puzrin e Alex Kocharin) con la struttura della regola del barrato di markdown-it-py (© ExecutableBookProject) | — | MIT (Expat) | `markdown_it_mark.py`, file a sé accanto a `rusca_markdown.py`; dichiarato nel file `copyright` del pacchetto, nella finestra Informazioni e nei manuali | RuscaLLama, RuscaMark, RuscaWriter, RuscaTranslator |
 | Esempi della specifica CommonMark (© John MacFarlane) | 0.30 | CC BY-SA 4.0 | `tests/data/commonmark-0.30-spec.json`, con `README.md`; solo per i test, non installati da nessun pacchetto | Test di `rusca_markdown.py` |
 
 markdown-it-py, mdit-py-plugins e linkify-it-py (licenza MIT) non sono inclusi: sono dipendenze dei pacchetti, installate da Debian.

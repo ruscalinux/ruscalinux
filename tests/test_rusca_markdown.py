@@ -37,6 +37,21 @@ def _normalize(html):
 
 
 class Copies(unittest.TestCase):
+    def test_external_component_identical(self):
+        digests = set()
+        for p in COPIES:
+            with open(os.path.join(TOOLS, os.path.dirname(p), "markdown_it_mark.py"), "rb") as f:
+                digests.add(hashlib.sha256(f.read()).hexdigest())
+        self.assertEqual(len(digests), 1, "le copie di markdown_it_mark.py sono diverse")
+
+    def test_no_external_code_in_engine(self):
+        # Specifiche, sezione 6, regola 6: il codice esterno sta in file a sé.
+        with open(os.path.join(TOOLS, COPIES[0]), encoding="utf-8") as f:
+            engine = f.read()
+        self.assertNotIn("Permission is hereby granted", engine)
+        self.assertNotIn("Copyright (c)", engine)
+        self.assertEqual(md.mark_plugin.__module__.rsplit(".", 1)[-1], "markdown_it_mark")
+
     def test_identical(self):
         digests = set()
         for p in COPIES:

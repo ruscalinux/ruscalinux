@@ -50,8 +50,8 @@ CONFIG_FILE = os.path.join(CONFIG_DIR, "settings.json")
 USER_MODELS = os.path.join(GLib.get_user_data_dir(), "ruscallama", "models")
 COMPONENTS = (
     ("llama.cpp", "MIT — The ggml authors", "https://github.com/ggml-org/llama.cpp"),
-    # Regola dell'evidenziato ==testo== nel motore comune rusca_markdown.py
-    ("markdown-it-mark", "MIT — Vitaly Puzrin, Alex Kocharin",
+    # Regola dell'evidenziato ==testo==, nel file a sé markdown_it_mark.py
+    ("markdown-it-mark", "MIT — Vitaly Puzrin, Alex Kocharin; ExecutableBookProject",
      "https://github.com/markdown-it/markdown-it-mark"),
 )
 

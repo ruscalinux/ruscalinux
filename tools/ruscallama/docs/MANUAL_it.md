@@ -4,7 +4,7 @@
 
 RuscaLLama è una chat con modelli linguistici che girano **interamente su questo computer**. Il modello viene eseguito da **ruscallama-engine**, cioè llama.cpp: un componente esterno con licenza MIT, compilato per RuscaLinux.
 
-Il motore Markdown comune include un componente esterno: la regola dell'evidenziato `==testo==`, porting del plugin [markdown-it-mark](https://github.com/markdown-it/markdown-it-mark) (licenza MIT, © Vitaly Puzrin e Alex Kocharin), in `rusca_markdown.py`.
+Il motore Markdown comune include un componente esterno: la regola dell'evidenziato `==testo==`, porting del plugin [markdown-it-mark](https://github.com/markdown-it/markdown-it-mark) (licenza MIT, © Vitaly Puzrin e Alex Kocharin; struttura in Python da markdown-it-py, © ExecutableBookProject), nel file a sé `markdown_it_mark.py`.
 
 ---
 

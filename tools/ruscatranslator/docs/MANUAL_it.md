@@ -4,7 +4,7 @@
 
 RuscaTranslator traduce documenti **Markdown** tra le ventisei lingue ufficiali di RuscaLinux con un modello linguistico che gira **su questo computer**, tramite **ruscallama-engine** (llama.cpp, componente esterno con licenza MIT). Titoli, elenchi, tabelle, codice e link restano intatti.
 
-Il motore Markdown comune include un componente esterno: la regola dell'evidenziato `==testo==`, porting del plugin [markdown-it-mark](https://github.com/markdown-it/markdown-it-mark) (licenza MIT, © Vitaly Puzrin e Alex Kocharin), in `rusca_markdown.py`.
+Il motore Markdown comune include un componente esterno: la regola dell'evidenziato `==testo==`, porting del plugin [markdown-it-mark](https://github.com/markdown-it/markdown-it-mark) (licenza MIT, © Vitaly Puzrin e Alex Kocharin; struttura in Python da markdown-it-py, © ExecutableBookProject), nel file a sé `markdown_it_mark.py`.
 
 Lingue: inglese, cinese semplificato, cinese tradizionale, spagnolo, hindi, arabo, portoghese brasiliano, portoghese europeo, russo, giapponese, tedesco, francese, italiano, coreano, indonesiano, turco, polacco, olandese, ucraino, ceco, vietnamita, svedese, rumeno, ungherese, greco, finlandese. La lingua di partenza si può rilevare in automatico: dall'alfabeto per cinese, giapponese, coreano, arabo, hindi, greco, russo e ucraino, dalle parole e dalle lettere più frequenti per le altre. Su testi molto brevi o misti il rilevamento può sbagliare, e tra varianti vicine (cinese semplificato e tradizionale, portoghese brasiliano ed europeo) sceglie in base a caratteri e forme tipiche: in quei casi conviene scegliere la lingua a mano.
 
