@@ -401,4 +401,6 @@ Assistenza: info@ruscalinux.org
 
 RuscaMark è software libero distribuito con licenza GPL-3.0: <https://www.gnu.org/licenses/gpl-3.0.html>.
 
+Il motore Markdown comune include un componente esterno: la regola dell'evidenziato `==testo==`, porting del plugin [markdown-it-mark](https://github.com/markdown-it/markdown-it-mark) (licenza MIT, © Vitaly Puzrin e Alex Kocharin), in `rusca_markdown.py`. È elencato anche nella finestra Informazioni, alla voce «Componenti esterni».
+
 La nota sull'uso di strumenti di intelligenza artificiale si trova nella finestra Informazioni del programma e nel file `NOTA-IA.md` del repository.

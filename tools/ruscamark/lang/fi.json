@@ -78,6 +78,7 @@
   "title_untitled": "Nimetön",
   "about_desc": "Ammattimainen Markdown-editori, jossa on muotoilun reaaliaikainen näkymä, keskitetty kirjoitussivu, reaaliaikainen oikoluku ehdotuksineen ja sanatavoite.",
   "about_license": "Lisenssi",
+  "about_components": "Ulkoiset komponentit",
   "mi_bold": "Lihavoitu",
   "mi_italic": "Kursivoitu",
   "mi_link": "Lisää linkki…",

@@ -4,6 +4,8 @@
 
 RuscaTranslator translates **Markdown** documents between the twenty-six official languages of RuscaLinux with a language model that runs **on this computer**, through **ruscallama-engine** (llama.cpp, an external component under the MIT license). Headings, lists, tables, code and links stay intact.
 
+The common Markdown engine includes an external component: the highlight rule `==text==`, a port of the [markdown-it-mark](https://github.com/markdown-it/markdown-it-mark) plugin (MIT license, © Vitaly Puzrin and Alex Kocharin), in `rusca_markdown.py`.
+
 Languages: English, Simplified Chinese, Traditional Chinese, Spanish, Hindi, Arabic, Brazilian Portuguese, European Portuguese, Russian, Japanese, German, French, Italian, Korean, Indonesian, Turkish, Polish, Dutch, Ukrainian, Czech, Vietnamese, Swedish, Romanian, Hungarian, Greek, Finnish. The source language can be detected automatically: from the script for Chinese, Japanese, Korean, Arabic, Hindi, Greek, Russian and Ukrainian, from the most frequent words and letters for the others. With very short or mixed texts detection can be wrong, and between close variants (Simplified and Traditional Chinese, Brazilian and European Portuguese) it decides from typical characters and forms: in those cases, choose the language by hand.
 
 ---

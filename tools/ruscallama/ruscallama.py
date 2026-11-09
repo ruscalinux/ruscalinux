@@ -48,8 +48,12 @@ LANG_DIR = os.path.join(BASE_DIR, "lang")
 CONFIG_DIR = os.path.join(GLib.get_user_config_dir(), "ruscallama")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "settings.json")
 USER_MODELS = os.path.join(GLib.get_user_data_dir(), "ruscallama", "models")
-COMPONENTS = (("llama.cpp", "MIT — The ggml authors",
-               "https://github.com/ggml-org/llama.cpp"),)
+COMPONENTS = (
+    ("llama.cpp", "MIT — The ggml authors", "https://github.com/ggml-org/llama.cpp"),
+    # Regola dell'evidenziato ==testo== nel motore comune rusca_markdown.py
+    ("markdown-it-mark", "MIT — Vitaly Puzrin, Alex Kocharin",
+     "https://github.com/markdown-it/markdown-it-mark"),
+)
 
 MAX_TOKENS = 4096
 MAX_TEXT_ATTACHMENT = 512 * 1024         # 512 KB di testo per allegato

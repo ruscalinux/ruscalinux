@@ -78,6 +78,7 @@
   "title_untitled": "제목 없음",
   "about_desc": "전문 Markdown 편집기: 서식 실시간 렌더링, 가운데 정렬된 쓰기 페이지, 제안이 있는 실시간 맞춤법 검사와 단어 목표.",
   "about_license": "라이선스",
+  "about_components": "외부 구성 요소",
   "mi_bold": "굵게",
   "mi_italic": "기울임",
   "mi_link": "링크 삽입…",

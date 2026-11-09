@@ -193,6 +193,9 @@ COMPONENTS = (
      "https://github.com/octaviopardo/EBGaramond12"),
     ("Courier Prime", "SIL Open Font License 1.1",
      "https://github.com/quoteunquoteapps/CourierPrime"),
+    # Regola dell'evidenziato ==testo== nel motore comune rusca_markdown.py
+    ("markdown-it-mark", "MIT — Vitaly Puzrin, Alex Kocharin",
+     "https://github.com/markdown-it/markdown-it-mark"),
 )
 
 # Icona: quella del tema (App ID). Avviando dai sorgenti, ensure_icon() la

@@ -528,6 +528,11 @@ def test_link_markdown():
     check("senza indirizzo resta l'etichetta",
           link_display("solo testo", "") == "solo testo")
     check("nessuno dei due: stringa vuota", link_display("", "") == "")
+    # un'ancora interna non dice niente a chi legge il libro stampato
+    check("link interno: solo l'etichetta",
+          link_display("vai ai risultati", "#risultati") == "vai ai risultati")
+    check("link interno nel testo",
+          parse_inline("vedi [qui](#titolo-codice).") == [("vedi qui.", "regular")])
 
     # --- e in ogni export -------------------------------------------------
     p = Project()

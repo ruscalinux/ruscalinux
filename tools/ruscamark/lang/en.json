@@ -78,6 +78,7 @@
   "title_untitled": "Untitled",
   "about_desc": "Professional Markdown editor with live rendering of formatting, centred writing page, live spell checking with suggestions and word goal.",
   "about_license": "License",
+  "about_components": "External Components",
   "mi_bold": "Bold",
   "mi_italic": "Italic",
   "mi_link": "Insert link…",

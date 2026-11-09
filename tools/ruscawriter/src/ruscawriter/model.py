@@ -962,10 +962,12 @@ def link_display(etichetta, indirizzo):
     non e' raggiungibile. Prima veniva buttato via in silenzio.
 
     Se etichetta e indirizzo dicono gia' la stessa cosa non si ripete nulla.
+    Un link interno al documento ([vai](#risultati)) mostra solo l'etichetta:
+    l'ancora #risultati non porta da nessuna parte a chi legge il libro.
     """
     etichetta = (etichetta or "").strip()
     indirizzo = (indirizzo or "").strip()
-    if not indirizzo:
+    if not indirizzo or indirizzo.startswith("#"):
         return etichetta
     if not etichetta:
         return indirizzo

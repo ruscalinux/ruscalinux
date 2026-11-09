@@ -78,6 +78,7 @@
   "title_untitled": "Unbenannt",
   "about_desc": "Professioneller Markdown-Editor mit Live-Darstellung der Formatierung, zentrierter Schreibseite, Live-Rechtschreibprüfung mit Vorschlägen und Wortziel.",
   "about_license": "Lizenz",
+  "about_components": "Externe Komponenten",
   "mi_bold": "Fett",
   "mi_italic": "Kursiv",
   "mi_link": "Link einfügen…",

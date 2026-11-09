@@ -2476,6 +2476,14 @@ def ensure_icon():
         pass
 
 
+# Componenti esterni inclusi (specifiche, sezioni 3.10 e 6)
+COMPONENTS = (
+    # Regola dell'evidenziato ==testo== nel motore comune rusca_markdown.py
+    ("markdown-it-mark", "MIT — Vitaly Puzrin, Alex Kocharin",
+     "https://github.com/markdown-it/markdown-it-mark"),
+)
+
+
 def show_about_dialog(parent, tr, app_id, app_name, version, description, has_icon,
                       components=()):
     """Finestra «Informazioni» comune ai RuscaLinux OS Tools.
@@ -3790,8 +3798,11 @@ class RuscaWindow(Adw.ApplicationWindow):
         mk("sup", rise=5 * Pango.SCALE, scale=0.75)
         mk("sub", rise=-3 * Pango.SCALE, scale=0.75)
         # Linea orizzontale: riga bassissima colorata da un bordo all'altro;
-        # il testo «---» prende lo stesso colore e sparisce.
-        mk("hr_bar", scale=0.25, foreground=c["border"], paragraph_background=c["border"])
+        # il testo «---» prende lo stesso colore e sparisce. Senza gli spazi
+        # dell'interlinea, che lo sfondo di paragrafo colorerebbe: 3 pixel con
+        # qualunque interlinea, invece di una fascia di 13-21.
+        mk("hr_bar", scale=0.12, foreground=c["border"], paragraph_background=c["border"],
+           pixels_above_lines=0, pixels_below_lines=0)
         mk("setext", foreground=c["subtle"])
         mk("hide", invisible=True)
         # Blocchi di codice e tabelle: interlinea minima (righe compatte).
@@ -4354,7 +4365,7 @@ class RuscaWindow(Adw.ApplicationWindow):
     # ------------------------------------------------------- Informazioni e scorciatoie
     def _action_about(self):
         show_about_dialog(self, self.t, APP_ID, APP_NAME, APP_VERSION,
-                          self.t("about_desc"), theme_has_icon())
+                          self.t("about_desc"), theme_has_icon(), COMPONENTS)
 
     def _action_shortcuts(self):
         """Adw.ShortcutsDialog arriva con libadwaita 1.8: su trixie si usa un

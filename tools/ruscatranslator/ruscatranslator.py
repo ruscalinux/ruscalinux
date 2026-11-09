@@ -49,8 +49,12 @@ LANG_DIR = os.path.join(BASE_DIR, "lang")
 DOC_DIRS = (os.path.join(BASE_DIR, "docs"), "/usr/share/doc/ruscatranslator")
 CONFIG_DIR = os.path.join(GLib.get_user_config_dir(), "ruscatranslator")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "settings.json")
-COMPONENTS = (("llama.cpp", "MIT — The ggml authors",
-               "https://github.com/ggml-org/llama.cpp"),)
+COMPONENTS = (
+    ("llama.cpp", "MIT — The ggml authors", "https://github.com/ggml-org/llama.cpp"),
+    # Regola dell'evidenziato ==testo== nel motore comune rusca_markdown.py
+    ("markdown-it-mark", "MIT — Vitaly Puzrin, Alex Kocharin",
+     "https://github.com/markdown-it/markdown-it-mark"),
+)
 
 CHUNK_CHAR = 6000                 # caratteri per blocco di traduzione
 MAX_TOKENS = 4096

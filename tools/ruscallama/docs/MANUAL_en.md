@@ -4,6 +4,8 @@
 
 RuscaLLama is a chat with language models that run **entirely on this computer**. The model is run by **ruscallama-engine**, that is llama.cpp: an external component under the MIT license, built for RuscaLinux.
 
+The common Markdown engine includes an external component: the highlight rule `==text==`, a port of the [markdown-it-mark](https://github.com/markdown-it/markdown-it-mark) plugin (MIT license, © Vitaly Puzrin and Alex Kocharin), in `rusca_markdown.py`.
+
 ---
 
 ## 1. Requirements

@@ -78,6 +78,7 @@
   "title_untitled": "未命名",
   "about_desc": "專業的 Markdown 編輯器：格式即時渲染、居中的寫作頁面、帶建議的即時拼字檢查和字數目標。",
   "about_license": "授權",
+  "about_components": "外部元件",
   "mi_bold": "粗體",
   "mi_italic": "斜體",
   "mi_link": "插入連結…",

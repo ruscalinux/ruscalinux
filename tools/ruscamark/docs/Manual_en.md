@@ -401,4 +401,6 @@ Support: info@ruscalinux.org
 
 RuscaMark is free software released under the GPL-3.0 license: <https://www.gnu.org/licenses/gpl-3.0.html>.
 
+The common Markdown engine includes an external component: the highlight rule `==text==`, a port of the [markdown-it-mark](https://github.com/markdown-it/markdown-it-mark) plugin (MIT license, © Vitaly Puzrin and Alex Kocharin), in `rusca_markdown.py`. It is also listed in the About window, under “External Components”.
+
 The note on the use of AI tools is in the program's About window and in the `NOTA-IA.md` file of the repository.
