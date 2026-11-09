@@ -50,9 +50,11 @@ For other languages install the matching dictionary, for example `hunspell-fr` o
 Open RuscaMark from the GNOME applications menu or by searching for it in Activities. From a terminal:
 
 ```bash
-ruscamark               # welcome document
+ruscamark               # new document
 ruscamark report.md     # open a file
 ```
+
+On first launch RuscaMark shows a welcome document that introduces its features; from then on it opens with an empty document.
 
 You can also drag a `.md` file into the window.
 
@@ -66,7 +68,7 @@ You can also drag a `.md` file into the window.
 
 ## 4. Two ways to view your text
 
-**Live rendering (Ctrl+L)** — the default mode. Headings, bold, italic, code, links, quotes and lists take on their final look immediately and the markers (`**`, `#`, `>`…) are hidden. When you move the cursor onto an element, its syntax reappears so you can edit it. Tables stay in a monospaced font, so aligned columns remain aligned.
+**Live rendering (Ctrl+L)** — the default mode. Headings, bold, italic, code, links, quotes and lists take on their final look immediately and the markers (`**`, `#`, `>`…) are hidden. When you move the cursor onto an element, its syntax reappears so you can edit it. Tables stay in a monospaced font, so aligned columns remain aligned. Live rendering reads Markdown exactly as the preview and the exports do, even when bold or italic text continues on the next line.
 
 **Classic preview (Ctrl+P)** — splits the window: source with syntax colouring on the left, the laid-out document on the right. Only the preview shows real images, tables drawn as grids and footnotes collected at the end. With the light style the preview uses the same colours as the PDF and HTML exports; with the dark style it stays plum.
 
@@ -282,6 +284,7 @@ There is no reference to the program or the website.
 - Long paragraphs continue on the next page; a heading is never left alone at the bottom of a page; short code blocks are never split, long ones continue on the next page with their box.
 - Long text wraps inside table cells and, when a table continues on the next page, the header row is repeated.
 - Local images are inserted at their natural size, scaled down if wider than the page. Remote images are not downloaded: their alternative text is shown instead.
+- Links are clickable: web and e-mail links open the browser or the mail program, internal links such as `[go to the results](#results)` jump to the heading. Links to files or relative paths stay as text, because outside the document's folder they would lead nowhere; an internal link to a heading that does not exist also stays as text.
 
 ### HTML
 

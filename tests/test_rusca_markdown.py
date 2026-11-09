@@ -53,15 +53,37 @@ class CommonMark(unittest.TestCase):
         with open(path, encoding="utf-8") as f:
             cls.examples = json.load(f)
 
+    def _failed(self, p):
+        return [e["example"] for e in self.examples
+                if _normalize(p.render(e["markdown"])) != _normalize(e["html"])]
+
     def test_spec_examples(self):
-        # La configurazione dei programmi, con l'HTML grezzo attivo solo qui:
-        # verifica che nessuna estensione (formule, tabelle, note, liste di
-        # attività) cambi il comportamento di CommonMark.
+        # La configurazione dei programmi, con l'HTML grezzo attivo solo qui
+        # e senza link automatici: nessuna estensione (formule, tabelle, note,
+        # liste di attività, evidenziato) cambia il comportamento di CommonMark.
         p = md._make_parser()
         p.options["html"] = True
-        failed = [e["example"] for e in self.examples
-                  if _normalize(p.render(e["markdown"])) != _normalize(e["html"])]
+        p.disable("linkify")
+        failed = self._failed(p)
         self.assertEqual(failed, [], f"esempi CommonMark non superati: {failed}")
+
+    def test_autolink_extension_changes_only_bare_urls(self):
+        # I link automatici di GFM cambiano di proposito solo gli esempi in cui
+        # CommonMark lascia come testo un indirizzo scritto senza < >.
+        p = md._make_parser()
+        p.options["html"] = True
+        self.assertEqual(self._failed(p), [601, 607, 610, 611])
+
+    def test_parse_source_same_tokens(self):
+        # La resa live vede esattamente quello che vedono anteprima ed export.
+        def shape(tokens):
+            return [(t.type, t.content, t.markup,
+                     [(c.type, c.content, c.markup) for c in t.children or []])
+                    for t in tokens]
+        different = [e["example"] for e in self.examples
+                     if shape(md.parser().parse(e["markdown"]))
+                     != shape(md.parse_source(e["markdown"]))]
+        self.assertEqual(different, [])
 
     def test_raw_html_is_text(self):
         self.assertFalse(md.parser().options["html"])
@@ -120,8 +142,48 @@ class Blocks(unittest.TestCase):
                    [("text", "testo<sup>[1]</sup>"), ("hr",),
                     ("text", "<sup>[1]</sup> nota")])
 
+    def test_mark(self):
+        self.check("a ==b **c**== d",
+                   [("text", 'a <span background="#f2a7c8" foreground="#2d0a1d">b <b>c</b></span> d')])
+        self.check("== no ==", [("text", "== no ==")])
+        self.check("===x===",
+                   [("text", '=<span background="#f2a7c8" foreground="#2d0a1d">x</span>=')])
+
+    def test_gfm_autolinks(self):
+        def hrefs(src):
+            return [t.attrs.get("href") for t in md.parser().parseInline(src)[0].children
+                    if t.type == "link_open"]
+        self.assertEqual(hrefs("vedi https://x.org/a."), ["https://x.org/a"])
+        self.assertEqual(hrefs("vedi www.debian.org."), ["http://www.debian.org"])
+        self.assertEqual(hrefs("scrivi a info@ruscalinux.org"), ["mailto:info@ruscalinux.org"])
+        # Senza www. né protocollo non è un link: .sh, .py e .md sono domini
+        for src in ("build.sh", "raglin.py", "NOTA-IA.md", "debian.org",
+                    "ftp://x.org", "//x.org/a", "`https://x.org`"):
+            self.assertEqual(hrefs(src), [], src)
+
     def test_hr(self):
         self.check("a\n\n***\n\nb", [("text", "a"), ("hr",), ("text", "b")])
+
+
+class SourcePositions(unittest.TestCase):
+    def spans(self, src):
+        inline = md.parse_source(src)[1]
+        return [(c.type, inline.content[slice(*c.meta["src"])])
+                for c in inline.children if "src" in c.meta and c.type != "text"]
+
+    def test_positions(self):
+        self.assertEqual(self.spans("a **b\nc** `d*e*` [f *g*](h) ~~i~~ ==j== ![k](l)"),
+                         [("strong_open", "*"), ("softbreak", "\n"), ("strong_close", "*"),
+                          ("code_inline", "`d*e*`"), ("link_open", "[f *g*](h)"),
+                          ("em_open", "*"), ("em_close", "*"), ("link_close", "[f *g*](h)"),
+                          ("s_open", "~~"), ("s_close", "~~"), ("mark_open", "=="),
+                          ("mark_close", "=="), ("image", "![k](l)")])
+
+    def test_link_label_end(self):
+        src = "[a [b] `]` c](d)"
+        self.assertEqual(src[md.link_label_end(src, 0)], "]")
+        self.assertEqual(md.link_label_end(src, 0), 12)
+        self.assertEqual(md.link_label_end("[aperta", 0), -1)
 
 
 class Math(unittest.TestCase):

@@ -330,7 +330,7 @@ SIZE_KB=$(du -sk "${ROOT}/usr" | cut -f1)
     echo "Version: ${VER}"
     echo "Architecture: ${ARCH}"
     echo "Maintainer: ${MAINT}"
-    echo "Depends: python3 (>= 3.10), python3-gi, python3-gi-cairo, gir1.2-gtk-4.0 (>= 4.18), gir1.2-adw-1 (>= 1.7), librsvg2-common, fonts-dejavu-core, python3-markdown-it (>= 3.0), python3-mdit-py-plugins (>= 0.4)"
+    echo "Depends: python3 (>= 3.10), python3-gi, python3-gi-cairo, gir1.2-gtk-4.0 (>= 4.18), gir1.2-adw-1 (>= 1.7), librsvg2-common, fonts-dejavu-core, python3-markdown-it (>= 3.0), python3-mdit-py-plugins (>= 0.4), python3-linkify-it (>= 2.0)"
     echo "Recommends: ${RECOMMENDS}"
     echo "Suggests: ${SUGGESTS}"
     # Le build precedenti si chiamavano "ruscamark-ruscalinux" e installavano

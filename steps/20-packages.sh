@@ -121,6 +121,7 @@ python3-gi-cairo
 # (tools/*/rusca_markdown.py, CommonMark)
 python3-markdown-it
 python3-mdit-py-plugins
+python3-linkify-it
 
 # RuscaWriter: sillabazione del PDF (Pyphen) e generatore di copertine (Pillow)
 python3-pyphen

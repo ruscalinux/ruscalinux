@@ -34,13 +34,12 @@ gi.require_version('Gdk', '4.0')
 gi.require_version('Adw', '1')
 from gi.repository import Adw, Gtk, Gdk, Gio, GLib, Pango, GdkPixbuf
 
-# Formule LaTeX -> simboli Unicode (E = mc², ≈, √…): modulo comune con
-# RuscaLLama, identico nei due programmi (si modifica una volta e si copia).
-try:
-    from rusca_markdown import latex_to_pango, plain_text as _pango_plain
-    from rusca_markdown import sub_inline_math
-except ImportError:                          # modulo mancante: formule come testo
-    latex_to_pango = _pango_plain = None
+# Motore Markdown comune dei RuscaLinux OS Tools (CommonMark, specifiche
+# sezione 1.2), identico in RuscaLLama, RuscaMark e RuscaWriter: si modifica
+# una volta e si copia. Formule LaTeX -> simboli Unicode (E = mc², ≈, √…).
+from markdown_it.tree import SyntaxTreeNode
+from rusca_markdown import parser as md_parser, latex_to_pango, plain_text as _pango_plain
+from rusca_markdown import parse_source, link_label_end
 # Export PDF: GtkPrintOperation + PangoCairo (pacchetto python3-gi-cairo).
 try:
     gi.require_foreign("cairo")
@@ -696,14 +695,14 @@ def system_font_families():
     except Exception:
         return ["Sans", "Serif", "Monospace"]
 # ----------------------------------------------------------------------------
-# Motore Markdown integrato (nessuna dipendenza esterna)
-# Copre CommonMark essenziale + estensioni GFM utili per articoli e report:
-# titoli ATX/setext con ancore, paragrafi con a-capo forzato, citazioni
-# annidate, elenchi annidati (anche numerati da N), liste di attività,
-# blocchi di codice (``` ~~~ e rientrati), tabelle con allineamento,
-# immagini, link (in linea, a riferimento, automatici), note a piè di
-# pagina, barrato, evidenziato ==x==, escape con backslash.
-# Lo stesso albero produce l'HTML dell'export e l'anteprima (Pango).
+# Markdown: analisi del motore comune (rusca_markdown.parser(), CommonMark
+# con le estensioni delle specifiche, sezione 1.2). MarkdownDoc trasforma il
+# suo albero nell'HTML dell'export, nell'anteprima (Pango) e negli elementi
+# del PDF.
+#
+# Le espressioni regolari qui sotto NON analizzano il documento: servono
+# all'editor per colorare il sorgente riga per riga (resa live) e ai comandi
+# sulle tabelle (Ctrl+Maiusc+T). Specifiche, sezione 1.2, regola 1.
 # ----------------------------------------------------------------------------
 _RE_FENCE = re.compile(r"^( {0,3})(`{3,}|~{3,})[ \t]*([^`\s]*)[^`]*$")
 _RE_ATX = re.compile(r"^ {0,3}(#{1,6})(?:[ \t]+(.*?))?(?:[ \t]+#+)?[ \t]*$")
@@ -711,11 +710,9 @@ _RE_HR = re.compile(r"^ {0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$")
 _RE_SETEXT = re.compile(r"^ {0,3}(=+|-+)[ \t]*$")
 _RE_QUOTE = re.compile(r"^ {0,3}> ?(.*)$")
 _RE_LIST = re.compile(r"^( {0,3})([-*+]|\d{1,9}[.)])([ \t]+|$)(.*)$")
-_RE_TASK = re.compile(r"^\[([ xX])\][ \t]+(.*)$", re.S)
 _RE_TABLE_SEP = re.compile(r"^ {0,3}\|?[ \t]*:?-+:?[ \t]*(\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$")
 _RE_FNDEF = re.compile(r"^ {0,3}\[\^([^\]\s]+)\]:[ \t]*(.*)$")
 _RE_REFDEF = re.compile(r'^ {0,3}\[([^\]^][^\]]*)\]:[ \t]*<?([^\s>]+)>?(?:[ \t]+["\'(](.+)["\')])?[ \t]*$')
-_RE_HARDBREAK = re.compile(r"(?: {2,}|\\)\n")
 _IMG_EXT = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp", ".tif", ".tiff", ".avif")
 
 
@@ -831,6 +828,250 @@ def align_table_lines(lines):
     return out
 
 
+# ----------------------------------------------------------------------------
+# Resa live: dove applicare stili e dove nascondere i marcatori.
+# La struttura viene dal motore comune (parse_source: gli stessi token
+# dell'anteprima e degli export, con le posizioni nel sorgente), così la resa
+# live riconosce la formattazione esattamente come l'anteprima.
+# ----------------------------------------------------------------------------
+_RE_QUOTE_MARKS = re.compile(r"^[ \t]*(?:>[ \t]?)+")
+_RE_REF_LINE = re.compile(r"^ {0,3}\[[^\]]+\]:")
+
+
+def _inline_mapper(lines, starts, token):
+    """Funzione posizione-nel-contenuto -> offset nel documento per un token
+    «inline» (le righe del contenuto sono le righe del sorgente senza i
+    prefissi di citazioni, elenchi e titoli), o None se non si ritrovano."""
+    if not token.map:
+        return None
+    parts = token.meta.get("src_content", token.content).split("\n")
+    first = token.map[0]
+    if first + len(parts) > len(lines):
+        return None
+    table = []                                   # (inizio nel contenuto, offset nel documento)
+    pos = 0
+    for i, part in enumerate(parts):
+        line = lines[first + i]
+        if line.endswith(part):
+            off = len(line) - len(part)
+        elif line.rstrip().endswith(part):
+            off = len(line.rstrip()) - len(part)
+        else:
+            off = line.find(part)                # titolo con # di chiusura
+            if off < 0:
+                return None
+        table.append((pos, len(part), starts[first + i] + off))
+        pos += len(part) + 1
+
+    def to_doc(p):
+        for cstart, length, doc in table:
+            if p <= cstart + length:
+                return doc + max(0, p - cstart)
+        cstart, length, doc = table[-1]
+        return doc + length
+    return to_doc
+
+
+def _live_inline(token, to_doc, out):
+    """Elementi in linea di un paragrafo o titolo."""
+    content = token.meta.get("src_content", token.content)
+    stack, last = [], 0
+    kinds = {"strong": "bold", "em": "italic", "s": "strike", "mark": "mark"}
+    children = token.children or []
+    for idx, c in enumerate(children):
+        src = c.meta.get("src")
+        t = c.type
+        if t.endswith("_open") and t[:-5] in kinds:
+            stack.append(c)
+            continue
+        if t.endswith("_close") and t[:-6] in kinds:
+            if not stack:
+                continue
+            o = stack.pop()
+            if "src" not in o.meta or src is None:
+                continue
+            n = len(c.markup)
+            oa, ca = o.meta["src"][1] - n, src[0]
+            a, z = to_doc(oa), to_doc(ca + n)
+            out.append((a, z, [(kinds[t[:-6]], to_doc(oa + n), to_doc(ca))],
+                        [(a, to_doc(oa + n)), (to_doc(ca), z)]))
+            last = max(last, ca + n)
+            continue
+        if t == "link_open":
+            if src is not None and c.markup == "autolink":            # <https://…>
+                a, z = src
+                out.append((to_doc(a), to_doc(z), [("link", to_doc(a + 1), to_doc(z - 1))],
+                            [(to_doc(a), to_doc(a + 1)), (to_doc(z - 1), to_doc(z))]))
+            elif src is not None and c.markup == "linkify":             # https://… nudo
+                out.append((to_doc(src[0]), to_doc(src[1]),
+                            [("link", to_doc(src[0]), to_doc(src[1]))], []))
+            elif src is not None:                                       # [testo](indirizzo)
+                a, z = src
+                end = link_label_end(content, a)
+                if end > a:
+                    out.append((to_doc(a), to_doc(z), [("link", to_doc(a + 1), to_doc(end))],
+                                [(to_doc(a), to_doc(a + 1)), (to_doc(end), to_doc(z))]))
+            else:
+                # Link automatico riconosciuto dopo l'analisi (www., email):
+                # il suo testo, dopo l'ultimo elemento già trovato.
+                text = children[idx + 1].content if idx + 1 < len(children) else ""
+                at = content.find(text, last) if text else -1
+                if at >= 0:
+                    out.append((to_doc(at), to_doc(at + len(text)),
+                                [("link", to_doc(at), to_doc(at + len(text)))], []))
+                    last = at + len(text)
+            if src is not None:
+                last = max(last, src[1])
+            continue
+        if src is None:
+            continue
+        a, z = src
+        if t == "image":
+            end = link_label_end(content, a + 1)
+            if end > a:
+                out.append((to_doc(a), to_doc(z), [("img", to_doc(a + 2), to_doc(end))],
+                            [(to_doc(a), to_doc(a + 2)), (to_doc(end), to_doc(z))]))
+        elif t == "code_inline":
+            n = len(c.markup)
+            out.append((to_doc(a), to_doc(z), [("code", to_doc(a + n), to_doc(z - n))],
+                        [(to_doc(a), to_doc(a + n)), (to_doc(z - n), to_doc(z))]))
+        elif t == "footnote_ref":
+            out.append((to_doc(a), to_doc(z), [("fnref", to_doc(a), to_doc(z))], []))
+        last = max(last, z)
+
+
+def live_elements(text):
+    """Elementi della resa live: (inizio, fine, stili, da_nascondere), con
+    stili = [(nome, a, z)] e da_nascondere = [(a, z)], in offset di carattere
+    (come Gtk.TextBuffer). I marcatori si nascondono solo quando il cursore o
+    la selezione non toccano (inizio, fine)."""
+    lines = text.split("\n")
+    starts, o = [], 0
+    for line in lines:
+        starts.append(o)
+        o += len(line) + 1
+
+    def span(i):                                 # riga i, a capo compreso
+        return starts[i], min(starts[i] + len(lines[i]) + 1, len(text))
+
+    out, covered, quoted, table_depth = [], set(), set(), 0
+    tokens = parse_source(text)
+    heading = None
+    for k, tok in enumerate(tokens):
+        t = tok.type
+        if tok.map and tok.level == 0:
+            covered.update(range(*tok.map))
+        if not tok.map and t not in ("table_close", "heading_close"):
+            continue                    # senza righe non si sa dove applicarlo
+        if t == "table_open":
+            table_depth += 1
+            l0, l1 = tok.map
+            for i in range(l0, l1):
+                a, z = span(i)
+                role = "table_head" if i == l0 else "table_sep" if i == l0 + 1 else "table"
+                styles = [("block", a, z), ("table", a, starts[i] + len(lines[i])),
+                          (role, a, starts[i] + len(lines[i]))]
+                if i != l0 + 1:
+                    styles += [("table_sep", a + m.start(), a + m.end())
+                               for m in re.finditer(r"\|", lines[i])]
+                out.append((a, z, styles, []))
+        elif t == "table_close":
+            table_depth -= 1
+        elif t == "heading_open":
+            heading = tok
+        elif t == "heading_close":
+            heading = None
+        elif t == "inline" and table_depth == 0:
+            to_doc = _inline_mapper(lines, starts, tok)
+            if to_doc is None:
+                continue
+            if heading is not None:
+                lvl = f"h{heading.tag[1]}"
+                l0, l1 = heading.map
+                if heading.markup.startswith("#"):                 # # Titolo
+                    line, a0 = lines[l0], starts[l0]
+                    c0 = to_doc(0) - a0
+                    c1 = to_doc(len(tok.meta.get("src_content", tok.content))) - a0
+                    ms = line.rfind(heading.markup, 0, c0)         # i # prima del testo
+                    if ms < 0:
+                        ms = c0
+                    out.append((a0 + ms, a0 + len(line), [(lvl, a0 + ms, a0 + len(line))], []))
+                    out.append((a0 + ms, a0 + c0, [], [(a0 + ms, a0 + c0)]))
+                    tail = line[c1:]
+                    if tail.strip().strip("#") == "" and "#" in tail:   # # di chiusura
+                        out.append((a0 + c1, a0 + len(line), [], [(a0 + c1, a0 + len(line))]))
+                else:                                               # sottolineato === ---
+                    for i in range(l0, l1 - 1):
+                        out.append((starts[i], starts[i] + len(lines[i]),
+                                    [(lvl, starts[i], starts[i] + len(lines[i]))], []))
+                    u = l1 - 1
+                    out.append((starts[u], starts[u] + len(lines[u]),
+                                [("setext", starts[u], starts[u] + len(lines[u]))], []))
+            _live_inline(tok, to_doc, out)
+        elif t in ("fence", "code_block") or t.startswith("math_block"):
+            l0, l1 = tok.map
+            l1 = min(l1, len(lines))
+            A, Z = starts[l0], starts[l1 - 1] + len(lines[l1 - 1])
+            styles, hides = [], []
+            for i in range(l0, l1):
+                a, z = span(i)
+                styles += [("block", a, z), ("code", a, starts[i] + len(lines[i]))]
+            if t == "fence":
+                fences = [l0]
+                last = lines[l1 - 1].strip()
+                if l1 - 1 > l0 and last and set(last.lstrip(">").strip()) == {tok.markup[0]} \
+                        and len(last.lstrip(">").strip()) >= len(tok.markup):
+                    fences.append(l1 - 1)
+                hides = [(starts[i], starts[i] + len(lines[i])) for i in fences]
+            out.append((A, Z, styles, hides))
+        elif t == "hr":
+            i = tok.map[0]
+            out.append((starts[i], starts[i] + len(lines[i]),
+                        [("hr", starts[i], starts[i] + len(lines[i]))], []))
+        elif t == "blockquote_open":
+            for i in range(*tok.map):
+                if i >= len(lines) or i in quoted:
+                    continue                     # citazioni annidate: una volta
+                quoted.add(i)
+                a, line = starts[i], lines[i]
+                m = _RE_QUOTE_MARKS.match(line)
+                out.append((a, a + len(line), [("quote", a, a + len(line))], []))
+                if m and ">" in m.group(0):
+                    ms = a + line.index(">")
+                    out.append((ms, a + m.end(), [], [(ms, a + m.end())]))
+        elif t == "list_item_open":
+            i = tok.map[0]
+            a, line = starts[i], lines[i]
+            marker = (tok.info + tok.markup) if tok.info else tok.markup
+            m = re.search(r"(?:^|(?<=[\s>]))" + re.escape(marker) + r"(?=[ \t]|$)", line)
+            if not m:
+                continue
+            ms, me = a + m.start(), a + m.end()
+            out.append((ms, me, [("bullet", ms, me)], []))
+            if "task-list-item" in str(tok.attrs.get("class", "")):
+                mt = re.match(r"[ \t]+(\[[ xX]\])[ \t]*", line[m.end():])
+                if mt:
+                    ta, tz = me + mt.start(1), me + mt.end(1)
+                    styles = [("task", ta, tz)]
+                    if mt.group(1)[1] in "xX":
+                        styles.append(("task_done", me + mt.end(), a + len(line)))
+                    out.append((ta, tz, styles, []))
+    # Definizioni di riferimento ([etichetta]: indirizzo) e di nota
+    # ([^etichetta]: testo): markdown-it usa le prime senza produrre token e
+    # sposta le seconde in fondo al documento, quindi sono le righe che nessun
+    # blocco copre. Il testo delle note ha già avuto i suoi stili in linea.
+    for i, line in enumerate(lines):
+        if i in covered:
+            continue
+        m = _RE_REF_LINE.match(line)
+        if m:
+            styles = [("fndef", starts[i], starts[i] + len(line))]
+            if line.lstrip().startswith("[^"):
+                styles.append(("fnref", starts[i] + line.index("["), starts[i] + m.end() - 1))
+            out.append((starts[i], starts[i] + len(line), styles, []))
+    return out
+
+
 def _safe_url(url):
     u = url.strip()
     if re.match(r"^\s*(javascript|vbscript|data:text/html)", u, re.I):
@@ -838,352 +1079,253 @@ def _safe_url(url):
     return u
 
 
+class _MathNode:
+    """Formula su riga propria ($$…$$, \\[…\\]) vista come un paragrafo con
+    una sola formula in evidenza: i renderer la trattano come $$…$$."""
+    type = "math_inline_double"
+    children = ()
+
+    def __init__(self, content):
+        self.content = content
+
+
 class MarkdownDoc:
-    """Albero di blocchi Markdown con resa HTML, Pango (anteprima) e testo."""
+    """Albero di blocchi Markdown con resa HTML, Pango (anteprima) e testo.
+
+    L'analisi è quella del motore comune (rusca_markdown.parser()). Qui il suo
+    albero diventa una lista di blocchi; il testo in linea resta come nodi
+    dell'albero di markdown-it e lo rende _inline():
+      ("heading", livello, nodi, id)    ("para", nodi)    ("code", lingua, testo)
+      ("hr",)    ("quote", blocchi)    ("table", allineamenti, intestazione, righe)
+      ("list", numerato, inizio, largo, [(attività, blocchi), …])
+    attività vale None (voce normale), True (fatta) o False (da fare). Le note
+    sono in self.footnotes (etichetta -> blocchi)."""
 
     def __init__(self, text):
-        self.refs = {}
         self.footnotes = {}
         self._ids = {}
         self._fn_num = {}
         self._img_src = None
         self._colors = LIGHT
         self._t = lambda k, **kw: k
-        text = text.replace("\r\n", "\n").replace("\r", "\n").replace("\t", "    ")
-        self.blocks = self._parse(text.split("\n"))
+        self._collect = None          # indirizzi dei link, per il PDF
+        text = text.replace("\r\n", "\n").replace("\r", "\n")
+        self.blocks = self._blocks(SyntaxTreeNode(md_parser().parse(text)).children)
 
-    # ------------------------------------------------------------ parsing
-    def _starts_block(self, line):
-        return bool(_RE_FENCE.match(line) or _RE_ATX.match(line) or _RE_HR.match(line)
-                    or _RE_QUOTE.match(line) or _RE_LIST.match(line))
-
-    def _make_id(self, text):
-        base = re.sub(r"[^\w\- ]", "", self.plain(text).lower(), flags=re.U).strip()
+    # ------------------------------------------------------------ albero
+    def _make_id(self, nodes):
+        base = re.sub(r"[^\w\- ]", "", self.plain(nodes).lower(), flags=re.U).strip()
         base = re.sub(r"\s+", "-", base) or "section"
         n = self._ids.get(base, 0)
         self._ids[base] = n + 1
         return base if n == 0 else f"{base}-{n}"
 
-    def _parse(self, lines):
-        blocks, para = [], []
-        i, n = 0, len(lines)
+    @staticmethod
+    def _inline_nodes(node):
+        """Nodi in linea di un paragrafo, titolo o cella."""
+        return list(node.children[0].children) if node.children else []
 
-        def flush():
-            if para:
-                blocks.append(("para", "\n".join(l.strip() for l in para)))
-                para.clear()
-        while i < n:
-            line = lines[i]
-            if not line.strip():
-                flush()
-                i += 1
-                continue
-            m = _RE_FENCE.match(line)
-            if m:
-                flush()
-                ind, fence, lang = len(m.group(1)), m.group(2), m.group(3)
-                body = []
-                i += 1
-                while i < n:
-                    cl = lines[i].strip()
-                    if cl and set(cl) == {fence[0]} and len(cl) >= len(fence):
-                        i += 1
-                        break
-                    k = 0
-                    while k < ind and k < len(lines[i]) and lines[i][k] == " ":
-                        k += 1
-                    body.append(lines[i][k:])
-                    i += 1
-                blocks.append(("code", lang, "\n".join(body)))
-                continue
-            if not para and line.startswith("    "):
-                body = []
-                while i < n and (lines[i].startswith("    ") or not lines[i].strip()):
-                    body.append(lines[i][4:])
-                    i += 1
-                while body and not body[-1].strip():
-                    body.pop()
-                blocks.append(("code", "", "\n".join(body)))
-                continue
-            if para and _RE_SETEXT.match(line):
-                lvl = 1 if line.strip()[0] == "=" else 2
-                text = " ".join(p.strip() for p in para)
-                para.clear()
-                blocks.append(("heading", lvl, text, self._make_id(text)))
-                i += 1
-                continue
-            m = _RE_ATX.match(line)
-            if m:
-                flush()
-                t = (m.group(2) or "").strip()
-                blocks.append(("heading", len(m.group(1)), t, self._make_id(t)))
-                i += 1
-                continue
-            if _RE_HR.match(line):
-                flush()
-                blocks.append(("hr",))
-                i += 1
-                continue
-            if _is_table_start(lines, i):
-                flush()
-                header = _split_table_row(line)
-                aligns = _table_aligns(lines[i + 1])
-                rows = []
-                i += 2
-                while i < n and lines[i].strip() and "|" in lines[i]:
-                    rows.append((_split_table_row(lines[i]) + [""] * len(header))[:len(header)])
-                    i += 1
-                blocks.append(("table", aligns, header, rows))
-                continue
-            m = _RE_FNDEF.match(line)
-            if m and not para:
-                fid, body = m.group(1), [m.group(2)]
-                i += 1
-                while i < n:
-                    l = lines[i]
-                    if l.startswith("    "):
-                        body.append(l[4:])
-                    elif not l.strip() and i + 1 < n and lines[i + 1].startswith("    "):
-                        body.append("")
-                    else:
-                        break
-                    i += 1
-                self.footnotes[fid] = self._parse(body)
-                continue
-            m = _RE_REFDEF.match(line)
-            if m and not para:
-                self.refs[m.group(1).strip().lower()] = (m.group(2), m.group(3))
-                i += 1
-                continue
-            m = _RE_QUOTE.match(line)
-            if m:
-                flush()
-                inner = []
-                while i < n:
-                    mm = _RE_QUOTE.match(lines[i])
-                    if mm:
-                        inner.append(mm.group(1))
-                    elif (lines[i].strip() and inner and inner[-1].strip()
-                          and not self._starts_block(lines[i])):
-                        inner.append(lines[i])
-                    else:
-                        break
-                    i += 1
-                blocks.append(("quote", self._parse(inner)))
-                continue
-            m = _RE_LIST.match(line)
-            if m and (not para or (m.group(4).strip() and
-                                   (not m.group(2)[0].isdigit() or m.group(2)[:-1] == "1"))):
-                flush()
-                i = self._parse_list(lines, i, blocks)
-                continue
-            para.append(line)
-            i += 1
-        flush()
-        return blocks
+    def _blocks(self, nodes):
+        out = []
+        for n in nodes:
+            t = n.type
+            if t == "paragraph":
+                out.append(("para", self._inline_nodes(n)))
+            elif t == "heading":
+                inline = self._inline_nodes(n)
+                out.append(("heading", int(n.tag[1]), inline, self._make_id(inline)))
+            elif t in ("fence", "code_block"):
+                lang = n.info.split()[0] if t == "fence" and n.info.strip() else ""
+                body = n.content[:-1] if n.content.endswith("\n") else n.content
+                out.append(("code", lang, body))
+            elif t.startswith("math_block"):
+                out.append(("para", [_MathNode(n.content.strip())]))
+            elif t == "hr":
+                out.append(("hr",))
+            elif t == "blockquote":
+                out.append(("quote", self._blocks(n.children)))
+            elif t in ("bullet_list", "ordered_list"):
+                out.append(self._list(n))
+            elif t == "table":
+                out.append(self._table(n))
+            elif t == "footnote_block":
+                for note in n.children:
+                    self.footnotes[note.meta["label"]] = self._blocks(note.children)
+            elif n.children:
+                out.extend(self._blocks(n.children))
+        return out
 
-    def _parse_list(self, lines, i, blocks):
-        n = len(lines)
-        m = _RE_LIST.match(lines[i])
-        first = m.group(2)
-        ordered = first[0].isdigit()
-        start = int(first[:-1]) if ordered else 1
-        items, loose = [], False
-        while i < n:
-            m = _RE_LIST.match(lines[i])
-            if not m:
-                break
-            mk = m.group(2)
-            if ordered != mk[0].isdigit() or mk[-1] != first[-1]:
-                break
-            sp = len(m.group(3)) if m.group(4) else 1
-            if sp > 4:
-                sp = 1
-            base = len(m.group(1))
-            content = base + len(mk) + sp
-            threshold = min(content, base + 2)
-            body = [m.group(4)]
-            i += 1
-            blank = False
-            while i < n:
-                l = lines[i]
-                if not l.strip():
-                    body.append("")
-                    blank = True
-                    i += 1
-                    continue
-                ind = len(l) - len(l.lstrip(" "))
-                if ind >= threshold:
-                    body.append(l[min(ind, content):])
-                    blank = False
-                    i += 1
-                    continue
-                if blank or self._starts_block(l) or _is_table_start(lines, i):
-                    break
-                body.append(l.strip())
-                i += 1
-            trailing = 0
-            while body and not body[-1].strip():
-                body.pop()
-                trailing += 1
+    def _list(self, node):
+        ordered = node.type == "ordered_list"
+        start = int(node.attrs.get("start", 1)) if ordered else 1
+        # markdown-it nasconde i paragrafi degli elenchi «stretti».
+        loose = any(not c.hidden for item in node.children
+                    for c in item.children if c.type == "paragraph")
+        items = []
+        for item in node.children:
             task = None
-            mt = _RE_TASK.match(body[0]) if body else None
-            if mt:
-                task = mt.group(1).lower() == "x"
-                body[0] = mt.group(2)
-            sub = self._parse(body)
-            if sum(1 for b in sub if b[0] == "para") > 1:
-                loose = True
-            items.append((task, sub))
-            if trailing and i < n and _RE_LIST.match(lines[i]):
-                mm = _RE_LIST.match(lines[i])
-                if mm.group(2)[0].isdigit() == ordered and mm.group(2)[-1] == first[-1] \
-                        and len(mm.group(1)) <= base:
-                    loose = True
-        blocks.append(("list", ordered, start, loose, items))
-        return i
+            if "task-list-item" in str(item.attrs.get("class", "")):
+                first = item.children[0] if item.children else None
+                box = next((x for x in self._inline_nodes(first) if x.type == "html_inline"),
+                           None) if first is not None and first.type == "paragraph" else None
+                task = box is not None and "checked" in box.content
+            items.append((task, self._blocks(item.children)))
+        return ("list", ordered, start, loose, items)
+
+    def _table(self, node):
+        aligns, header, rows = [], [], []
+        for section in node.children:                  # thead, tbody
+            for tr in section.children:
+                cells = [self._inline_nodes(cell) for cell in tr.children]
+                if section.type == "thead":
+                    header = cells
+                    for cell in tr.children:
+                        style = str(cell.attrs.get("style", ""))
+                        aligns.append(style.split(":", 1)[1] if ":" in style else None)
+                else:
+                    rows.append(cells)
+        return ("table", aligns, header, rows)
+
+    @staticmethod
+    def _split_hardbreaks(nodes):
+        """Righe di un paragrafo divise agli a capo forzati."""
+        pieces = [[]]
+        for n in nodes:
+            if n.type == "hardbreak":
+                pieces.append([])
+            else:
+                pieces[-1].append(n)
+        return pieces
+
+    def _lone_image(self, nodes):
+        """(percorso, descrizione) se il paragrafo è una sola immagine."""
+        real = [n for n in nodes if not (n.type == "text" and not n.content.strip())]
+        if len(real) == 1 and real[0].type == "image":
+            img = real[0]
+            return (md_parser().normalizeLinkText(str(img.attrs.get("src", ""))),
+                    self._inline(img.children, "plain"))
+        return None
 
     # ------------------------------------------------------------ inline
     def plain(self, text):
         return self._inline(text, "plain")
 
-    def _inline(self, text, mode):
-        store = []
-
-        def keep(s):
-            store.append(s)
-            return f"\x00{len(store) - 1}\x00"
+    def _inline(self, nodes, mode):
+        """Nodi in linea (o testo Markdown) -> HTML, markup Pango o testo."""
+        if isinstance(nodes, str):
+            tokens = md_parser().parseInline(nodes)
+            nodes = SyntaxTreeNode(tokens).children[0].children if tokens else []
         c = self._colors
         esc = (lambda s: s) if mode == "plain" else html.escape
-        text = text.replace("\x00", "")
-
-        def code(m):
-            body = m.group(2)
-            if body.startswith(" ") and body.endswith(" ") and body.strip():
-                body = body[1:-1]
-            if mode == "html":
-                return keep(f"<code>{html.escape(body)}</code>")
-            if mode == "pango" and c.get("guide"):
-                # Export PDF: «pillola» rosa come nelle guide RuscaLinux
-                # (gli spazi sottili fanno da margine interno dello sfondo).
-                return keep(f'<span font_family="{c["mono"]}" size="smaller" '
-                            f'background="{c["code_bg"]}" foreground="{c["code_fg"]}">'
-                            f'\u2009{html.escape(body)}\u2009</span>')
-            if mode == "pango":
-                return keep(f'<span font_family="monospace" background="{c["code_bg"]}" '
-                            f'foreground="{c["code_fg"]}">{html.escape(body)}</span>')
-            return keep(body)
-        text = re.sub(r"(`+)(.+?)(?<!`)\1(?!`)", code, text)
-
-        def math(src, big):
-            markup = latex_to_pango(src)
-            if mode == "plain":
-                return keep(_pango_plain(markup))
-            if big:                              # $$…$$: formula in evidenza
-                markup = (f'<span size="large">{markup}</span>' if mode == "pango"
-                          else f'<span style="font-size: 1.2em">{markup}</span>')
-            return keep(markup)
-        if latex_to_pango is not None:
-            # $$…$$, \(…\) e $…$ (ma non «$5 e $10»), prima delle sequenze
-            # con barra rovesciata, perché il LaTeX ne è pieno. Le regole
-            # sono quelle comuni di rusca_markdown.sub_inline_math.
-            text = sub_inline_math(text, math)
-        text = re.sub(r"\\([\\`*_{}\[\]()#+\-.!|~>=<^])", lambda m: keep(esc(m.group(1))), text)
-
-        def link_out(label_markup, url, title=None):
-            url = _safe_url(url)
-            if mode == "html":
-                t = f' title="{html.escape(title)}"' if title else ""
-                return keep(f'<a href="{html.escape(url)}"{t}>{label_markup}</a>')
-            if mode == "pango":
-                uc = f' underline_color="{c["link_line"]}"' if c.get("link_line") else ""
-                return keep(f'<span underline="single"{uc} foreground="{c["link"]}">{label_markup}</span>')
-            return keep(label_markup)
-
-        def autolink(m):
-            u = m.group(1)
-            href = u if re.match(r"^[a-z][\w+.-]*:", u, re.I) else "mailto:" + u
-            return link_out(esc(u), href)
-        text = re.sub(r"<((?:https?|ftp|mailto):[^\s<>]+|[\w.+-]+@[\w-]+\.[\w.-]+)>", autolink, text)
-
-        def image(alt, src, title):
-            if mode == "html":
-                real = self._img_src(src) if self._img_src else src
-                t = f' title="{html.escape(title)}"' if title else ""
-                return keep(f'<img src="{html.escape(_safe_url(real))}" alt="{html.escape(alt)}"{t}>')
-            if mode == "pango":
-                return keep(f'<span foreground="{c["accent"]}">🖼 {html.escape(alt or src)}</span>')
-            return keep(alt)
-        text = re.sub(r'!\[([^\]]*)\]\(\s*<?((?:[^\s()<>]|\([^\s()<>]*\))+)>?(?:\s+"([^"]*)")?\s*\)',
-                      lambda m: image(m.group(1), m.group(2), m.group(3)), text)
-
-        def ref_image(m):
-            r = self.refs.get((m.group(2) or m.group(1)).strip().lower())
-            return image(m.group(1), r[0], r[1]) if r else m.group(0)
-        text = re.sub(r"!\[([^\]]*)\]\[([^\]]*)\]", ref_image, text)
-
-        def fnref(m):
-            fid = m.group(1)
-            if fid not in self.footnotes:
-                return m.group(0)
-            if fid not in self._fn_num:
-                self._fn_num[fid] = len(self._fn_num) + 1
-            num = self._fn_num[fid]
-            sid = re.sub(r"[^\w-]", "-", fid)
-            if mode == "html":
-                return keep(f'<sup class="fnref"><a href="#fn-{sid}" id="fnref-{sid}">{num}</a></sup>')
-            if mode == "pango":
-                return keep(f'<span rise="5000" size="smaller" foreground="{c["accent"]}">{num}</span>')
-            return keep(f"[{num}]")
-        text = re.sub(r"\[\^([^\]\s]+)\]", fnref, text)
-
-        lbl = r"\[((?:[^\[\]]|\[[^\[\]]*\])*)\]"
-        text = re.sub(lbl + r'\(\s*<?((?:[^\s()<>]|\([^\s()<>]*\))*)>?(?:\s+"([^"]*)")?\s*\)',
-                      lambda m: link_out(self._inline(m.group(1), mode), m.group(2), m.group(3)), text)
-
-        def ref_link(m):
-            key = (m.group(2) or m.group(1)).strip().lower()
-            r = self.refs.get(key)
-            return link_out(self._inline(m.group(1), mode), r[0], r[1]) if r else m.group(0)
-        text = re.sub(lbl + r"\[([^\]]*)\]", ref_link, text)
-        text = re.sub(r"\[([^\]\[]+)\](?![(\[:])",
-                      lambda m: (link_out(self._inline(m.group(1), mode), *self.refs[m.group(1).strip().lower()])
-                                 if m.group(1).strip().lower() in self.refs else m.group(0)), text)
-        if mode != "plain":
-            text = re.sub(r"(?<![\w/\"'=<])(https?://[^\s<>\x00]+[^\s<>\x00.,;:!?)\]'\"])",
-                          lambda m: link_out(esc(m.group(1)), m.group(1)), text)
-        text = _RE_HARDBREAK.sub("\x01", text)
-        text = esc(text)
         tags = {
-            "html": {"bi": ("<strong><em>", "</em></strong>"), "b": ("<strong>", "</strong>"),
-                     "i": ("<em>", "</em>"), "s": ("<del>", "</del>"), "m": ("<mark>", "</mark>")},
-            "pango": {"bi": ("<b><i>", "</i></b>"), "b": ("<b>", "</b>"),
+            "html": {"b": ("<strong>", "</strong>"), "i": ("<em>", "</em>"),
+                     "s": ("<del>", "</del>"), "m": ("<mark>", "</mark>")},
+            "pango": {"b": ("<b>", "</b>"),
                       "i": ((f'<span style="italic" foreground="{c["em"]}">', "</span>")
                             if c.get("em") else ("<i>", "</i>")),
                       "s": ("<s>", "</s>"),
                       "m": (f'<span background="{c["selection"]}">', "</span>")},
-            "plain": {k: ("", "") for k in ("bi", "b", "i", "s", "m")},
+            "plain": {k: ("", "") for k in ("b", "i", "s", "m")},
         }[mode]
+        kinds = {"strong": "b", "em": "i", "s": "s", "mark": "m"}
+        out, after_box = [], False
+        for n in nodes:
+            t = n.type
+            if t == "text":
+                out.append(esc(n.content.lstrip(" ") if after_box else n.content))
+            elif t == "softbreak":
+                out.append("\n" if mode == "html" else " ")
+            elif t == "hardbreak":
+                out.append("<br>\n" if mode == "html" else "\n")
+            elif t == "code_inline":
+                out.append(self._code_span(n.content, mode))
+            elif t in ("math_inline", "math_inline_double"):
+                out.append(self._math(n.content, t == "math_inline_double", mode))
+            elif t in kinds:
+                a, z = tags[kinds[t]]
+                out.append(a + self._inline(n.children, mode) + z)
+            elif t == "link":
+                out.append(self._link(self._inline(n.children, mode), n.attrs.get("href", ""),
+                                      n.attrs.get("title"), mode))
+            elif t == "image":
+                src = md_parser().normalizeLinkText(str(n.attrs.get("src", "")))
+                out.append(self._image(self._inline(n.children, "plain"), src,
+                                       n.attrs.get("title"), mode))
+            elif t == "footnote_ref":
+                out.append(self._fnref(n.meta, mode))
+            elif t in ("html_inline", "footnote_anchor"):
+                pass                # casella delle liste di attività; ritorno dalla nota
+            elif n.children:
+                out.append(self._inline(n.children, mode))
+            else:
+                out.append(esc(n.content))
+            after_box = t == "html_inline"
+        return "".join(out)
 
-        def sub(pat, kind, s):
-            a, z = tags[kind]
-            return re.sub(pat, lambda m: a + m.group(1) + z, s)
-        text = sub(r"\*\*\*(?=\S)(.+?)(?<=\S)\*\*\*", "bi", text)
-        text = sub(r"\*\*(?=\S)(.+?)(?<=\S)\*\*", "b", text)
-        text = sub(r"(?<![\w])__(?=\S)(.+?)(?<=\S)__(?![\w])", "b", text)
-        text = sub(r"(?<!\*)\*(?=[^\s*])(.+?)(?<=[^\s*])\*(?!\*)", "i", text)
-        text = sub(r"(?<![\w])_(?=[^\s_])(.+?)(?<=[^\s_])_(?![\w])", "i", text)
-        text = sub(r"~~(?=\S)(.+?)(?<=\S)~~", "s", text)
-        text = sub(r"==(?=\S)(.+?)(?<=\S)==", "m", text)
-        if mode != "html":
-            text = text.replace("\n", " ")
-        br = {"html": "<br>\n", "pango": "\n", "plain": "\n"}[mode]
-        text = text.replace("\x01", br)
-        for _ in range(3):
-            if "\x00" not in text:
-                break
-            text = re.sub(r"\x00(\d+)\x00", lambda m: store[int(m.group(1))], text)
-        return text
+    def _code_span(self, body, mode):
+        c = self._colors
+        if mode == "html":
+            return f"<code>{html.escape(body)}</code>"
+        if mode == "pango" and c.get("guide"):
+            # Export PDF: «pillola» rosa come nelle guide RuscaLinux
+            # (gli spazi sottili fanno da margine interno dello sfondo).
+            return (f'<span font_family="{c["mono"]}" size="smaller" '
+                    f'background="{c["code_bg"]}" foreground="{c["code_fg"]}">'
+                    f'\u2009{html.escape(body)}\u2009</span>')
+        if mode == "pango":
+            return (f'<span font_family="monospace" background="{c["code_bg"]}" '
+                    f'foreground="{c["code_fg"]}">{html.escape(body)}</span>')
+        return body
+
+    @staticmethod
+    def _math(src, big, mode):
+        markup = latex_to_pango(src)
+        if mode == "plain":
+            return _pango_plain(markup)
+        if big:                                     # $$…$$: formula in evidenza
+            return (f'<span size="large">{markup}</span>' if mode == "pango"
+                    else f'<span style="font-size: 1.2em">{markup}</span>')
+        return markup
+
+    def _link(self, label_markup, url, title, mode):
+        c = self._colors
+        url = _safe_url(url)
+        if mode == "html":
+            t = f' title="{html.escape(title)}"' if title else ""
+            return f'<a href="{html.escape(url)}"{t}>{label_markup}</a>'
+        if mode == "pango":
+            if self._collect is not None:
+                # PDF: l'esportatore trova i link come tratti sottolineati,
+                # nell'ordine del testo. Un link senza testo non ha tratto.
+                if not label_markup:
+                    return ""
+                self._collect.append(url)
+            uc = f' underline_color="{c["link_line"]}"' if c.get("link_line") else ""
+            return f'<span underline="single"{uc} foreground="{c["link"]}">{label_markup}</span>'
+        return label_markup
+
+    def _image(self, alt, src, title, mode):
+        c = self._colors
+        if mode == "html":
+            real = self._img_src(src) if self._img_src else src
+            t = f' title="{html.escape(title)}"' if title else ""
+            return f'<img src="{html.escape(_safe_url(real))}" alt="{html.escape(alt)}"{t}>'
+        if mode == "pango":
+            return f'<span foreground="{c["accent"]}">🖼 {html.escape(alt or src)}</span>'
+        return alt
+
+    def _fnref(self, meta, mode):
+        """Numero della nota: l'ordine in cui le note compaiono nel testo."""
+        c = self._colors
+        label = meta.get("label") or str(meta["id"])
+        num = meta["id"] + 1
+        self._fn_num[label] = num
+        sid = re.sub(r"[^\w-]", "-", label)
+        if mode == "html":
+            return f'<sup class="fnref"><a href="#fn-{sid}" id="fnref-{sid}">{num}</a></sup>'
+        if mode == "pango":
+            return f'<span rise="5000" size="smaller" foreground="{c["accent"]}">{num}</span>'
+        return f"[{num}]"
 
     # ------------------------------------------------------------ HTML
     def to_html(self, img_src=None, t=None):
@@ -1301,11 +1443,11 @@ class MarkdownDoc:
                 out.append(("m", f'<span size="{sizes[b[1]]}" weight="bold" foreground="{hc}">'
                                  f'{self._inline(b[2], "pango")}</span>', False))
             elif k == "para":
-                m = re.fullmatch(r'\s*!\[([^\]]*)\]\(\s*<?((?:[^\s()<>]|\([^\s()<>]*\))+)>?(?:\s+"[^"]*")?\s*\)\s*', b[1])
-                if m:
-                    out.append(("img", m.group(2), m.group(1), ""))
+                img = self._lone_image(b[1])
+                if img:
+                    out.append(("img", img[0], img[1], ""))
                     continue
-                for piece in _RE_HARDBREAK.split(b[1]):
+                for piece in self._split_hardbreaks(b[1]):
                     out.append(("m", self._inline(piece, "pango").replace("\n", " "), False))
             elif k == "code":
                 lines = b[2].split("\n") or [""]
@@ -1370,13 +1512,16 @@ class MarkdownDoc:
         """Elementi semantici per l'export PDF in stile «guida RuscaLinux».
         Ogni elemento porta i propri rientri sinistro/destro (l, r) in punti:
           ("gap", pt)                         spazio verticale
-          ("h", livello, markup, l, r)        titolo (livello 1 = banner)
-          ("p", markup, l, r, marker, stile)  paragrafo; marker = (markup, x_destra)
+          ("h", livello, markup, l, r, link, id)   titolo (livello 1 = banner)
+          ("p", markup, l, r, marker, stile, link) paragrafo; marker = (markup, x_destra)
           ("code", testo, l, r)               blocco di codice scuro
           ("qopen", l, r) / ("qclose",)       riquadro di citazione
           ("hr", l, r)                        linea di separazione
           ("img", src, alt, l, r)             immagine centrata
-          ("table", allin., intest., righe, l, r)"""
+          ("table", allin., intest., righe, l, r, link)
+        link: indirizzi dei link del markup, nell'ordine del testo (per le
+        tabelle, una lista per cella, riga per riga a partire
+        dall'intestazione). id: l'ancora del titolo, per i link interni."""
         self._colors = colors
         self._fn_num = {}
         if t:
@@ -1384,13 +1529,22 @@ class MarkdownDoc:
         items = self._pr_blocks(self.blocks, 0.0, 0.0)
         if self._fn_num:
             items += [("gap", 18.0), ("hr", 0.0, 0.0), ("gap", 8.0),
-                      ("p", f'<b>{html.escape(self._t("fn_title"))}</b>', 0.0, 0.0, None, "small"),
+                      ("p", f'<b>{html.escape(self._t("fn_title"))}</b>', 0.0, 0.0, None, "small", ()),
                       ("gap", 3.0)]
             for fid, num in sorted(self._fn_num.items(), key=lambda kv: kv[1]):
                 sub = self._pr_blocks(self.footnotes.get(fid, []), 18.0, 0.0, tight=True, style="small")
                 items += self._pr_marker(sub, f"{num}.", 18.0, "small")
                 items.append(("gap", 2.0))
         return items
+
+    def _pr_inline(self, nodes):
+        """Markup Pango per il PDF e indirizzi dei suoi link."""
+        self._collect = []
+        try:
+            markup = self._inline(nodes, "pango")
+            return markup, tuple(self._collect)
+        finally:
+            self._collect = None
 
     @staticmethod
     def _pr_marker(items, marker, l, style):
@@ -1404,7 +1558,7 @@ class MarkdownDoc:
                 items[idx] = it[:4] + ((marker, l - 6.0),) + it[5:]
                 return items
             break
-        items.insert(0, ("p", "", l, 0.0, (marker, l - 6.0), style))
+        items.insert(0, ("p", "", l, 0.0, (marker, l - 6.0), style, ()))
         return items
 
     def _pr_blocks(self, blocks, l, r, tight=False, style="body", depth=0):
@@ -1421,15 +1575,17 @@ class MarkdownDoc:
                     out.append(("gap", max(self._PR_AFTER.get(prev, 7.0),
                                            self._PR_BEFORE.get(kind, 0.0))))
             if k == "heading":
-                out.append(("h", b[1], self._inline(b[2], "pango"), l, r))
+                markup, links = self._pr_inline(b[2])
+                out.append(("h", b[1], markup, l, r, links, b[3]))
             elif k == "para":
-                m = re.fullmatch(r'\s*!\[([^\]]*)\]\(\s*<?((?:[^\s()<>]|\([^\s()<>]*\))+)>?(?:\s+"[^"]*")?\s*\)\s*', b[1])
-                if m:
-                    out.append(("img", m.group(2), m.group(1), l, r))
+                img = self._lone_image(b[1])
+                if img:
+                    out.append(("img", img[0], img[1], l, r))
                     kind = "img"
                 else:
                     st = "lead" if (prev == "h1" and depth == 0 and l == 0.0 and style == "body") else style
-                    out.append(("p", self._inline(b[1], "pango"), l, r, None, st))
+                    markup, links = self._pr_inline(b[1])
+                    out.append(("p", markup, l, r, None, st, links))
             elif k == "code":
                 out.append(("code", b[2], l, r))
             elif k == "hr":
@@ -1460,8 +1616,10 @@ class MarkdownDoc:
                     out += self._pr_marker(inner, mark, ind, style)
             elif k == "table":
                 _, aligns, header, rows = b
-                out.append(("table", aligns, [self._inline(h, "pango") for h in header],
-                            [[self._inline(cell, "pango") for cell in row] for row in rows], l, r))
+                grid = [[self._pr_inline(cell) for cell in row] for row in [header] + rows]
+                out.append(("table", aligns, [m for m, _ in grid[0]],
+                            [[m for m, _ in row] for row in grid[1:]], l, r,
+                            [[links for _, links in row] for row in grid]))
             prev = kind
         return out
 # ----------------------------------------------------------------------------
@@ -1640,6 +1798,28 @@ PRINT_COLORS.update({
 })
 
 
+def _cairo_str(s):
+    """Stringa per gli attributi dei tag di cairo, tra apici singoli."""
+    return str(s).replace("\\", "\\\\").replace("'", "\\'")
+
+
+def _pdf_link_target(url, dests):
+    """Attributo di cairo per la destinazione di un link del PDF: un indirizzo
+    web o di posta, oppure un titolo del documento (#ancora) fra quelli in
+    dests. Un link interno a un titolo che non c'è renderebbe non valido
+    l'intero PDF (cairo lo rifiuta alla chiusura): resta testo. Gli altri
+    indirizzi (file, percorsi relativi) non diventano link: fuori dalla
+    cartella del documento non porterebbero da nessuna parte."""
+    url = str(url)
+    if url.startswith("#") and len(url) > 1:
+        # markdown-it codifica l'ancora (#perch%C3%A9), l'id del titolo no.
+        name = urllib.parse.unquote(url[1:])
+        return f"dest='{_cairo_str(name)}'" if name in dests else ""
+    if re.match(r"^(https?:|mailto:)", url, re.I):
+        return f"uri='{_cairo_str(url)}'"
+    return ""
+
+
 class PdfExporter:
     """Impagina gli elementi di MarkdownDoc.to_print() su pagine del formato
     carta predefinito del sistema (A4 o Letter), con margini di 2 cm.
@@ -1701,6 +1881,8 @@ class PdfExporter:
         G = GUIDE
         self.pages, self._keep, self._boxes = [[]], [], []
         self._y = 0.0
+        # Titoli del documento: le sole destinazioni dei link interni.
+        self._dests = {it[6] for it in self.items if it[0] == "h"}
         self._ctx = ctx
 
         def font(size, bold=False, mono=False):
@@ -1741,6 +1923,45 @@ class PdfExporter:
         def emit(op_):
             self.pages[-1].append(op_)
 
+        # --- link cliccabili. Nel markup del PDF i link sono gli unici tratti
+        # sottolineati: si abbinano, nell'ordine, agli indirizzi raccolti da
+        # MarkdownDoc. Se i conti non tornano (markup non valido) niente link.
+        def link_ranges(lay, links):
+            if not links:
+                return []
+            spans = sorted((a.start_index, a.end_index) for a in lay.get_attributes().get_attributes()
+                           if a.klass.type == Pango.AttrType.UNDERLINE and a.end_index > a.start_index)
+            if len(spans) != len(links):
+                return []
+            return [(a, z, url) for (a, z), url in zip(spans, links)
+                    if _pdf_link_target(url, self._dests)]
+
+        def emit_links(line, ranges, x, top, h):
+            """Rettangoli dei link che cadono in questa riga (x = inizio
+            della riga, top = suo bordo superiore, in punti)."""
+            ls, le = line.start_index, line.start_index + line.length
+            for a, z, url in ranges:
+                a, z = max(a, ls), min(z, le)
+                if z <= a:
+                    continue
+                xa, xb = line.index_to_x(a, False) / S, line.index_to_x(z, False) / S
+                if xb == xa:
+                    continue
+                emit(("link", x + min(xa, xb), top, abs(xb - xa), h, url))
+
+        def lay_links(lay, links, x, y):
+            """Link di un layout disegnato tutto insieme (celle di tabella)."""
+            ranges = link_ranges(lay, links)
+            if not ranges:
+                return
+            li = lay.get_iter()
+            while True:
+                logical = li.get_line_extents()[1]
+                emit_links(li.get_line_readonly(), ranges, x + logical.x / S,
+                           y + logical.y / S, logical.height / S)
+                if not li.next_line():
+                    break
+
         # --- riquadri (codice, citazioni) che si spezzano tra le pagine.
         # Lo sfondo va disegnato prima del testo: alla chiusura di ogni tratto
         # lo si inserisce nella pagina alla posizione registrata all'apertura.
@@ -1773,11 +1994,13 @@ class PdfExporter:
             self._y += self.BOXES[box["kind"]][3]
             close_chunk(box, self._y)
 
-        def flow(lay, x0, color, line_h, marker=None, break_at=None):
+        def flow(lay, x0, color, line_h, marker=None, break_at=None, links=()):
             """Disegna un layout riga per riga, andando a pagina nuova se serve.
             line_h è l'interlinea in punti (come line-height in CSS): lo spazio
             in più si divide sopra e sotto la riga. break_at forza il salto di
-            pagina prima di quella riga (vedove e orfane)."""
+            pagina prima di quella riga (vedove e orfane). links: indirizzi dei
+            link del markup, nell'ordine del testo."""
+            ranges = link_ranges(lay, links)
             li = lay.get_iter()
             first = True
             idx = 0
@@ -1791,8 +2014,11 @@ class PdfExporter:
                 if self._y + lh > H and (self.pages[-1] or self._boxes):
                     if self._y > 0:
                         new_page()
-                base = self._y + (lh - lh0) / 2 + (li.get_baseline() - logical.y) / S
+                top = self._y + (lh - lh0) / 2
+                base = top + (li.get_baseline() - logical.y) / S
                 emit(("line", li.get_line_readonly(), x0 + logical.x / S, base, color))
+                if ranges:
+                    emit_links(li.get_line_readonly(), ranges, x0 + logical.x / S, top, lh0)
                 if first and marker is not None:
                     mlay, mx = marker
                     mw = size(mlay)[0]
@@ -1830,7 +2056,7 @@ class PdfExporter:
             if self._y > 0 and self._y + h > H:
                 new_page()
 
-        def table(aligns, header, rows, l, r):
+        def table(aligns, header, rows, l, r, links=None):
             pad_x, pad_y = 6.0, 6.5
             TW = W - l - r
             ncol = len(header)
@@ -1874,7 +2100,7 @@ class PdfExporter:
                     lays.append(lay)
                 return lays, max(size(x)[1] for x in lays) + 2 * pad_y
 
-            def place(lays, h, is_head, stripe):
+            def place(lays, h, is_head, stripe, cell_links=None):
                 x = l
                 if is_head:
                     emit(("fill", l, self._y, sum(widths), h, G["th_bg"]))
@@ -1882,6 +2108,8 @@ class PdfExporter:
                     emit(("fill", l, self._y, sum(widths), h, G["stripe"]))
                 for ci, lay in enumerate(lays):
                     emit(("lay", lay, x + pad_x, self._y + pad_y, G["th_fg"] if is_head else G["fg"]))
+                    if cell_links and ci < len(cell_links):
+                        lay_links(lay, cell_links[ci], x + pad_x, self._y + pad_y)
                     if is_head and ci < ncol - 1:
                         emit(("fill", x + widths[ci] - 0.4, self._y, 0.8, h, G["page"]))
                     x += widths[ci]
@@ -1889,16 +2117,17 @@ class PdfExporter:
                     emit(("fill", l, self._y + h - 0.75, sum(widths), 0.75, G["rule"]))
                 self._y += h
 
+            links = links or [[] for _ in range(len(rows) + 1)]
             head_lays, head_h = row_lays(header, True)
             first_h = row_lays(rows[0], False)[1] if rows else 0.0
             keep_room(head_h + first_h)
-            place(head_lays, head_h, True, False)
+            place(head_lays, head_h, True, False, links[0])
             for ri, row in enumerate(rows):
                 lays, h = row_lays(row, False)
                 if self._y + h > H and self._y > 0:
                     new_page()
-                    place(*row_lays(header, True), True, False)   # intestazione ripetuta
-                place(lays, h, False, ri % 2 == 1)
+                    place(*row_lays(header, True), True, False, links[0])   # intestazione ripetuta
+                place(lays, h, False, ri % 2 == 1, links[ri + 1])
 
         def next_heading(i):
             """Il titolo che segue subito (saltando gli spazi), se c'è."""
@@ -1913,17 +2142,18 @@ class PdfExporter:
                 if self._y > 0:
                     self._y = min(self._y + it[1], H)
             elif kind == "h" and it[1] == 1:
-                _, _lvl, markup, l, r = it
+                _, _lvl, markup, l, r, links, hid = it
                 px, py = 15.0, 19.0
                 lay = layout(markup, W - l - r - 2 * px, font(21.0, bold=True))
                 h = text_height(lay, 21.0 * 1.45) + 2 * py
                 keep_room(h + self.BODY * self.LEADING * 2)
+                emit(("dest", hid, l, self._y))
                 emit(("grad", l, self._y, W - l - r, h))
                 self._y += py
-                flow(lay, l + px, G["banner_fg"], 21.0 * 1.45)
+                flow(lay, l + px, G["banner_fg"], 21.0 * 1.45, links=links)
                 self._y += py
             elif kind == "h":
-                _, lvl, markup, l, r = it
+                _, lvl, markup, l, r, links, hid = it
                 fs, col = self.HEADINGS.get(lvl, self.HEADINGS[6])
                 lay = layout(markup, W - l - r, font(fs, bold=True))
                 need = text_height(lay, fs * 1.3) + 6.0 + self.BODY * self.LEADING * 3
@@ -1931,19 +2161,20 @@ class PdfExporter:
                 if nh:          # titolo seguito da un sottotitolo: restano insieme
                     need += self.HEADINGS.get(nh[1], self.HEADINGS[6])[0] * 1.3 + 22.0
                 keep_room(need)
-                flow(lay, l, G[col], fs * 1.3)
+                emit(("dest", hid, l, self._y))
+                flow(lay, l, G[col], fs * 1.3, links=links)
                 if lvl == 2:
                     self._y += 4.0
                     emit(("fill", l, self._y, W - l - r, 1.5, G["rule_h2"]))
                     self._y += 1.5
             elif kind == "p":
-                _, markup, l, r, marker, style = it
+                _, markup, l, r, marker, style, links = it
                 fs, col, bold = self.STYLE.get(style, self.STYLE["body"])
                 fd = font(fs, bold)
                 lay = layout(markup or " ", W - l - r, fd)
                 mk = (layout(marker[0], None, fd), marker[1]) if marker else None
                 flow(lay, l, G[col], fs * self.LEADING, marker=mk,
-                     break_at=split_point(lay, fs * self.LEADING))
+                     break_at=split_point(lay, fs * self.LEADING), links=links)
             elif kind == "code":
                 _, text, l, r = it
                 inner = l + self.BAR_W + 12.0
@@ -2069,6 +2300,29 @@ class PdfExporter:
                 cr.set_source_rgb(*self._rgb(color))
                 cr.move_to(x, y)
                 PangoCairo.show_layout(cr, lay)
+            elif kind in ("link", "dest") and hasattr(cr, "tag_begin"):
+                # Link e destinazioni del PDF (cairo >= 1.16): un'area
+                # cliccabile sopra il testo, o un punto d'arrivo per i link
+                # interni (#ancora). cairo vuole le coordinate della pagina,
+                # senza le trasformazioni del contesto (margini): si
+                # convertono con user_to_device.
+                try:
+                    if kind == "link":
+                        _, x, y, w, h, url = item
+                        x0, y0 = cr.user_to_device(x, y)
+                        x1, y1 = cr.user_to_device(x + w, y + h)
+                        rect = (f"rect=[{min(x0, x1):.2f} {min(y0, y1):.2f} "
+                                f"{abs(x1 - x0):.2f} {abs(y1 - y0):.2f}] ")
+                        cr.tag_begin(cairo.TAG_LINK, rect + _pdf_link_target(url, self._dests))
+                        cr.tag_end(cairo.TAG_LINK)
+                    else:
+                        _, name, x, y = item
+                        dx, dy = cr.user_to_device(x, y)
+                        cr.tag_begin(cairo.TAG_DEST, f"name='{_cairo_str(name)}' "
+                                                     f"x={dx:.2f} y={dy:.2f} internal")
+                        cr.tag_end(cairo.TAG_DEST)
+                except Exception:
+                    pass
         cr.restore()
         # Piè di pagina: «titolo - pag. N / totale», centrato.
         lay = ctx.create_pango_layout()
@@ -2380,8 +2634,14 @@ class RuscaWindow(Adw.ApplicationWindow):
         self.add_controller(dt)
         if path:
             self.load_file(path)
-        else:
+        elif not self.cfg.get("sample_shown", False):
+            # Il documento dimostrativo solo al primo avvio; poi un documento
+            # vuoto, come Testo di GNOME.
             self._load_sample()
+            self.cfg["sample_shown"] = True
+            save_config(self.cfg)
+        else:
+            self._reset_doc()
         self._schedule_refresh()
         GLib.timeout_add(120, self._init_paned)
         GLib.idle_add(self._center_page)
@@ -3535,194 +3795,33 @@ class RuscaWindow(Adw.ApplicationWindow):
         text = self._get_text()
         if len(text) > self.LIVE_MAX_CHARS:
             return
+        # L'analisi si rifà solo quando il testo cambia: spostando il cursore
+        # cambiano soltanto i marcatori da mostrare.
+        if getattr(self, "_live_cache", (None,))[0] != text:
+            try:
+                self._live_cache = (text, live_elements(text))
+            except Exception as err:            # mai bloccare l'editor
+                print(f"[ruscamark] resa live: {err}", file=sys.stderr)
+                self._live_cache = (text, [])
+        elements = self._live_cache[1]
         cur = buf.get_iter_at_mark(buf.get_insert()).get_offset()
         selb = buf.get_selection_bounds()
         sa, sb = (selb[0].get_offset(), selb[1].get_offset()) if selb else (None, None)
 
-        def cin(a, z):
+        def touched(a, z):
             if a <= cur <= z:
                 return True
-            if sa is not None and not (z < sa or a > sb):
-                return True
-            return False
+            return sa is not None and not (z < sa or a > sb)
 
-        def tag(name, a, z):
+        def apply(name, a, z):
             if z > a:
                 buf.apply_tag(self.lv[name], buf.get_iter_at_offset(a), buf.get_iter_at_offset(z))
-
-        def hide(a, z):
-            if z > a and not cin(a, z):
-                buf.apply_tag(self.lv["hide"], buf.get_iter_at_offset(a), buf.get_iter_at_offset(z))
-
-        def inline(base, s):
-            if not s.strip():
-                return
-            used = []
-
-            def ovl(x, y):
-                return any(not (y <= u0 or x >= u1) for u0, u1 in used)
-
-            def element(m, tagname):
-                x, y = m.span()
-                if ovl(x, y):
-                    return
-                used.append((x, y))
-                tag(tagname, base + m.start(1), base + m.end(1))
-                if not cin(base + x, base + y):
-                    hide(base + x, base + m.start(1))
-                    hide(base + m.end(1), base + y)
-            for m in re.finditer(r"`([^`]+)`", s):
-                element(m, "code")
-            for m in re.finditer(r"\[\^([^\]\s]+)\]", s):
-                x, y = m.span()
-                if not ovl(x, y):
-                    used.append((x, y))
-                    tag("fnref", base + x, base + y)
-            for m in re.finditer(r"!\[([^\]]*)\]\(([^)]*)\)", s):
-                element(m, "img")
-            for m in re.finditer(r"\[([^\]]+)\]\(([^)]*)\)", s):
-                element(m, "link")
-            for pat in (r"(?<!\\)\*\*(.+?)\*\*", r"(?<![\w\\])__(.+?)__(?!\w)"):
-                for m in re.finditer(pat, s):
-                    element(m, "bold")
-            for m in re.finditer(r"~~(.+?)~~", s):
-                element(m, "strike")
-            for m in re.finditer(r"==(?=\S)(.+?)(?<=\S)==", s):
-                element(m, "mark")
-            for m in re.finditer(r"(?<![*\\])\*([^*\s](?:[^*]*[^*\s])?)\*(?!\*)", s):
-                element(m, "italic")
-            for m in re.finditer(r"(?<![\w_\\])_([^_\s](?:[^_]*[^_\s])?)_(?![\w_])", s):
-                element(m, "italic")
-        lines = text.split("\n")
-        offs = []
-        o = 0
-        for s in lines:
-            offs.append(o)
-            o += len(s) + 1
-        blocks = []
-        curblk = None
-        fence_idx = set()
-        for i, s in enumerate(lines):
-            if s.lstrip().startswith("```") or s.lstrip().startswith("~~~"):
-                fence_idx.add(i)
-                if curblk is None:
-                    curblk = [i, i]
-                else:
-                    curblk[1] = i
-                    blocks.append(tuple(curblk))
-                    curblk = None
-        if curblk is not None:
-            blocks.append(tuple(curblk))
-        line_block = {}
-        block_range = {}
-        for bi, (ba, bb) in enumerate(blocks):
-            A = offs[ba]
-            B = offs[bb] + len(lines[bb])
-            block_range[bi] = (A, B)
-            for i in range(ba, bb + 1):
-                line_block[i] = bi
-        # tabelle: intestazione, separatore, righe (fuori dai blocchi codice)
-        table_role = {}
-        for ta, tb in find_table_blocks(lines):
-            if ta in line_block:
-                continue
-            table_role[ta] = "head"
-            table_role[ta + 1] = "sep"
-            for i in range(ta + 2, tb + 1):
-                table_role[i] = "row"
-        # titoli setext: testo seguito da una riga di === o ---
-        setext = {}
-        for i in range(1, len(lines)):
-            if i in line_block or (i - 1) in line_block or i in table_role:
-                continue
-            prev = lines[i - 1]
-            if not prev.strip() or not _RE_SETEXT.match(lines[i]):
-                continue
-            if (i - 1) in table_role or _RE_ATX.match(prev) or _RE_LIST.match(prev) \
-                    or _RE_QUOTE.match(prev) or _RE_HR.match(prev) or prev.startswith("    "):
-                continue
-            if i >= 2 and lines[i - 2].strip() and not (i - 2) in setext:
-                continue        # solo paragrafi di una riga: evita falsi positivi
-            setext[i - 1] = 1 if lines[i].strip()[0] == "=" else 2
-            setext[i] = 0
-        for i, s in enumerate(lines):
-            a = offs[i]
-            L = a + len(s)
-            if i in line_block:
-                tag("block", a, min(L + 1, len(text)))
-                tag("code", a, L)
-                if i in fence_idx:
-                    A, B = block_range[line_block[i]]
-                    if not cin(A, B):
-                        hide(a, L)
-                continue
-            st = s.strip()
-            if not st:
-                continue
-            role = table_role.get(i)
-            if role:
-                # Monospazio senza nascondere marcatori: le colonne allineate
-                # con "Allinea tabella" restano incolonnate.
-                tag("block", a, min(L + 1, len(text)))
-                tag("table", a, L)
-                tag("table_sep" if role == "sep" else "table_head" if role == "head" else "table", a, L)
-                if role != "sep":
-                    for m in re.finditer(r"\|", s):
-                        tag("table_sep", a + m.start(), a + m.end())
-                continue
-            if i in setext:
-                if setext[i] == 0:
-                    tag("setext", a, L)
-                else:
-                    tag(f"h{setext[i]}", a, L)
-                    inline(a, s)
-                continue
-            m = re.match(r"^(\s*)(#{1,6})(\s+)(.*)$", s)
-            if m:
-                lvl = len(m.group(2))
-                ms = a + len(m.group(1))
-                ct = ms + len(m.group(2)) + len(m.group(3))
-                tag(f"h{lvl}", ms, L)
-                hide(ms, ct)
-                inline(ct, m.group(4))
-                continue
-            if re.match(r"^\s*([-*_])(\s*\1){2,}\s*$", s):
-                tag("hr", a, L)
-                continue
-            m = _RE_FNDEF.match(s)
-            if m:
-                tag("fndef", a, L)
-                tag("fnref", a, a + s.index("]:") + 1)
-                continue
-            if _RE_REFDEF.match(s):
-                tag("fndef", a, L)
-                continue
-            m = re.match(r"^(\s*)((?:>\s?)+)(.*)$", s)
-            if m:
-                tag("quote", a, L)
-                ms = a + len(m.group(1))
-                me = ms + len(m.group(2))
-                hide(ms, me)
-                inline(me, m.group(3))
-                continue
-            m = re.match(r"^(\s*)([-*+]|\d+[.)])(\s+)(.*)$", s)
-            if m:
-                ms = a + len(m.group(1))
-                me = ms + len(m.group(2))
-                tag("bullet", ms, me)
-                ct = me + len(m.group(3))
-                body = m.group(4)
-                mt = re.match(r"^\[([ xX])\](\s+)", body)
-                if mt:
-                    tag("task", ct, ct + 3)
-                    rest = ct + mt.end()
-                    if mt.group(1) in "xX":
-                        tag("task_done", rest, L)
-                    inline(rest, body[mt.end():])
-                else:
-                    inline(ct, body)
-                continue
-            inline(a, s)
+        for a, z, styles, hides in elements:
+            for name, x, y in styles:
+                apply(name, x, y)
+            if hides and not touched(a, z):
+                for x, y in hides:
+                    apply("hide", x, y)
 
     # ------------------------------------------------------- comandi di scrittura
     def _toggle_wrap(self, marker):

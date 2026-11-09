@@ -14,6 +14,11 @@ Sintassi riconosciuta (parser(), sempre la stessa in tutti i programmi):
     CommonMark completo, senza HTML grezzo (resta testo: più sicuro, e le
     risposte dei modelli non possono inserire markup)
     tabelle e ~~barrato~~ (GFM), liste di attività - [ ] / - [x] (GFM)
+    link automatici: anche gli indirizzi nudi diventano link, con le regole
+    di GFM: http://…, https://…, www.… e indirizzi email, ma non «build.sh»
+    o «debian.org» (libreria linkify-it, vedi _GfmLinkify)
+    ==evidenziato== (estensione «mark» di Pandoc; la regola è quella del
+    plugin markdown-it-mark, vedi _mark_plugin)
     note a piè di pagina [^1]
     formule $…$, $$…$$ (regole di Pandoc: dopo il $ di apertura e prima di
     quello di chiusura non c'è uno spazio, e il $ di chiusura non è seguito
@@ -34,6 +39,11 @@ Per chi non usa Pango (RuscaWriter: PDF, EPUB, ODT, DOCX, testo):
     math_to_text(markdown)   sostituisce le formule $…$, $$…$$, \\(…\\), \\[…\\]
                              in un testo Markdown, fuori dal codice
 
+Posizioni nel sorgente, per gli editor (resa live di RuscaMark):
+    parse_source(testo)      i token di parser(), con in più la posizione di
+                             ogni elemento in linea (vedi parse_source)
+    link_label_end(src, i)   fine dell'etichetta [..] di un link
+
 Strumenti per riga, usati dagli editor per evidenziare il sorgente:
     table_at(righe, i), display_math_at(righe, i), has_inline_math(riga),
     sub_inline_math(testo, f)
@@ -49,13 +59,16 @@ si copia.
 import re
 
 from markdown_it import MarkdownIt
+from markdown_it.helpers import parseLinkLabel
+from markdown_it.rules_inline.state_inline import Delimiter, StateInline
 from markdown_it.tree import SyntaxTreeNode
+from linkify_it import LinkifyIt
 from mdit_py_plugins.dollarmath import dollarmath_plugin
 from mdit_py_plugins.footnote import footnote_plugin
 from mdit_py_plugins.tasklists import tasklists_plugin
 from mdit_py_plugins.texmath import texmath_plugin
 
-__all__ = ["parser", "parse_blocks", "inline_to_pango", "latex_to_pango", "escape",
+__all__ = ["parser", "parse_source", "link_label_end", "parse_blocks", "inline_to_pango", "latex_to_pango", "escape",
            "plain_text", "latex_to_text", "math_to_text", "table_at", "display_math_at",
            "has_inline_math", "sub_inline_math"]
 
@@ -348,9 +361,120 @@ def latex_to_text(src):
 
 
 # ── Parser ──────────────────────────────────────────────────────────────────
+# ==evidenziato==: porting della regola del plugin markdown-it-mark
+# (https://github.com/markdown-it/markdown-it-mark, licenza MIT, © Vitaly
+# Puzrin e Alex Kocharin), che è la regola del barrato di markdown-it con «=»
+# al posto di «~». Debian non ha il plugin per Python: queste righe seguono la
+# regola del barrato di markdown-it-py 3.0 (rules_inline/strikethrough.py).
+#
+# markdown-it-mark — Copyright (c) 2014-2015 Vitaly Puzrin, Alex Kocharin.
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to
+# deal in the Software without restriction, including without limitation the
+# rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+# sell copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions: The above copyright
+# notice and this permission notice shall be included in all copies or
+# substantial portions of the Software. THE SOFTWARE IS PROVIDED "AS IS",
+# WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+# TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+# NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE
+# FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+# TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR
+# THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+_EQUALS = 0x3D
+
+
+def _mark_tokenize(state, silent):
+    start = state.pos
+    if silent or state.src[start] != "=":
+        return False
+    scanned = state.scanDelims(state.pos, True)
+    length = scanned.length
+    if length < 2:
+        return False
+    if length % 2:
+        token = state.push("text", "", 0)
+        token.content = "="
+        length -= 1
+    for _ in range(0, length, 2):
+        token = state.push("text", "", 0)
+        token.content = "=="
+        state.delimiters.append(Delimiter(marker=_EQUALS, length=0,
+                                          token=len(state.tokens) - 1, end=-1,
+                                          open=scanned.can_open,
+                                          close=scanned.can_close))
+    state.pos += scanned.length
+    return True
+
+
+def _mark_balance(state, delimiters):
+    lone = []
+    for start in delimiters:
+        if start.marker != _EQUALS or start.end == -1:
+            continue
+        end = delimiters[start.end]
+        for index, kind, nesting in ((start.token, "mark_open", 1),
+                                     (end.token, "mark_close", -1)):
+            token = state.tokens[index]
+            token.type, token.tag, token.nesting = kind, "mark", nesting
+            token.markup, token.content = "==", ""
+        before = state.tokens[end.token - 1]
+        if before.type == "text" and before.content == "=":
+            lone.append(end.token - 1)
+    # Una sequenza dispari (===) lascia un «=» davanti: va spostato dopo i
+    # mark_close che lo seguono, come fa la regola del barrato.
+    while lone:
+        i = lone.pop()
+        j = i + 1
+        while j < len(state.tokens) and state.tokens[j].type == "mark_close":
+            j += 1
+        j -= 1
+        if i != j:
+            state.tokens[i], state.tokens[j] = state.tokens[j], state.tokens[i]
+
+
+def _mark_post_process(state):
+    _mark_balance(state, state.delimiters)
+    for meta in state.tokens_meta:
+        if meta and "delimiters" in meta:
+            _mark_balance(state, meta["delimiters"])
+
+
+def _mark_plugin(md):
+    md.inline.ruler.before("emphasis", "mark", _mark_tokenize)
+    md.inline.ruler2.before("emphasis", "mark", _mark_post_process)
+
+
+class _GfmLinkify(LinkifyIt):
+    """linkify-it con le regole dei link automatici di GFM (specifica GFM,
+    «Autolinks (extension)»): indirizzi http:// e https://, indirizzi che
+    cominciano con www. e indirizzi email. linkify-it da solo riconosce anche
+    i domini senza www., e «build.sh», «raglin.py» o «NOTA-IA.md» (.sh, .py e
+    .md sono domini nazionali) diventerebbero link."""
+
+    @staticmethod
+    def _gfm(m):
+        return (m.schema in ("http:", "https:", "mailto:")
+                or (m.schema == "" and m.raw.lower().startswith("www.")))
+
+    def match(self, text):
+        """Usato dalla regola che cerca i link nel testo."""
+        keep = [m for m in (super().match(text) or []) if self._gfm(m)]
+        return keep or None
+
+    def match_at_start(self, text):
+        """Usato dalla regola in linea per gli indirizzi con protocollo."""
+        m = super().match_at_start(text)
+        return m if m is not None and self._gfm(m) else None
+
+
 def _make_parser():
-    return (MarkdownIt("commonmark", {"html": False})
-            .enable(["table", "strikethrough"])
+    md = MarkdownIt("commonmark", {"html": False, "linkify": True})
+    md.linkify = _GfmLinkify()
+    return (md
+            .enable(["table", "strikethrough", "linkify"])
+            .use(_mark_plugin)
             .use(dollarmath_plugin, allow_space=False, allow_digits=False,
                  double_inline=True)
             .use(texmath_plugin, delimiters="brackets")
@@ -366,6 +490,82 @@ def parser():
     programmi. parser().parse(testo) dà i token (con token.map, le righe del
     sorgente); parser().render(testo) dà l'HTML."""
     return _PARSER
+
+
+# ── Posizioni nel sorgente ──────────────────────────────────────────────────
+# markdown-it dà le righe dei blocchi (token.map) ma non la posizione degli
+# elementi in linea. Un editor che nasconde i marcatori (**, `, [ ]( )) deve
+# sapere dove sono: ogni regola in linea viene avvolta da una funzione che annota in
+# token.meta["src"] il tratto (inizio, fine) del testo in linea che la regola
+# ha letto. L'analisi resta quella di parser(): stessa configurazione, stesse
+# regole, nello stesso ordine.
+def _record_positions(fn):
+    def rule(state, silent):
+        start, count, pending = state.pos, len(state.tokens), state.pending
+        ok = fn(state, silent)
+        if not ok or silent:
+            return ok
+        new = state.tokens[count:]
+        # Il testo in attesa (pending) diventa un token quando la regola ne
+        # aggiunge uno: sta prima dell'elemento e non gli appartiene.
+        if (pending and new and new[0].type == "text" and not state.pending
+                and pending.startswith(new[0].content)):
+            new = new[1:]
+        new = [t for t in new if "src" not in t.meta]
+        end = state.pos
+        if new and all(t.type == "text" for t in new) \
+                and sum(len(t.content) for t in new) == end - start:
+            # Delimitatori (* _ ~ =): un token per carattere o per coppia.
+            pos = start
+            for t in new:
+                t.meta["src"] = (pos, pos + len(t.content))
+                pos += len(t.content)
+        else:
+            for t in new:
+                t.meta["src"] = (start, end)
+        return ok
+    return rule
+
+
+_SOURCE_PARSER = None
+
+
+def parse_source(text):
+    """I token di parser().parse(testo), con la posizione degli elementi in
+    linea: per i figli di ogni token «inline», token.meta["src"] = (inizio,
+    fine) nel testo inline.meta["src_content"], cioè token.content com'era
+    durante l'analisi in linea (i plugin possono accorciarlo dopo: quello
+    delle liste di attività toglie «[x] »). Le aperture e chiusure di grassetto, corsivo,
+    barrato ed evidenziato coprono il loro marcatore (per ** il secondo
+    asterisco dell'apertura e il primo della chiusura: si usa token.markup per
+    la lunghezza); link, immagini, codice, note e formule coprono l'elemento
+    intero. I link automatici senza < > riconosciuti dopo l'analisi in linea
+    (www., email) non hanno posizione."""
+    global _SOURCE_PARSER
+    if _SOURCE_PARSER is None:
+        md = _make_parser()
+        ruler = md.inline.ruler
+        # Si avvolge ogni regola una per una: Ruler.at() sostituisce per nome,
+        # e le regole delle formule $…$ e \\(…\\) si chiamano entrambe
+        # «math_inline». __cache__ = None ricompone le catene, come fa at().
+        for rule in ruler.__rules__:
+            rule.fn = _record_positions(rule.fn)
+        ruler.__cache__ = None
+
+        def keep_content(state):
+            for token in state.tokens:
+                if token.type == "inline":
+                    token.meta["src_content"] = token.content
+        md.core.ruler.after("block", "rusca_src_content", keep_content)
+        _SOURCE_PARSER = md
+    return _SOURCE_PARSER.parse(text)
+
+
+def link_label_end(src, start):
+    """Posizione della «]» che chiude l'etichetta del link o dell'immagine la
+    cui «[» è in src[start], o -1. È la funzione di markdown-it
+    (parseLinkLabel), quindi rispetta parentesi annidate, codice ed escape."""
+    return parseLinkLabel(StateInline(src, _PARSER, {}, []), start, True)
 
 
 # ── Testo in linea -> Pango ─────────────────────────────────────────────────
@@ -400,6 +600,11 @@ def _inline(nodes):
             out.append(f"<i>{_inline(n.children)}</i>")
         elif t == "s":
             out.append(f"<s>{_inline(n.children)}</s>")
+        elif t == "mark":
+            # Rosa 300 con testo prugna 900: 9,5:1, leggibile con i due temi
+            # (specifiche, sezione 4.2).
+            out.append(f'<span background="#f2a7c8" foreground="#2d0a1d">'
+                       f'{_inline(n.children)}</span>')
         elif t == "link":
             out.append(_link(n.attrs.get("href", ""), _inline(n.children)))
         elif t == "image":

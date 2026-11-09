@@ -50,9 +50,11 @@ Per altre lingue installa il dizionario corrispondente, ad esempio `hunspell-fr`
 Apri RuscaMark dal menu applicazioni di GNOME oppure cercandolo in Attività. Da terminale:
 
 ```bash
-ruscamark                 # documento di benvenuto
+ruscamark                 # documento nuovo
 ruscamark relazione.md    # apre un file
 ```
+
+Al primo avvio RuscaMark mostra un documento di benvenuto che presenta le sue funzioni; dalle volte successive si apre con un documento vuoto.
 
 Puoi anche trascinare un file `.md` dentro la finestra.
 
@@ -66,7 +68,7 @@ Puoi anche trascinare un file `.md` dentro la finestra.
 
 ## 4. Due modi di vedere il testo
 
-**Resa live (Ctrl+L)** — modalità predefinita. Titoli, grassetti, corsivi, codice, link, citazioni ed elenchi assumono subito il loro aspetto e i marcatori (`**`, `#`, `>`…) si nascondono. Quando porti il cursore su un elemento, la sua sintassi riappare per poterla modificare. Le tabelle restano in carattere monospazio, così le colonne allineate rimangono incolonnate.
+**Resa live (Ctrl+L)** — modalità predefinita. Titoli, grassetti, corsivi, codice, link, citazioni ed elenchi assumono subito il loro aspetto e i marcatori (`**`, `#`, `>`…) si nascondono. Quando porti il cursore su un elemento, la sua sintassi riappare per poterla modificare. Le tabelle restano in carattere monospazio, così le colonne allineate rimangono incolonnate. La resa live riconosce il Markdown esattamente come l'anteprima e gli export, anche quando un grassetto o un corsivo continua sulla riga successiva.
 
 **Anteprima classica (Ctrl+P)** — divide la finestra: a sinistra il sorgente con la sintassi colorata, a destra il documento impaginato. Solo l'anteprima mostra le immagini vere, le tabelle disegnate a griglia e le note raccolte in fondo. Con lo stile chiaro l'anteprima usa gli stessi colori dell'export PDF e HTML; con lo stile scuro resta prugna.
 
@@ -282,6 +284,7 @@ Non ci sono riferimenti al programma o al sito.
 - I paragrafi lunghi continuano sulla pagina successiva; un titolo non resta mai da solo in fondo a una pagina; i blocchi di codice brevi non vengono spezzati, quelli lunghi continuano nella pagina successiva con il loro riquadro.
 - Le tabelle vanno a capo dentro la cella e, se continuano sulla pagina successiva, la riga di intestazione viene ripetuta.
 - Le immagini locali sono inserite alla loro dimensione naturale, ridotte se più larghe della pagina. Le immagini remote non vengono scaricate: al loro posto compare il testo alternativo.
+- I link sono cliccabili: quelli web e di posta aprono il browser o il programma di posta, quelli interni come `[vai ai risultati](#risultati)` portano al titolo. I link a file o a percorsi relativi restano testo, perché fuori dalla cartella del documento non porterebbero da nessuna parte; anche un link interno a un titolo che non esiste resta testo.
 
 ### HTML
 
