@@ -7,8 +7,11 @@ office and multimedia software, refined in detail — a finished desktop the
 moment it boots.
 
 **Latest release:** @VERSION@ (@ARCH@)
+
 **Website:** https://www.ruscalinux.org
+
 **YouTube:** https://www.youtube.com/@ruscalinux
+
 **Contact:** info@ruscalinux.org
 
 ---
