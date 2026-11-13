@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-RuscaLLama 1.99.2 — chat con modelli linguistici locali per RuscaLinux.
+RuscaLLama 1.99.3 — chat con modelli linguistici locali per RuscaLinux.
 
 Usa ruscallama-engine (llama.cpp, software esterno con licenza MIT) per
 eseguire modelli GGUF sul computer dell'utente. Nessun dato lascia la
@@ -41,7 +41,7 @@ _RE_LINK_TAG = re.compile(r"</?a\b[^>]*>")
 
 APP_ID = "org.ruscalinux.RuscaLLama"
 APP_NAME = "RuscaLLama"
-APP_VERSION = "1.99.2"
+APP_VERSION = "1.99.3"
 STYLE_SRC = os.path.join(BASE_DIR, "style.css")
 ICON_SRC = os.path.join(BASE_DIR, "ruscallama.svg")
 LANG_DIR = os.path.join(BASE_DIR, "lang")

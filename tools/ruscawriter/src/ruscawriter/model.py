@@ -132,7 +132,7 @@ APP_NAME = "RuscaWriter"
 # EN: the version is RuscaLinux's. Title, About window and package derive
 #     from it.
 # ---------------------------------------------------------------------------
-APP_VERSION_SHORT = "1.99.2"
+APP_VERSION_SHORT = "1.99.3"
 APP_VERSION = APP_VERSION_SHORT
 APP_AUTHOR = "Nunzio Curcuruto"
 

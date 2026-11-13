@@ -10,7 +10,7 @@ set -euo pipefail
 # ---- configurazione ---------------------------------------------------------
 PKG_NAME="ruscacleaner"   # nome del pacchetto Debian e del programma
 DEB_SUFFIX="ruscalinux"   # solo nel nome del file .deb
-PKG_VERSION="1.99.2"
+PKG_VERSION="1.99.3"
 ARCH="${ARCH:-all}"        # Python puro: per le regole Debian l'architettura è "all"
 MAINTAINER="Nunzio Curcuruto <info@ruscalinux.org>"
 HOMEPAGE="https://www.ruscalinux.org/"

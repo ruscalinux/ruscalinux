@@ -5,7 +5,7 @@
 set -euo pipefail
 
 PKG="ruscahub"
-VER="1.99.2"
+VER="1.99.3"
 ARCH="all"                     # solo Python: indipendente dall'architettura
 SUFFIX="ruscalinux"            # suffisso obbligatorio (specifiche RuscaLinux)
 MAINT="Nunzio Curcuruto <info@ruscalinux.org>"

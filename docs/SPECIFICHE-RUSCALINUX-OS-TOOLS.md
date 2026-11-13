@@ -21,7 +21,7 @@ Si trova nel repository in `docs/SPECIFICHE-RUSCALINUX-OS-TOOLS.md`. In caso di 
 | Desktop | GNOME 48 (Wayland) |
 | OS di riferimento | Debian - The universal operating system (debian.org) |
 | Autore | Nunzio Curcuruto (ruscalinux-dev) |
-| Versione attuale | 1.99.2 |
+| Versione attuale | 1.99.3 |
 | Licenza codice | GPL-3.0 — https://www.gnu.org/licenses/gpl-3.0.html |
 | Prefisso App ID | `org.ruscalinux.` |
 
@@ -128,7 +128,7 @@ Fino alla versione 1.99.1 RuscaMark usava l’App ID `org.ruscalinux.ruscamark`.
 | Markdown | CommonMark 0.30 con le estensioni della sezione 1.2, tramite `python3-markdown-it` (>= 3.0), `python3-mdit-py-plugins` (>= 0.4) e `python3-linkify-it` (>= 2.0) |
 | Distro base | Debian Stable |
 | Formato pacchetti | deb, `Architecture: all` (`amd64` per ruscallama-engine, che è compilato) |
-| Versione tool | 1.99.2 |
+| Versione tool | 1.99.3 |
 
 Regole tecniche:
 
@@ -373,7 +373,7 @@ Ogni tool include lo stesso file `style.css`, installato in `/usr/share/ruscafoo
 La palette chiara e quella scura sono legate alle classi `rusca-light` e `rusca-dark`, che il programma mette sulle proprie finestre seguendo `Adw.StyleManager:dark` (sezione 4.6). Non si usa `@media (prefers-color-scheme: dark)`: il modo in cui GTK valuta questa condizione per i fogli di stile delle applicazioni cambia tra GTK 4.18 (trixie) e GTK 4.20 e successivi, e nelle versioni recenti la palette scura non verrebbe applicata. Con le classi il risultato è identico su tutte le versioni.
 
 ```css
-/* RuscaLinux OS Tools — style.css — 1.99.2 — GPL-3.0
+/* RuscaLinux OS Tools — style.css — 1.99.3 — GPL-3.0
  * Tema comune Prugna/Rosa. File identico in tutti i tool: si modifica una
  * volta sola e si copia. Ridefinisce solo i colori di libadwaita (>= 1.6),
  * non la forma dei widget. Contrasti verificati: vedi le specifiche, sez. 4.2.
@@ -458,7 +458,7 @@ gi.require_version("Adw", "1")
 from gi.repository import Adw, Gdk, Gio, Gtk
 
 APP_ID = "org.ruscalinux.RuscaFoo"
-APP_VERSION = "1.99.2"
+APP_VERSION = "1.99.3"
 BASE_DIR = os.path.dirname(os.path.realpath(__file__))   # /usr/share/ruscafoo
 STYLE_SRC = os.path.join(BASE_DIR, "style.css")
 
@@ -594,7 +594,7 @@ Serve perché il tool compaia correttamente in GNOME Software. Contenuto minimo:
   <url type="homepage">https://www.ruscalinux.org</url>
   <content_rating type="oars-1.1"/>
   <releases>
-    <release version="1.99.2" date="2026-01-01"/>
+    <release version="1.99.3" date="2026-01-01"/>
   </releases>
 </component>
 ```
@@ -666,7 +666,7 @@ Esempio di output:
 
 ```text
 build-deb/
-├── ruscacleaner-ruscalinux_1.99.2_all.deb
+├── ruscacleaner-ruscalinux_1.99.3_all.deb
 └── SHA256SUMS
 ```
 
@@ -674,7 +674,7 @@ Esempio di file `DEBIAN/control`:
 
 ```text
 Package: ruscafoo
-Version: 1.99.2
+Version: 1.99.3
 Section: utils
 Priority: optional
 Architecture: all
@@ -713,7 +713,7 @@ La versione di tutti i RuscaLinux OS Tools è identica alla versione di RuscaLin
 Versione attuale:
 
 ```text
-1.99.2
+1.99.3
 ```
 
 ---
@@ -950,13 +950,13 @@ sha256sum -c SHA256SUMS
 Installazione consigliata:
 
 ```bash
-sudo apt install ./nome-tool-ruscalinux_1.99.2_all.deb
+sudo apt install ./nome-tool-ruscalinux_1.99.3_all.deb
 ```
 
 Installazione alternativa:
 
 ```bash
-sudo dpkg -i nome-tool-ruscalinux_1.99.2_all.deb
+sudo dpkg -i nome-tool-ruscalinux_1.99.3_all.deb
 sudo apt -f install    # solo se mancano dipendenze
 ```
 
@@ -1067,7 +1067,7 @@ Tutti i dati elaborati dai RuscaLinux OS Tools rimangono in locale. Nessun dato 
 | Base distribution | Debian Stable |
 | Desktop | GNOME |
 | Author | Nunzio Curcuruto (ruscalinux-dev) |
-| Current version | 1.99.2 |
+| Current version | 1.99.3 |
 | Code license | GPL-3.0 — https://www.gnu.org/licenses/gpl-3.0.html |
 
 ## 🛠️ Included tools
@@ -1105,13 +1105,13 @@ sha256sum -c SHA256SUMS
 Recommended installation:
 
 ```bash
-sudo apt install ./tool-name-ruscalinux_1.99.2_all.deb
+sudo apt install ./tool-name-ruscalinux_1.99.3_all.deb
 ```
 
 Alternative installation:
 
 ```bash
-sudo dpkg -i tool-name-ruscalinux_1.99.2_all.deb
+sudo dpkg -i tool-name-ruscalinux_1.99.3_all.deb
 sudo apt -f install    # only if dependencies are missing
 ```
 

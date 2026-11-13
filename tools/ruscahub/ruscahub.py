@@ -46,7 +46,7 @@ from pathlib import Path
 # ------------------------------------------------------------------ costanti
 APP_ID      = "org.ruscalinux.RuscaHub"
 APP_NAME    = "RuscaHub"
-APP_VERSION = "1.99.2"
+APP_VERSION = "1.99.3"
 AUTHOR      = "Nunzio Curcuruto"
 SITE_URI    = "https://www.ruscalinux.org/"
 SITE_LABEL  = "ruscalinux.org"

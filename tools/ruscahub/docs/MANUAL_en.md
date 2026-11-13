@@ -1,6 +1,6 @@
 # RuscaHub — User Manual
 
-**Version 1.99.2 · RuscaTools Suite · RuscaLinux**
+**Version 1.99.3 · RuscaTools Suite · RuscaLinux**
 Author: Nunzio Curcuruto — © 2026 — GPL-3.0 License — <https://www.ruscalinux.org/>
 
 ## 1. Overview
@@ -30,7 +30,7 @@ The `.deb` package installs the dependencies and recommended packages automatica
 Check integrity, then install:
 
     cd build-deb && sha256sum -c SHA256SUMS
-    sudo apt install ./ruscahub-ruscalinux_1.99.2_all.deb
+    sudo apt install ./ruscahub-ruscalinux_1.99.3_all.deb
 
 The installed package name is still `ruscahub`, so the new version upgrades the
 previous one without conflicts.
@@ -144,7 +144,7 @@ From the project root:
     ./make-deb.sh
 
 Output in the `build-deb/` folder:
-`ruscahub-ruscalinux_1.99.2_all.deb` + `SHA256SUMS`.
+`ruscahub-ruscalinux_1.99.3_all.deb` + `SHA256SUMS`.
 The architecture is `all` because RuscaHub is written entirely in Python.
 
 ## 13. Troubleshooting

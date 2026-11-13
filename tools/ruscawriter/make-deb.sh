@@ -12,7 +12,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-VER="1.99.2"
+VER="1.99.3"
 PKG="ruscawriter"
 NAME="RuscaWriter"
 APP_ID="org.ruscalinux.RuscaWriter"

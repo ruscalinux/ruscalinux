@@ -1,4 +1,4 @@
-"""RuscaLinux OS Tools — rusca_liveblocks.py — 1.99.2 — GPL-3.0
+"""RuscaLinux OS Tools — rusca_liveblocks.py — 1.99.3 — GPL-3.0
 
 Tabelle e formule mostrate «rese» dentro un Gtk.TextView mentre si scrive,
 senza toccare il testo del documento.

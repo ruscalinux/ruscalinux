@@ -1,4 +1,4 @@
-"""RuscaLinux OS Tools — test del Markdown di RuscaMark — 1.99.2 — GPL-3.0
+"""RuscaLinux OS Tools — test del Markdown di RuscaMark — 1.99.3 — GPL-3.0
 
 MarkdownDoc (tools/ruscamark/ruscamark.py) usa l'analisi del motore comune
 rusca_markdown.py e la rende in HTML (export), Pango (anteprima) ed elementi

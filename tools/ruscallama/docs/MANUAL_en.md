@@ -1,6 +1,6 @@
-# RuscaLLama 1.99.2 — Manual
+# RuscaLLama 1.99.3 — Manual
 
-**Version** 1.99.2 · **Author** Nunzio Curcuruto · **Distribution** RuscaLinux ([ruscalinux.org](https://www.ruscalinux.org/)) · **License** GNU GPL v3 or later
+**Version** 1.99.3 · **Author** Nunzio Curcuruto · **Distribution** RuscaLinux ([ruscalinux.org](https://www.ruscalinux.org/)) · **License** GNU GPL v3 or later
 
 RuscaLLama is a chat with language models that run **entirely on this computer**. The model is run by **ruscallama-engine**, that is llama.cpp: an external component under the MIT license, built for RuscaLinux.
 

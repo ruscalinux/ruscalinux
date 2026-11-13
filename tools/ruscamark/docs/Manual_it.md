@@ -1,10 +1,10 @@
-# Manuale di RuscaMark 1.99.2
+# Manuale di RuscaMark 1.99.3
 
 RuscaMark è l'editor Markdown dei RuscaLinux OS Tools. È pensato per scrivere articoli, report, appunti e documentazione: la formattazione compare mentre scrivi, la pagina resta centrata come un foglio e tutto il lavoro avviene sul tuo computer.
 
 | Campo | Valore |
 |---|---|
-| Versione | 1.99.2 |
+| Versione | 1.99.3 |
 | Autore | Nunzio Curcuruto (ruscalinux-dev) |
 | Sito web | [ruscalinux.org](https://www.ruscalinux.org) |
 | Contatto | info@ruscalinux.org |
@@ -30,10 +30,10 @@ sha256sum -c SHA256SUMS
 Installazione consigliata:
 
 ```bash
-sudo apt install ./ruscamark-ruscalinux_1.99.2_all.deb
+sudo apt install ./ruscamark-ruscalinux_1.99.3_all.deb
 ```
 
-In alternativa `sudo dpkg -i ruscamark-ruscalinux_1.99.2_all.deb`, seguito da `sudo apt -f install` se mancano dipendenze.
+In alternativa `sudo dpkg -i ruscamark-ruscalinux_1.99.3_all.deb`, seguito da `sudo apt -f install` se mancano dipendenze.
 
 Pacchetti consigliati (installati automaticamente da `apt` se disponibili):
 

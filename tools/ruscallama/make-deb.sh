@@ -12,7 +12,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-VER="1.99.2"
+VER="1.99.3"
 PKG="ruscallama"
 NAME="RuscaLLama"
 APP_ID="org.ruscalinux.RuscaLLama"

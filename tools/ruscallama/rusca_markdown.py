@@ -1,4 +1,4 @@
-"""RuscaLinux OS Tools — rusca_markdown.py — 1.99.2 — GPL-3.0
+"""RuscaLinux OS Tools — rusca_markdown.py — 1.99.3 — GPL-3.0
 
 Motore Markdown comune dei RuscaLinux OS Tools.
 

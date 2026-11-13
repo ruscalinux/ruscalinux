@@ -43,7 +43,7 @@ from pathlib import Path
 from typing import Callable, List, Optional, Tuple, Union
 
 APP_ID = "org.ruscalinux.RuscaCleaner"
-APP_VERSION = "1.99.2"
+APP_VERSION = "1.99.3"
 ICON_NAME = APP_ID
 
 

@@ -1,6 +1,6 @@
-# RuscaTranslator 1.99.2 — Manual
+# RuscaTranslator 1.99.3 — Manual
 
-**Version** 1.99.2 · **Author** Nunzio Curcuruto · **Distribution** RuscaLinux ([ruscalinux.org](https://www.ruscalinux.org/)) · **License** GNU GPL v3 or later
+**Version** 1.99.3 · **Author** Nunzio Curcuruto · **Distribution** RuscaLinux ([ruscalinux.org](https://www.ruscalinux.org/)) · **License** GNU GPL v3 or later
 
 RuscaTranslator translates **Markdown** documents between the twenty-six official languages of RuscaLinux with a language model that runs **on this computer**, through **ruscallama-engine** (llama.cpp, an external component under the MIT license). Headings, lists, tables, code and links stay intact.
 

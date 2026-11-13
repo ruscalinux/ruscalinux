@@ -94,7 +94,7 @@ Crea `tools/<nome>/` con dentro uno script `make-deb.sh` che:
 - si lancia dalla sua cartella, senza argomenti;
 - ha la versione scritta dentro di sé, uguale a `VERSION` di `release.conf`;
 - scrive un solo `.deb` in `build-deb/` (per esempio
-  `<nome>-ruscalinux_1.99.2_all.deb`);
+  `<nome>-ruscalinux_1.99.3_all.deb`);
 - produce un pacchetto Debian che si chiama `<nome>`, come la cartella.
 
 Nient'altro. `make-debs.sh` scorre `tools/*/` e costruisce quello che trova;

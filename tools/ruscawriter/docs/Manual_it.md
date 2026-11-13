@@ -3,7 +3,7 @@
 | Campo | Valore |
 |---|---|
 | Programma | RuscaWriter |
-| Versione | 1.99.2 |
+| Versione | 1.99.3 |
 | Progetto | RuscaLinux OS Tools |
 | Sito | https://www.ruscalinux.org |
 | Sorgenti | https://github.com/ruscalinux/ruscalinux (cartella `tools/ruscawriter`) |
@@ -29,7 +29,7 @@ Verifica l'integrità del pacchetto e installalo:
 
 ```bash
 sha256sum -c SHA256SUMS
-sudo apt install ./ruscawriter-ruscalinux_1.99.2_all.deb
+sudo apt install ./ruscawriter-ruscalinux_1.99.3_all.deb
 ```
 
 In alternativa, `sudo dpkg -i` seguito da `sudo apt -f install` per le dipendenze mancanti.

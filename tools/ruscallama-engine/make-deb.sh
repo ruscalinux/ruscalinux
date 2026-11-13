@@ -49,7 +49,7 @@ cd "$(dirname "$0")"
 SRC_DIR="$(pwd)"
 
 # ── Versioni ────────────────────────────────────────────────────────────────
-VER="1.99.2"                       # = VERSION in release.conf
+VER="1.99.3"                       # = VERSION in release.conf
 # La versione di llama.cpp non e' scritta qui: e' l'ultima release stabile,
 # o quella di RUSCALLAMA_LLAMA_VERSION (vedi ultima-versione.sh).
 

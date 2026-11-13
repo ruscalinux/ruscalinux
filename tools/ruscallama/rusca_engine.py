@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# rusca_engine.py — RuscaLinux OS Tools 1.99.2 — GPL-3.0-or-later
+# rusca_engine.py — RuscaLinux OS Tools 1.99.3 — GPL-3.0-or-later
 #
 # Avvio, sorveglianza e interrogazione di ruscallama-engine (llama-server,
 # cioe' llama.cpp: software esterno, licenza MIT). Il file e' IDENTICO in

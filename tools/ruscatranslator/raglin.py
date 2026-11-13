@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 #
 # raglin.py — RAG linguistico di RuscaTranslator (italiano <-> inglese)
-# RuscaLinux OS Tools 1.99.2 — Copyright (C) 2026 Nunzio Curcuruto — GPL-3.0-or-later
+# RuscaLinux OS Tools 1.99.3 — Copyright (C) 2026 Nunzio Curcuruto — GPL-3.0-or-later
 #
 # Strati:
 #   1) base di conoscenza lessicale (idiomi, falsi amici, pragmatica,

@@ -12,7 +12,7 @@
 #     separata dai sorgenti;
 #   * nome del pacchetto Debian: ruscamark; il suffisso -ruscalinux
 #     compare solo nel nome del file .deb (ruscamark-ruscalinux_*.deb);
-#   * versione identica a RuscaLinux (1.99.2);
+#   * versione identica a RuscaLinux (1.99.3);
 #   * le lingue dei RuscaLinux OS Tools (file lang/*.json), fallback en.json;
 #   * Python >= 3.10, GTK >= 4.18, libadwaita >= 1.7, dipendenze minime;
 #   * tema comune RuscaLinux (style.css), icona simbolica, metainfo
@@ -35,7 +35,7 @@ set -euo pipefail
 APP="ruscamark"                    # nome applicazione: binario, icone, dati
 PKG="ruscamark"                    # nome del pacchetto Debian (apt, dpkg)
 SUFFIX="ruscalinux"                # suffisso obbligatorio, solo nel nome del file
-VER="1.99.2"                       # identica alla versione di RuscaLinux
+VER="1.99.3"                       # identica alla versione di RuscaLinux
 ARCH="all"
 MAINT="Nunzio Curcuruto <info@ruscalinux.org>"
 HOMEPAGE="https://www.ruscalinux.org/"

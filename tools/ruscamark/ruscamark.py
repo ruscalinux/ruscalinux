@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-RuscaMark 1.99.2 — Editor professionale Markdown in Python + GTK4 + libadwaita
+RuscaMark 1.99.3 — Editor professionale Markdown in Python + GTK4 + libadwaita
 Autore : Nunzio Curcuruto
 Sito   : https://www.ruscalinux.org
 Licenza: GPL-3.0 — https://www.gnu.org/licenses/gpl-3.0.html
@@ -524,7 +524,7 @@ class Translator:
         return self.code in RTL_LANGUAGES
 # ----------------------------------------------------------------------------
 APP_NAME    = "RuscaMark"
-APP_VERSION = "1.99.2"
+APP_VERSION = "1.99.3"
 APP_AUTHOR  = "Nunzio Curcuruto"
 APP_WEBSITE = "https://www.ruscalinux.org"
 APP_ID      = "org.ruscalinux.RuscaMark"

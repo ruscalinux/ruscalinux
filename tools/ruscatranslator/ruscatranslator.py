@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-RuscaTranslator 1.99.2 — traduttore di documenti Markdown per RuscaLinux.
+RuscaTranslator 1.99.3 — traduttore di documenti Markdown per RuscaLinux.
 
 Traduce tra le 26 lingue ufficiali con un modello linguistico locale, eseguito da
 ruscallama-engine (llama.cpp, software esterno con licenza MIT). Per la
@@ -42,7 +42,7 @@ except ImportError:
 
 APP_ID = "org.ruscalinux.RuscaTranslator"
 APP_NAME = "RuscaTranslator"
-APP_VERSION = "1.99.2"
+APP_VERSION = "1.99.3"
 STYLE_SRC = os.path.join(BASE_DIR, "style.css")
 ICON_SRC = os.path.join(BASE_DIR, "ruscatranslator.svg")
 LANG_DIR = os.path.join(BASE_DIR, "lang")

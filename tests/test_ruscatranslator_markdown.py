@@ -1,4 +1,4 @@
-"""RuscaLinux OS Tools — test del Markdown di RuscaTranslator — 1.99.2 — GPL-3.0
+"""RuscaLinux OS Tools — test del Markdown di RuscaTranslator — 1.99.3 — GPL-3.0
 
 split_markdown divide il documento da tradurre in pezzi per il modello, solo
 fra un blocco Markdown e l'altro (rusca_markdown.block_ranges). Si lanciano

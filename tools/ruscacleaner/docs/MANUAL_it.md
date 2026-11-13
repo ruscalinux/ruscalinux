@@ -1,6 +1,6 @@
 # RuscaCleaner — Manuale d'uso
 
-**Versione** 1.99.2 · **Autore** Nunzio Curcuruto · **Distribuzione** RuscaLinux ([ruscalinux.org](https://www.ruscalinux.org/)) · **Licenza** GNU GPL v3 o successiva
+**Versione** 1.99.3 · **Autore** Nunzio Curcuruto · **Distribuzione** RuscaLinux ([ruscalinux.org](https://www.ruscalinux.org/)) · **Licenza** GNU GPL v3 o successiva
 
 ---
 
@@ -16,7 +16,7 @@ Requisiti: RuscaLinux o Debian Stable, GNOME, Python 3.10+, GTK 4.18+, libadwait
 
 ```bash
 sha256sum -c SHA256SUMS                                   # prima verifica l'integrità
-sudo apt install ./ruscacleaner-ruscalinux_1.99.2_all.deb # installa anche le dipendenze
+sudo apt install ./ruscacleaner-ruscalinux_1.99.3_all.deb # installa anche le dipendenze
 ```
 
 Per costruire il pacchetto dai sorgenti: `./make-deb.sh`. Pacchetto e `SHA256SUMS` vengono creati in `build-deb/`.

@@ -491,7 +491,7 @@ def anteprima(font, cartella, png):
     d.text((x, round(H * 0.92)),
            "↑ ↓  Select      Enter  Start      E  Edit      C  Command line",
            font=testo, fill=esadecimale(TENUE))
-    v = "RuscaLinux 1.99.2"
+    v = "RuscaLinux 1.99.3"
     d.text((round(W * 0.92) - d.textlength(v, font=testo), round(H * 0.92)), v,
            font=testo, fill=esadecimale(TENUE))
     img.convert("RGB").save(png, optimize=True)

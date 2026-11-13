@@ -1,4 +1,4 @@
-"""RuscaLinux OS Tools — test di rusca_markdown.py — 1.99.2 — GPL-3.0
+"""RuscaLinux OS Tools — test di rusca_markdown.py — 1.99.3 — GPL-3.0
 
 Si lanciano dalla radice del repository:
     python3 -m unittest tests/test_rusca_markdown.py
