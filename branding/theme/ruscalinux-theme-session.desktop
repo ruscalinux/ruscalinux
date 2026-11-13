@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=RuscaLinux theme session helper
+Comment=Keep the Adwaita-Prugna theme in step with the light, dark and high contrast settings
+Exec=/usr/libexec/ruscalinux-theme/ruscalinux-theme-session
+OnlyShowIn=GNOME;
+NoDisplay=true
+X-GNOME-Autostart-Phase=Applications

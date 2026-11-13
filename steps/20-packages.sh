@@ -4,6 +4,9 @@ cat <<EOF >> .work/config/package-lists/live.list.chroot
 # GNOME
 gnome-core
 gnome-tweaks
+# Estensione ufficiale per i temi della Shell: la usa ruscalinux-shell-theme
+# (branding/shell-theme/)
+gnome-shell-extension-user-theme
 gnome-initial-setup
 
 # Internet
@@ -65,6 +68,7 @@ live-build
 squashfs-tools
 fastfetch
 pdftk
+weasyprint
 tree
 file-roller
 

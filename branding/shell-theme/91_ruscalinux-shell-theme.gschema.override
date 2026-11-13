@@ -1,0 +1,10 @@
+# RuscaLinux — tema di GNOME Shell.
+# Sono valori predefiniti: l'utente li cambia da Estensioni o Ritocchi.
+#
+# Il tema si carica con User Themes, l'estensione ufficiale di GNOME per i
+# temi della Shell (pacchetto gnome-shell-extension-user-theme).
+[org.gnome.shell]
+enabled-extensions=['user-theme@gnome-shell-extensions.gcampax.github.com']
+
+[org.gnome.shell.extensions.user-theme]
+name='Adwaita-Prugna'

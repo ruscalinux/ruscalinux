@@ -1,0 +1,12 @@
+# RuscaLinux — aspetto predefinito del desktop.
+# Sono valori predefiniti: l'utente li cambia da Impostazioni o Ritocchi.
+#
+#  - accent-color: l'accento di sistema di GNOME (>= 47). Vale per GNOME
+#    Shell, la schermata di accesso e tutte le applicazioni libadwaita.
+#    'pink' e' il valore ufficiale piu' vicino al prugna/rosa di RuscaLinux.
+#  - gtk-theme: riguarda solo le applicazioni GTK 3.
+#  - icon-theme: le icone del pacchetto ruscalinux-adwaita-prugna.
+[org.gnome.desktop.interface]
+accent-color='pink'
+gtk-theme='Adwaita-Prugna'
+icon-theme='Adwaita-Prugna'

@@ -61,7 +61,7 @@ esegui() {                        # esegui  DESCRIZIONE  COMANDO...
 }
 
 
-# --- Icone, sfondi, caratteri ----------------------------------------------
+# --- Icone, sfondi, caratteri, tema ------------------------------------------
 #
 # Ognuno di questi script sta accanto ai file che impacchetta e scrive il
 # .deb nella cartella corrente: per questo prima ci si sposta in $LAVORO.
@@ -76,6 +76,11 @@ esegui "Sfondi" bash "$QUI/branding/backgrounds/make-backgrounds-deb.sh" \
 
 esegui "Caratteri" bash "$QUI/branding/fonts/make-fonts-deb.sh" \
        "$QUI/branding/fonts/DM_Sans,Syne.zip" "$BRANDING_VERSION"
+
+esegui "Tema" bash "$QUI/branding/theme/make-theme-deb.sh" "$BRANDING_VERSION"
+
+esegui "Tema della Shell" bash "$QUI/branding/shell-theme/make-shell-theme-deb.sh" \
+       "$BRANDING_VERSION"
 
 cd "$QUI"
 

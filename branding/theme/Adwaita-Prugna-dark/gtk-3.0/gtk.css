@@ -1,0 +1,4 @@
+/* RuscaLinux — Adwaita-Prugna-dark, tema GTK 3 — GPL-3.0
+ * La variante scura sta in Adwaita-Prugna: qui la si richiama soltanto,
+ * cosi' i due temi non possono divergere. */
+@import url("../../Adwaita-Prugna/gtk-3.0/gtk-dark.css");

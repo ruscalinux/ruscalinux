@@ -1,0 +1,71 @@
+#!/bin/sh
+# RuscaLinux — ruscalinux-theme-session — GPL-3.0
+#
+# Piccolo aiuto di sessione per il tema Adwaita-Prugna. Fa due cose che
+# GNOME non fa da solo con i temi non suoi:
+#
+#  1. GTK 3 segue lo stile chiaro/scuro di Impostazioni -> Aspetto.
+#     GTK 3 sceglie il tema solo dal nome: qui si passa da Adwaita-Prugna
+#     ad Adwaita-Prugna-dark e viceversa.
+#
+#  2. Con il contrasto elevato il tema di GNOME Shell si mette da parte.
+#     Un tema della Shell resta attivo anche con il contrasto elevato e ne
+#     coprirebbe i colori: l'accessibilita' ha la precedenza (specifiche,
+#     sezione 4.7), quindi lo si sospende e lo si ripristina dopo.
+#
+# In entrambi i casi tocca solo Adwaita-Prugna: se l'utente ha scelto un
+# altro tema non cambia nulla. Usa solo gsettings; nessuna rete, nessun
+# privilegio.
+
+# Solo utenti reali, non la schermata di accesso di GDM.
+[ "$(id -u)" -ge 1000 ] || exit 0
+case "$XDG_CURRENT_DESKTOP" in *Greeter*) exit 0 ;; esac
+command -v gsettings > /dev/null 2>&1 || exit 0
+
+IFACE=org.gnome.desktop.interface
+A11Y=org.gnome.desktop.a11y.interface
+SHELL_THEME=org.gnome.shell.extensions.user-theme
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/ruscalinux-theme"
+PAUSED="$STATE_DIR/shell-theme-paused"
+
+apply_gtk3() {
+    current=$(gsettings get "$IFACE" gtk-theme 2> /dev/null) || return 0
+    case "$current" in
+        "'Adwaita-Prugna'" | "'Adwaita-Prugna-dark'") ;;
+        *) return 0 ;;
+    esac
+    if [ "$(gsettings get "$IFACE" color-scheme 2> /dev/null)" = "'prefer-dark'" ]; then
+        wanted=Adwaita-Prugna-dark
+    else
+        wanted=Adwaita-Prugna
+    fi
+    [ "$current" = "'$wanted'" ] || gsettings set "$IFACE" gtk-theme "$wanted"
+}
+
+apply_shell() {
+    # Senza l'estensione User Themes (o senza ruscalinux-shell-theme) non
+    # c'e' nulla da fare.
+    name=$(gsettings get "$SHELL_THEME" name 2> /dev/null) || return 0
+    if [ "$(gsettings get "$A11Y" high-contrast 2> /dev/null)" = "true" ]; then
+        if [ "$name" = "'Adwaita-Prugna'" ]; then
+            mkdir -p "$STATE_DIR" && : > "$PAUSED" || return 0
+            gsettings set "$SHELL_THEME" name "''"
+        fi
+    elif [ -e "$PAUSED" ]; then
+        rm -f "$PAUSED"
+        # Si ripristina solo se nel frattempo l'utente non ha scelto altro.
+        [ "$name" = "''" ] && gsettings reset "$SHELL_THEME" name
+    fi
+    return 0
+}
+
+apply_gtk3
+apply_shell
+{
+    gsettings monitor "$IFACE" color-scheme &
+    gsettings monitor "$A11Y" high-contrast &
+    wait
+} | while read -r _line; do
+    apply_gtk3
+    apply_shell
+done

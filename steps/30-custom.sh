@@ -2,7 +2,8 @@
 set -e
 
 # COPIA DEI PACCHETTI DA LOCAL PER ESSERE INSTALLATI DURANTE LA FASE DI BUILD
-# adwaita-prugna, ruscalinux-backgrounds-it, ruscalinux-fonts e le utility di
+# adwaita-prugna, ruscalinux-backgrounds-it, ruscalinux-fonts, ruscalinux-theme,
+# ruscalinux-shell-theme e le utility di
 # tools/ (ruscacleaner, ruscahub, ruscamark, ruscawriter, ruscallama-engine, ruscallama,
 # ruscatranslator)
 cp local/extra_debs/*.deb .work/config/packages.chroot/
@@ -118,6 +119,9 @@ mkdir -p .work/config/includes.chroot_after_packages/usr/share/icons/hicolor/256
 cp local/ruscalinux-logo.png .work/config/includes.chroot_after_packages/usr/share/icons/hicolor/256x256/apps/ruscalinux-logo.png
 
 # IMPOSTA SFONDI PREDEFINITI DI GNOME E PERSONALIZZAZIONI
+# Accento, tema GTK 3 e icone NON si impostano qui: li imposta il pacchetto
+# ruscalinux-theme (branding/theme/90_ruscalinux-theme.gschema.override).
+# Il tema della Shell lo imposta ruscalinux-shell-theme (branding/shell-theme/).
 # Disabilita anche le notifiche di aggiornamento di gnome-software (sessione live e installata)
 mkdir -p .work/config/includes.chroot_after_packages/usr/share/glib-2.0/schemas
 cat <<EOF > .work/config/includes.chroot_after_packages/usr/share/glib-2.0/schemas/99_ruscalinux-backgrounds-it.gschema.override
@@ -127,10 +131,6 @@ picture-uri-dark='file:///usr/share/backgrounds/ruscalinux-backgrounds/ruscalinu
 
 [org.gnome.desktop.screensaver]
 picture-uri='file:///usr/share/backgrounds/ruscalinux-backgrounds/ruscalinux-wallpaper-dark.png'
-
-[org.gnome.desktop.interface]
-icon-theme='Adwaita-Prugna'
-accent-color='slate'
 
 [org.gnome.software]
 allow-updates=false

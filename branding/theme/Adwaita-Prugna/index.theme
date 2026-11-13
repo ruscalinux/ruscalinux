@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=X-GNOME-Metatheme
+Name=Adwaita-Prugna
+Comment=Adwaita for GTK 3 with the RuscaLinux plum and pink accent
+Encoding=UTF-8
+
+[X-GNOME-Metatheme]
+GtkTheme=Adwaita-Prugna
+IconTheme=Adwaita-Prugna
