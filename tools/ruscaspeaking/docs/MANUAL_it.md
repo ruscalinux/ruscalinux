@@ -48,7 +48,7 @@ Come si legge un documento:
 
 ## 4. Leggere dei sottotitoli
 
-Apri un file `.srt`: la finestra mostra ogni sottotitolo con la sua ora. Con **Genera l'audio** ogni frase parte **all'ora del suo sottotitolo**, e l'audio dura fino alla fine dell'ultimo sottotitolo. Puoi usarlo come traccia di doppiaggio, per esempio dopo una trascrizione fatta con RuscaDubbing.
+Apri un file `.srt`: la finestra mostra ogni sottotitolo con la sua ora. Con **Genera l'audio** ogni frase parte **all'ora del suo sottotitolo**, e l'audio dura fino alla fine dell'ultimo sottotitolo. Puoi usarlo come traccia di doppiaggio, per esempio dopo una trascrizione fatta con RuscaTranscriber.
 
 - Tag come `<i>` e `{\an8}`, descrizioni di suoni fra parentesi quadre (`[musica]`) e note musicali (♪) non si leggono; i trattini dei dialoghi si tolgono.
 - Ogni frase ha a disposizione il tempo fino al sottotitolo dopo. Se la voce è più lunga, si **accelera** senza cambiare il tono, fino alla **velocità massima** scelta nelle Preferenze (1,3 volte se non la cambi).

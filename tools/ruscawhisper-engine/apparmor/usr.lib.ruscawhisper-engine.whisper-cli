@@ -30,11 +30,11 @@ profile ruscawhisper-engine /usr/lib/ruscawhisper-engine/whisper-cli {
   /usr/share/ruscawhisper/models/ r,
   /usr/share/ruscawhisper/models/** r,
 
-  # Cartella di lavoro di RuscaDubbing: l'audio da trascrivere (WAV
+  # Cartella di lavoro di RuscaTranscriber: l'audio da trascrivere (WAV
   # preparato da FFmpeg) e il risultato in JSON. E' l'unico posto in cui
   # il motore scrive.
-  owner @{HOME}/.cache/ruscadubbing/ r,
-  owner @{HOME}/.cache/ruscadubbing/** rw,
+  owner @{HOME}/.cache/ruscatranscriber/ r,
+  owner @{HOME}/.cache/ruscatranscriber/** rw,
 
   # Dal terminale: audio che whisper-cli sa leggere da solo.
   owner @{HOME}/**/*.wav r,

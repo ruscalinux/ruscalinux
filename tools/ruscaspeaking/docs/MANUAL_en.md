@@ -48,7 +48,7 @@ How a document is read:
 
 ## 4. Reading subtitles
 
-Open an `.srt` file: the window shows each subtitle with its time. With **Generate Audio** every sentence starts **at the time of its subtitle**, and the audio lasts until the end of the last subtitle. You can use it as a dubbing track, for example after a transcription made with RuscaDubbing.
+Open an `.srt` file: the window shows each subtitle with its time. With **Generate Audio** every sentence starts **at the time of its subtitle**, and the audio lasts until the end of the last subtitle. You can use it as a dubbing track, for example after a transcription made with RuscaTranscriber.
 
 - Tags such as `<i>` and `{\an8}`, sound descriptions in square brackets (`[music]`) and musical notes (♪) are not read; dialogue dashes are removed.
 - Each sentence has the time until the next subtitle. If the voice is longer, it is **sped up** without changing the pitch, up to the **maximum speed** chosen in Preferences (1.3 times unless you change it).

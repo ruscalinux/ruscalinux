@@ -5,7 +5,7 @@ set -e
 # adwaita-prugna, ruscalinux-backgrounds-it, ruscalinux-fonts, ruscalinux-theme,
 # ruscalinux-shell-theme e le utility di
 # tools/ (ruscacleaner, ruscahub, ruscamark, ruscawriter, ruscallama-engine, ruscallama,
-# ruscatranslator, ruscawhisper-engine, ruscadubbing, ruscaspeaking)
+# ruscatranslator, ruscawhisper-engine, ruscatranscriber, ruscaspeaking)
 cp local/extra_debs/*.deb .work/config/packages.chroot/
 
 # IMPOSTAZIONE splash.png BINARY
@@ -139,11 +139,13 @@ download-updates-notify=false
 
 [org.gnome.shell]
 disable-user-extensions=false
-# Pannello (dash): Firefox, Thunderbird, File, Editor di testo, Calcolatrice.
-# Senza questa chiave vale l'elenco di GNOME, che finisce con Aiuto (yelp),
-# nascosto piu' sotto. E' un valore predefinito: vale per gli utenti nuovi e
-# per chi non ha mai cambiato i preferiti.
-favorite-apps=['firefox-esr.desktop', 'thunderbird.desktop', 'org.gnome.Nautilus.desktop', 'org.gnome.TextEditor.desktop', 'org.gnome.Calculator.desktop']
+# Pannello (dash): Firefox, Thunderbird, Terminale, File, Editor di testo,
+# Calcolatrice. Il terminale e' GNOME Terminale (gnome-terminal, la prima
+# scelta di gnome-core in Debian 13). Senza questa chiave vale l'elenco di
+# GNOME, che finisce con Aiuto (yelp), nascosto piu' sotto. E' un valore
+# predefinito: vale per gli utenti nuovi e per chi non ha mai cambiato i
+# preferiti.
+favorite-apps=['firefox-esr.desktop', 'thunderbird.desktop', 'org.gnome.Terminal.desktop', 'org.gnome.Nautilus.desktop', 'org.gnome.TextEditor.desktop', 'org.gnome.Calculator.desktop']
 
 # PRIVACY E SICUREZZA
 # Valori predefiniti; l'utente puo' cambiarli da Impostazioni.

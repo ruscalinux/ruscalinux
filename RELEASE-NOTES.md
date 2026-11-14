@@ -55,7 +55,7 @@
   (Ukrainian and Russian, Simplified and Traditional Chinese, European and
   Brazilian Portuguese). Models are not included: copy a GGUF file into
   `~/.local/share/ruscallama/models/`.
-- **Speech to text.** RuscaDubbing transcribes a video or audio file with a
+- **Speech to text.** RuscaTranscriber transcribes a video or audio file with a
   Whisper model that runs on your own computer and saves the text as
   Markdown and the subtitles as SRT. Its engine, **ruscawhisper-engine**, is
   whisper.cpp built from source with Vulkan and without any network code.

@@ -4,7 +4,7 @@
 #
 #   ./make-deb.sh
 #
-# ruscawhisper-engine e' il motore di riconoscimento vocale di RuscaDubbing.
+# ruscawhisper-engine e' il motore di riconoscimento vocale di RuscaTranscriber.
 # E' whisper.cpp, SOFTWARE ESTERNO (licenza MIT,
 # https://github.com/ggml-org/whisper.cpp), compilato dal sorgente con il
 # backend Vulkan: un solo binario per NVIDIA, AMD e Intel, che ripiega sulla
@@ -26,12 +26,12 @@
 #     della stessa versione devono trovare lo stesso archivio. Il file nuovo
 #     in checksums/ va aggiunto al repository (git add).
 # Dopo la compilazione si controlla che whisper-cli accetti tutte le opzioni
-# usate da RuscaDubbing (OPZIONI_USATE, qui sotto), che i binari non abbiano
+# usate da RuscaTranscriber (OPZIONI_USATE, qui sotto), che i binari non abbiano
 # codice di rete e che il motore trascriva davvero un audio di prova.
 #
 # Si impacchetta solo whisper-cli (piu' whisper-bench per misurare): un
 # programma che legge un file audio e scrive un file di testo. Niente
-# whisper-server: RuscaDubbing non apre porte, nemmeno su 127.0.0.1.
+# whisper-server: RuscaTranscriber non apre porte, nemmeno su 127.0.0.1.
 #
 # Il risultato della compilazione viene tenuto in una cache
 # (~/.cache/ruscalinux/ruscawhisper-engine) e riusato finche' non cambiano
@@ -61,10 +61,10 @@ VER="1.99.3"                       # = VERSION in release.conf
 
 # Una release piu' giovane di cosi' viene costruita lo stesso, ma con un
 # avviso: le prime correzioni di una release arrivano di solito nei primi
-# giorni. Prima di pubblicare la ISO, prova RuscaDubbing.
+# giorni. Prima di pubblicare la ISO, prova RuscaTranscriber.
 GIORNI_MINIMI=14
 
-# Opzioni di whisper-cli usate da RuscaDubbing (rusca_whisper.py). Se una
+# Opzioni di whisper-cli usate da RuscaTranscriber (rusca_whisper.py). Se una
 # release non ne riconosce una, il motore non partirebbe: la build si ferma.
 # Aggiornare l'elenco quando il programma comincia a usare un'opzione nuova.
 OPZIONI_USATE="-m -f -l -t -oj -of -pp -ng"
@@ -94,7 +94,7 @@ SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-$(date +%s)}"
 LIBDIR="usr/lib/${PKG}"            # binari e librerie private
 PROFILE="usr.lib.ruscawhisper-engine.whisper-cli"
 
-# Solo questi finiscono nel pacchetto: whisper-cli per RuscaDubbing (e per
+# Solo questi finiscono nel pacchetto: whisper-cli per RuscaTranscriber (e per
 # il terminale), whisper-bench per misurare la velocita' di un modello.
 KEEP_BINARIES="whisper-cli whisper-bench"
 
@@ -225,7 +225,7 @@ if [ -n "$DATA_RELEASE" ]; then
     say "Release del $DATA_RELEASE ($GIORNI giorni fa)"
     if [ "$GIORNI" -lt "$GIORNI_MINIMI" ]; then
         avviso "whisper.cpp $TAG e' uscita da $GIORNI giorni (meno di $GIORNI_MINIMI).
-            Prova RuscaDubbing prima di pubblicare la ISO;
+            Prova RuscaTranscriber prima di pubblicare la ISO;
             per costruire la versione precedente:
             RUSCAWHISPER_WHISPER_VERSION=<versione> ./make-deb.sh"
     fi
@@ -240,7 +240,7 @@ fi
 #   WHISPER_BUILD_SERVER=OFF  niente whisper-server (cpp-httplib);
 #   WHISPER_CURL=OFF          niente libcurl;
 #   WHISPER_SDL2=OFF          niente microfono: si trascrivono solo file;
-#   WHISPER_COMMON_FFMPEG=OFF video e altri formati li converte RuscaDubbing
+#   WHISPER_COMMON_FFMPEG=OFF video e altri formati li converte RuscaTranscriber
 #                             con il comando ffmpeg di Debian, senza
 #                             collegare il motore alle librerie di FFmpeg.
 #   Dopo la compilazione si controlla che i binari non usino socket.
@@ -286,11 +286,11 @@ else
         esac
     done
 
-    # RuscaDubbing sceglie la scheda grafica con la variabile
+    # RuscaTranscriber sceglie la scheda grafica con la variabile
     # GGML_VK_VISIBLE_DEVICES di ggml (rusca_whisper.py): deve esistere.
     if [ "$BACKEND" = vulkan ] && \
        ! grep -rqs GGML_VK_VISIBLE_DEVICES "$SORG/ggml/src/ggml-vulkan/"; then
-        die "whisper.cpp $TAG non ha piu' GGML_VK_VISIBLE_DEVICES: RuscaDubbing
+        die "whisper.cpp $TAG non ha piu' GGML_VK_VISIBLE_DEVICES: RuscaTranscriber
         non potrebbe scegliere la scheda grafica. Adatta rusca_whisper.py, oppure
         costruisci la versione precedente:
         RUSCAWHISPER_WHISPER_VERSION=<versione> ./make-deb.sh"
@@ -372,7 +372,7 @@ SOCKET=$(cd "$STAGE_CACHE/bin" && for f in *; do [ -L "$f" ] && continue
 [ -z "$SOCKET" ] || die "il motore contiene codice di rete: $SOCKET"
 say "Nessun codice di rete nei binari"
 
-# Le opzioni che RuscaDubbing passa a whisper-cli devono esistere.
+# Le opzioni che RuscaTranscriber passa a whisper-cli devono esistere.
 AIUTO=$(LD_LIBRARY_PATH="$STAGE_CACHE/bin" VK_ICD_FILENAMES=/dev/null \
         VK_DRIVER_FILES=/dev/null timeout 60 "$STAGE_CACHE/bin/whisper-cli" --help 2>&1 || true)
 MANCANO=""
@@ -383,10 +383,10 @@ for o in $OPZIONI_USATE; do
     grep -qE -- "(^|[ ,])$o([ ,=]|\$)" <<< "$AIUTO" || MANCANO="$MANCANO $o"
 done
 [ -z "$MANCANO" ] || die "whisper-cli di whisper.cpp $TAG non riconosce opzioni usate
-        da RuscaDubbing:$MANCANO
+        da RuscaTranscriber:$MANCANO
         Adatta il programma, oppure costruisci la versione precedente:
         RUSCAWHISPER_WHISPER_VERSION=<versione> ./make-deb.sh"
-say "whisper-cli accetta tutte le opzioni usate da RuscaDubbing"
+say "whisper-cli accetta tutte le opzioni usate da RuscaTranscriber"
 # Le librerie si cercano solo nella cartella privata del pacchetto: un
 # percorso della macchina di build nei binari sarebbe un errore.
 if command -v readelf >/dev/null; then
@@ -409,7 +409,7 @@ find "$ROOT/$LIBDIR" -type f \( -name '*.so*' -o -perm -u+x \) -exec \
 find "$ROOT/$LIBDIR" -type f -name '*.so*' -exec chmod 644 {} \;
 
 # Controllo delle librerie: se ne manca una il motore non parte e
-# RuscaDubbing vede solo "terminato (codice 127)". Meglio scoprirlo qui.
+# RuscaTranscriber vede solo "terminato (codice 127)". Meglio scoprirlo qui.
 MANCANTI=$(cd "$ROOT/$LIBDIR" && for f in $KEEP_BINARIES; do
     [ -f "$f" ] && LD_LIBRARY_PATH=. ldd "./$f" 2>/dev/null; done \
     | grep 'not found' | awk '{print $1}' | sort -u || true)
@@ -427,7 +427,7 @@ fi
 cat > "$DOC/README.md" <<README
 # ruscawhisper-engine $VER
 
-Motore di riconoscimento vocale del RuscaLinux OS Tool RuscaDubbing.
+Motore di riconoscimento vocale del RuscaLinux OS Tool RuscaTranscriber.
 
 **Componente esterno:** whisper.cpp $TAG — $UPSTREAM — licenza MIT,
 copyright The ggml authors. RuscaLinux lo compila dal sorgente senza
@@ -555,7 +555,7 @@ $PKG ($VER) unstable; urgency=medium
     stesse regole di ruscallama-engine.
   * Solo whisper-cli e whisper-bench: niente server, niente libcurl,
     nessun socket nei binari (controllato dalla build).
-  * Controllo che whisper-cli accetti le opzioni usate da RuscaDubbing e
+  * Controllo che whisper-cli accetti le opzioni usate da RuscaTranscriber e
     che trascriva l'audio di prova.
   * Binari e librerie in /$LIBDIR; profilo AppArmor in complain.
 
@@ -585,9 +585,9 @@ Recommends: $RECOMMENDS
 Maintainer: $MAINT
 Homepage: $HOMEPAGE
 Installed-Size: $(du -sk --exclude=DEBIAN "$ROOT" | cut -f1)
-Description: speech recognition engine for RuscaDubbing
+Description: speech recognition engine for RuscaTranscriber
  Runs local Whisper speech recognition models (ggml files) for the
- RuscaLinux OS Tool RuscaDubbing. Contains whisper-cli, plus whisper-bench
+ RuscaLinux OS Tool RuscaTranscriber. Contains whisper-cli, plus whisper-bench
  for measurements.
  .
  This is whisper.cpp $TAG, an external component (MIT license,
