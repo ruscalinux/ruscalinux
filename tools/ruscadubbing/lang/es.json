@@ -64,6 +64,8 @@
   "group_engine": "Motor",
   "gpu": "Tarjeta gráfica (Vulkan)",
   "gpu_sub": "Mucho más rápido; desactívalo si el controlador da problemas",
+  "gpu_device": "Tarjeta gráfica a usar",
+  "gpu_device_auto": "Automática",
   "threads": "Hilos de la CPU",
   "threads_sub": "Este equipo tiene {n} núcleos físicos: usa los mismos",
   "group_look": "Apariencia",

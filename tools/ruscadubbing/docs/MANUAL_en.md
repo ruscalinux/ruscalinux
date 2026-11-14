@@ -60,6 +60,7 @@ Video and audio that **FFmpeg** can read: MP4, MKV, WebM, MOV, AVI, MPEG, MP3, W
 | Model | Choice among the models found in the models folders |
 | Open the Models Folder | Opens `~/.local/share/ruscawhisper/models/` in the file manager |
 | Graphics Card (Vulkan) | Much faster; off by default because some drivers hang |
+| Graphics Card to Use | With more than one graphics card (for example the integrated one and an NVIDIA or AMD card): **Automatic** lets the engine choose, otherwise the chosen card is used. If the chosen card is no longer there, the choice goes back to automatic |
 | CPU Threads | As many as the physical cores is recommended |
 
 Settings are in `~/.config/ruscadubbing/settings.json`.
@@ -98,7 +99,8 @@ Settings are in `~/.config/ruscadubbing/settings.json`.
 | "No speech recognized" | The file contains no voice, or the chosen language is not the spoken one |
 | Text in the wrong language | Choose the language by hand instead of **Detect language** |
 | Very slow | Use a smaller model, or turn on **Graphics Card (Vulkan)** in Preferences |
-| It hangs with the graphics card | Turn off **Graphics Card (Vulkan)** |
+| It hangs with the graphics card | Try another card in **Graphics Card to Use**, or turn off **Graphics Card (Vulkan)** |
+| Slow even with the graphics card | The integrated card may be doing the work: choose the dedicated one in **Graphics Card to Use**. The **Engine Log** shows which card was used |
 
 To try the engine from a terminal: `/usr/lib/ruscawhisper-engine/whisper-cli --version`.
 

@@ -64,6 +64,8 @@
   "group_engine": "Engine",
   "gpu": "Graphics Card (Vulkan)",
   "gpu_sub": "Much faster; turn off if the driver gives problems",
+  "gpu_device": "Graphics Card to Use",
+  "gpu_device_auto": "Automatic",
   "threads": "CPU Threads",
   "threads_sub": "This computer has {n} physical cores: use as many",
   "group_look": "Appearance",

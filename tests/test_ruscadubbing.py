@@ -90,7 +90,8 @@ args = sys.argv[1:]
 opt = lambda name: args[args.index(name) + 1]
 model, wav, prefix = opt("-m"), opt("-f"), opt("-of")
 assert os.path.isfile(wav) and "-oj" in args and "-pp" in args, args
-json.dump(args, open(os.environ["FAKE_ARGS"], "w"))
+json.dump(args + ["ENV", os.environ.get("GGML_VK_VISIBLE_DEVICES", ""),
+                  os.environ.get("VK_DRIVER_FILES", "")], open(os.environ["FAKE_ARGS"], "w"))
 if "rotto" in model:
     sys.stderr.write("whisper_init: failed to load model\\n")
     sys.exit(3)
@@ -203,6 +204,36 @@ class Parsing(unittest.TestCase):
                         b'"text": "caf\xc3"}]}')
             self.assertEqual(rw.load_json(path)[1], [S(0, 9, "caf�")])
 
+    def test_devices(self):
+        devices = [{"index": 0, "name": "AMD Radeon RX 7600 (RADV NAVI33)", "label": "AMD Radeon RX 7600 (RADV NAVI33)"},
+                   {"index": 2, "name": "NVIDIA GeForce RTX 4060", "label": "NVIDIA GeForce RTX 4060"}]
+        self.assertEqual(rw.device_index("NVIDIA GeForce RTX 4060", devices), 2)
+        self.assertIsNone(rw.device_index("", devices))               # automatica
+        self.assertIsNone(rw.device_index("Scheda tolta", devices))   # non c'è più
+
+    def test_device_labels(self):
+        """Due schede con lo stesso nome restano distinguibili."""
+        fake = '[{"index": 0, "name": "GPU", "type": "discrete", "mib": 8192}, ' \
+               '{"index": 1, "name": "GPU", "type": "discrete", "mib": 8192}]'
+        saved = rw.subprocess.run
+
+        class R:
+            stdout = fake
+        rw.subprocess.run = lambda *a, **k: R()
+        try:
+            self.assertEqual([d["label"] for d in rw.list_devices()], ["GPU", "GPU (2)"])
+        finally:
+            rw.subprocess.run = saved
+
+    def test_vulkan_probe(self):
+        """L'interrogazione vera di Vulkan, in un processo a parte: non deve
+        mai fallire, con o senza schede. Con RUSCADUBBING_VK_ALL=1 elenca
+        anche i driver software (llvmpipe), se ci sono."""
+        types = rw.VK_ALL_TYPES if os.environ.get("RUSCADUBBING_VK_ALL") else rw.VK_TYPES
+        for d in rw.list_devices():
+            self.assertEqual(set(d), {"index", "name", "type", "mib", "label"})
+            self.assertIn(d["type"], types.values())
+
     def test_models(self):
         with tempfile.TemporaryDirectory() as tmp:
             for name, size in (("ggml-tiny.bin", 10), ("ggml-large-v3-turbo.bin", 30),
@@ -281,6 +312,7 @@ class Transcription(unittest.TestCase):
         self.assertEqual(args[args.index("-l") + 1], "auto")
         self.assertEqual(args[args.index("-t") + 1], "3")
         self.assertIn("-ng", args)                       # scheda grafica spenta
+        self.assertEqual(args[-2:], ["", "/dev/null"])   # driver Vulkan nascosti
         # I file di lavoro (l'audio dell'utente) non restano sul disco.
         self.assertEqual(os.listdir(rw.WORK_DIR), [])
         self.assertEqual(stat.S_IMODE(os.stat(rw.WORK_DIR).st_mode), 0o700)
@@ -292,6 +324,29 @@ class Transcription(unittest.TestCase):
             args = json.load(f)
         self.assertEqual(args[args.index("-l") + 1], "de")
         self.assertNotIn("-ng", args)
+        self.assertEqual(args[-2:], ["", ""])            # scelta del motore
+
+    def test_gpu_device(self):
+        """La scheda scelta arriva al motore come GGML_VK_VISIBLE_DEVICES,
+        con il numero che ha oggi; se non c'è più decide il motore."""
+        saved = rw.list_devices
+        rw.list_devices = lambda: [{"index": 1, "name": "RTX", "label": "RTX", "mib": 8192,
+                                    "type": "discrete"}]
+        try:
+            seen = self.run_one("video.mkv", "ggml-base.bin", gpu=True, gpu_device="RTX")
+            with open(self.args, encoding="utf-8") as f:
+                self.assertEqual(json.load(f)[-2:], ["1", ""])
+            self.assertTrue(any("GGML_VK_VISIBLE_DEVICES=1" in line for line in seen["log"]))
+            seen = self.run_one("video.mkv", "ggml-base.bin", gpu=True, gpu_device="Tolta")
+            with open(self.args, encoding="utf-8") as f:
+                self.assertEqual(json.load(f)[-2:], ["", ""])
+            self.assertTrue(any("non trovata" in line for line in seen["log"]))
+            # Con la scheda grafica spenta la scelta non conta.
+            self.run_one("video.mkv", "ggml-base.bin", gpu=False, gpu_device="RTX")
+            with open(self.args, encoding="utf-8") as f:
+                self.assertEqual(json.load(f)[-2:], ["", "/dev/null"])
+        finally:
+            rw.list_devices = saved
 
     def test_no_audio(self):
         error = self.run_one("senza-audio.mkv", "ggml-base.bin")["done"][0]

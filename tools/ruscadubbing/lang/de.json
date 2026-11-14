@@ -64,6 +64,8 @@
   "group_engine": "Engine",
   "gpu": "Grafikkarte (Vulkan)",
   "gpu_sub": "Viel schneller; ausschalten, wenn der Treiber Probleme macht",
+  "gpu_device": "Zu verwendende Grafikkarte",
+  "gpu_device_auto": "Automatisch",
   "threads": "CPU-Threads",
   "threads_sub": "Dieser Computer hat {n} physische Kerne: ebenso viele verwenden",
   "group_look": "Erscheinungsbild",

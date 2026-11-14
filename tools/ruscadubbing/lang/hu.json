@@ -64,6 +64,8 @@
   "group_engine": "Motor",
   "gpu": "Videokártya (Vulkan)",
   "gpu_sub": "Sokkal gyorsabb; kapcsolja ki, ha az illesztőprogram gondot okoz",
+  "gpu_device": "Használt videokártya",
+  "gpu_device_auto": "Automatikus",
   "threads": "CPU-szálak",
   "threads_sub": "Ennek a gépnek {n} fizikai magja van: használjon ugyanennyit",
   "group_look": "Megjelenés",

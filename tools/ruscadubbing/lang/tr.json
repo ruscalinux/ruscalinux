@@ -64,6 +64,8 @@
   "group_engine": "Motor",
   "gpu": "Ekran Kartı (Vulkan)",
   "gpu_sub": "Çok daha hızlı; sürücü sorun çıkarırsa kapatın",
+  "gpu_device": "Kullanılacak ekran kartı",
+  "gpu_device_auto": "Otomatik",
   "threads": "CPU İş Parçacıkları",
   "threads_sub": "Bu bilgisayarda {n} fiziksel çekirdek var: aynı sayıda kullanın",
   "group_look": "Görünüm",

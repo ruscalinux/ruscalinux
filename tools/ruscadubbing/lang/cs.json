@@ -64,6 +64,8 @@
   "group_engine": "Engine",
   "gpu": "Grafická karta (Vulkan)",
   "gpu_sub": "Mnohem rychlejší; vypněte, pokud ovladač dělá potíže",
+  "gpu_device": "Použitá grafická karta",
+  "gpu_device_auto": "Automaticky",
   "threads": "Vlákna CPU",
   "threads_sub": "Tento počítač má {n} fyzických jader: použijte stejný počet",
   "group_look": "Vzhled",

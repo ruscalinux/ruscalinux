@@ -64,6 +64,8 @@
   "group_engine": "Motor",
   "gpu": "Grafikkort (Vulkan)",
   "gpu_sub": "Mycket snabbare; stäng av om drivrutinen ställer till problem",
+  "gpu_device": "Grafikkort att använda",
+  "gpu_device_auto": "Automatiskt",
   "threads": "CPU-trådar",
   "threads_sub": "Den här datorn har {n} fysiska kärnor: använd lika många",
   "group_look": "Utseende",

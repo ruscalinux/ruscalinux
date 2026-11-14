@@ -64,6 +64,8 @@
   "group_engine": "Motor",
   "gpu": "Placa de vídeo (Vulkan)",
   "gpu_sub": "Muito mais rápido; desligue se o driver der problemas",
+  "gpu_device": "Placa de vídeo a usar",
+  "gpu_device_auto": "Automática",
   "threads": "Threads da CPU",
   "threads_sub": "Este computador tem {n} núcleos físicos: use a mesma quantidade",
   "group_look": "Aparência",

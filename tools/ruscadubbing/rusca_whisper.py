@@ -24,12 +24,14 @@
 #     sono cancellati alla fine di ogni trascrizione, a ogni avvio e alla
 #     chiusura.
 import collections
+import ctypes
 import json
 import os
 import re
 import shutil
 import signal
 import subprocess
+import sys
 import tempfile
 import threading
 
@@ -154,6 +156,120 @@ def clean_work_dir():
                     pass
     except OSError:
         pass
+
+
+# ── schede grafiche ─────────────────────────────────────────────────────────
+# whisper-cli non sa elencare le schede: le chiede al caricatore Vulkan
+# (libvulkan1 di Debian) questo stesso modulo, tramite ctypes. La scheda
+# scelta si passa al motore con GGML_VK_VISIBLE_DEVICES, che usa la stessa
+# numerazione (l'ordine di vkEnumeratePhysicalDevices): il motore vede solo
+# quella scheda e la usa come scheda 0. Il nome dell'opzione e' controllato
+# dalla build di ruscawhisper-engine.
+#
+# L'elenco si legge in un processo a parte (list_devices): il driver di una
+# scheda puo' bloccarsi o terminare il processo che lo carica, e non deve
+# succedere a RuscaDubbing.
+VK_TYPES = {1: "integrated", 2: "discrete"}        # le altre (CPU, virtuali) no
+# Solo per le prove: RUSCADUBBING_VK_ALL=1 elenca anche le schede emulate
+# (come llvmpipe, il driver software di Mesa), che ggml di solito ignora.
+VK_ALL_TYPES = {0: "other", 1: "integrated", 2: "discrete", 3: "virtual", 4: "cpu"}
+
+
+def _vulkan_devices():
+    """[{"index", "name", "type", "mib"}] dal caricatore Vulkan, nell'ordine
+    di vkEnumeratePhysicalDevices. Solo schede vere, integrate o dedicate:
+    sono quelle che ggml usa. Lista vuota se manca Vulkan."""
+    try:
+        vk = ctypes.CDLL("libvulkan.so.1")
+    except OSError:
+        return []
+    p = ctypes.c_void_p
+
+    class AppInfo(ctypes.Structure):
+        _fields_ = [("sType", ctypes.c_int), ("pNext", p), ("pApplicationName", ctypes.c_char_p),
+                    ("applicationVersion", ctypes.c_uint32), ("pEngineName", ctypes.c_char_p),
+                    ("engineVersion", ctypes.c_uint32), ("apiVersion", ctypes.c_uint32)]
+
+    class CreateInfo(ctypes.Structure):
+        _fields_ = [("sType", ctypes.c_int), ("pNext", p), ("flags", ctypes.c_uint32),
+                    ("pApplicationInfo", ctypes.POINTER(AppInfo)),
+                    ("enabledLayerCount", ctypes.c_uint32), ("ppEnabledLayerNames", p),
+                    ("enabledExtensionCount", ctypes.c_uint32), ("ppEnabledExtensionNames", p)]
+
+    app = AppInfo(0, None, b"RuscaDubbing", 1, None, 0, 1 << 22)      # Vulkan 1.0
+    info = CreateInfo(1, None, 0, ctypes.pointer(app), 0, None, 0, None)
+    instance = p()
+    vk.vkCreateInstance.restype = ctypes.c_int
+    if vk.vkCreateInstance(ctypes.byref(info), None, ctypes.byref(instance)) != 0:
+        return []
+    devices = []
+    try:
+        count = ctypes.c_uint32(0)
+        vk.vkEnumeratePhysicalDevices.restype = ctypes.c_int
+        if vk.vkEnumeratePhysicalDevices(instance, ctypes.byref(count), None) != 0:
+            return []
+        handles = (p * count.value)()
+        if vk.vkEnumeratePhysicalDevices(instance, ctypes.byref(count), handles) not in (0, 5):
+            return []
+        for i in range(count.value):
+            # VkPhysicalDeviceProperties: 5 interi a 32 bit (deviceType e'
+            # il quinto), poi deviceName[256]. Il buffer e' piu' grande
+            # della struttura intera.
+            props = ctypes.create_string_buffer(4096)
+            vk.vkGetPhysicalDeviceProperties(p(handles[i]), props)
+            kind = int.from_bytes(props.raw[16:20], "little")
+            name = props.raw[20:276].split(b"\0", 1)[0].decode("utf-8", "replace").strip()
+            # VkPhysicalDeviceMemoryProperties: memoryTypeCount (4 byte),
+            # 32 VkMemoryType da 8 byte, memoryHeapCount (offset 260), poi
+            # 16 VkMemoryHeap da 16 byte {size 64 bit, flags} da offset 264.
+            mem = ctypes.create_string_buffer(1024)
+            vk.vkGetPhysicalDeviceMemoryProperties(p(handles[i]), mem)
+            heaps = min(16, int.from_bytes(mem.raw[260:264], "little"))
+            local = 0
+            for h in range(heaps):
+                off = 264 + 16 * h
+                size = int.from_bytes(mem.raw[off:off + 8], "little")
+                flags = int.from_bytes(mem.raw[off + 8:off + 12], "little")
+                if flags & 1:                                # DEVICE_LOCAL
+                    local = max(local, size)
+            types = VK_ALL_TYPES if os.environ.get("RUSCADUBBING_VK_ALL") else VK_TYPES
+            if kind in types and name:
+                devices.append({"index": i, "name": name, "type": types[kind],
+                                "mib": local // (1024 * 1024)})
+    finally:
+        vk.vkDestroyInstance(instance, None)
+    return devices
+
+
+def list_devices(timeout=20):
+    """Schede grafiche utilizzabili, lette in un processo a parte (vedi
+    sopra). Ogni scheda ha anche "label", unica anche quando due schede hanno
+    lo stesso nome: e' cio' che si salva nelle impostazioni. Puo' servire un
+    secondo: va chiamata fuori dal thread dell'interfaccia."""
+    try:
+        # -I: senza le variabili PYTHON* e i moduli della cartella corrente.
+        # RUSCADUBBING_VK_ALL e le variabili di Vulkan passano comunque.
+        r = subprocess.run([sys.executable, "-I", os.path.abspath(__file__), "--list-devices"],
+                           stdin=subprocess.DEVNULL, capture_output=True, text=True,
+                           timeout=timeout)
+        devices = json.loads(r.stdout or "[]")
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return []
+    seen = collections.Counter()
+    for d in devices:
+        seen[d["name"]] += 1
+        d["label"] = d["name"] if seen[d["name"]] == 1 else f"{d['name']} ({seen[d['name']]})"
+    return devices
+
+
+def device_index(label, devices):
+    """Numero Vulkan della scheda salvata, o None se la scelta e'
+    automatica o la scheda non c'e' piu'. Si salva il nome e non il numero,
+    perche' il numero puo' cambiare se cambiano schede o driver."""
+    for d in devices:
+        if label and d["label"] == label:
+            return d["index"]
+    return None
 
 
 # ── risultato di whisper-cli ────────────────────────────────────────────────
@@ -319,8 +435,10 @@ class Transcriber:
     def running(self):
         return self._thread is not None and self._thread.is_alive()
 
-    def start(self, media, model, language="auto", threads=None, gpu=False):
-        """Avvia la trascrizione in background e ritorna subito."""
+    def start(self, media, model, language="auto", threads=None, gpu=False, gpu_device=""):
+        """Avvia la trascrizione in background e ritorna subito. gpu_device:
+        "label" di una scheda di list_devices(), o "" per la scelta del
+        motore."""
         if self.running:
             return
         if not find_binary():
@@ -334,7 +452,8 @@ class Transcriber:
         self._cancel.clear()
         self._thread = threading.Thread(
             target=self._work, args=(media, model, language or "auto",
-                                     int(threads or physical_cores()), bool(gpu)),
+                                     int(threads or physical_cores()), bool(gpu),
+                                     gpu_device or ""),
             daemon=True)
         self._thread.start()
 
@@ -402,7 +521,7 @@ class Transcriber:
             raise _Cancelled()
         return code, "\n".join(t for t in tail if t.strip())
 
-    def _work(self, media, model, language, threads, gpu):
+    def _work(self, media, model, language, threads, gpu, gpu_device=""):
         error, detected, segments = None, "", []
         run_dir = None
         try:
@@ -435,6 +554,15 @@ class Transcriber:
                 cmd.append("-ng")
                 env["VK_DRIVER_FILES"] = "/dev/null"
                 env["VK_ICD_FILENAMES"] = "/dev/null"
+            elif gpu_device:
+                index = device_index(gpu_device, list_devices())
+                if index is None:
+                    self._emit(self.on_log, f"ruscadubbing: scheda «{gpu_device}» non trovata, "
+                                            "scelta automatica")
+                else:
+                    env["GGML_VK_VISIBLE_DEVICES"] = str(index)
+                    self._emit(self.on_log, f"ruscadubbing: scheda «{gpu_device}», "
+                                            f"GGML_VK_VISIBLE_DEVICES={index}")
             found = []
 
             def on_stdout(line):
@@ -476,3 +604,8 @@ class Transcriber:
 
 class _Cancelled(Exception):
     pass
+
+
+if __name__ == "__main__" and sys.argv[1:] == ["--list-devices"]:
+    # Usato da list_devices(), in un processo a parte.
+    print(json.dumps(_vulkan_devices()))

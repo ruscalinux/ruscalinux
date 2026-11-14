@@ -35,6 +35,9 @@ Blocchi restituiti da parse_blocks():
 Le formule LaTeX diventano testo Unicode (², ≈, √, α, ⁄ …) con <sup>/<sub>
 di Pango dove Unicode non basta: nessuna dipendenza in più.
 
+Per chi legge il documento ad alta voce (RuscaSpeaking):
+    speech_blocks(markdown)  [(tipo, testo)] da leggere, senza marcatori
+
 Per chi non usa Pango (RuscaWriter: PDF, EPUB, ODT, DOCX, testo):
     latex_to_text(formula)   formula -> testo Unicode senza markup
     math_to_text(markdown)   sostituisce le formule $…$, $$…$$, \\(…\\), \\[…\\]
@@ -868,6 +871,91 @@ def parse_blocks(text):
     blocks = []
     _walk(tree.children, blocks)
     return blocks
+
+
+# ── Lettura ad alta voce ────────────────────────────────────────────────────
+def _speech_inline(nodes):
+    """Testo in linea come si legge: niente marcatori, il testo dei link e
+    non l'indirizzo, il testo alternativo delle immagini, le formule in
+    simboli Unicode; niente rimandi alle note e caselle delle liste."""
+    out = []
+    for n in nodes:
+        t = n.type
+        if t in ("text", "text_special", "code_inline"):
+            out.append(n.content)
+        elif t in ("softbreak", "hardbreak"):
+            out.append(" ")
+        elif t in ("math_inline", "math_inline_double"):
+            out.append(latex_to_text(n.content))
+        elif t == "image":
+            out.append(n.content or "")
+        elif t in ("footnote_ref", "footnote_anchor", "html_inline"):
+            pass
+        elif n.children:
+            out.append(_speech_inline(n.children))
+        else:
+            out.append(n.content or "")
+    return " ".join("".join(out).split())
+
+
+def _speech_walk(nodes, out, kind="text"):
+    for n in nodes:
+        t = n.type
+        if t == "paragraph":
+            inline = n.children[0].children if n.children else []
+            real = [c for c in inline if not (c.type == "text" and not c.content.strip())]
+            if len(real) == 1 and real[0].type == "math_inline_double":
+                out.append(("math", " ".join(latex_to_text(real[0].content).split())))
+            else:
+                out.append((kind, _speech_inline(inline)))
+        elif t == "heading":
+            out.append(("heading", _speech_inline(n.children[0].children) if n.children else ""))
+        elif t in ("fence", "code_block"):
+            out.append(("code", _strip_newline(n.content)))
+        elif t.startswith("math_block"):
+            out.append(("math", " ".join(latex_to_text(n.content).split())))
+        elif t == "table":
+            for section in n.children:
+                for tr in section.children:
+                    cells = [_speech_inline(c.children[0].children) if c.children else ""
+                             for c in tr.children]
+                    out.append(("table", ", ".join(c for c in cells if c)))
+        elif t in ("bullet_list", "ordered_list"):
+            number = int(n.attrs.get("start", 1)) if t == "ordered_list" else None
+            for item in n.children:
+                sub = []
+                _speech_walk(item.children, sub, "item")
+                if number is not None and sub and sub[0][0] == "item":
+                    sub[0] = ("item", f"{number}. {sub[0][1]}")
+                    number += 1
+                out.extend(sub)
+        elif t == "blockquote":
+            _speech_walk(n.children, out, "quote")
+        elif t == "footnote_block":
+            for note in n.children:
+                sub = []
+                _speech_walk(note.children, sub, "note")
+                out.extend(("note", b[1]) if b[0] in ("text", "item", "quote") else b
+                           for b in sub)
+        elif t == "hr":
+            out.append(("break", ""))
+        elif n.children:
+            _speech_walk(n.children, out, kind)
+
+
+def speech_blocks(text):
+    """Il documento come si legge ad alta voce: [(tipo, testo)] in ordine.
+    Tipi: "heading" (titolo), "text" (paragrafo), "item" (voce di elenco,
+    con il numero se l'elenco è numerato), "quote" (citazione), "table"
+    (una riga di tabella, celle separate da virgole), "math" (formula su
+    riga propria, in simboli Unicode), "code" (blocco di codice, come nel
+    sorgente), "note" (nota a piè di pagina), "break" (linea orizzontale,
+    testo vuoto). Il testo è su una riga sola; i blocchi vuoti si scartano,
+    tranne "break". Chi legge decide che cosa saltare (codice, note)."""
+    tree = SyntaxTreeNode(_PARSER.parse(text.replace("\r\n", "\n")))
+    blocks = []
+    _speech_walk(tree.children, blocks)
+    return [b for b in blocks if b[1].strip() or b[0] == "break"]
 
 
 # ── Strumenti per riga (editor) ─────────────────────────────────────────────

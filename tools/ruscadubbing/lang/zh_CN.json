@@ -64,6 +64,8 @@
   "group_engine": "引擎",
   "gpu": "显卡 (Vulkan)",
   "gpu_sub": "快得多；如果驱动出现问题请关闭",
+  "gpu_device": "使用的显卡",
+  "gpu_device_auto": "自动",
   "threads": "CPU 线程",
   "threads_sub": "这台电脑有 {n} 个物理核心：使用同样数量",
   "group_look": "外观",

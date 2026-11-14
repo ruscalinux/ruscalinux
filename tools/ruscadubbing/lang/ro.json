@@ -64,6 +64,8 @@
   "group_engine": "Motor",
   "gpu": "Placă video (Vulkan)",
   "gpu_sub": "Mult mai rapid; dezactivați dacă driverul creează probleme",
+  "gpu_device": "Placa video folosită",
+  "gpu_device_auto": "Automat",
   "threads": "Fire de execuție CPU",
   "threads_sub": "Acest calculator are {n} nuclee fizice: folosiți tot atâtea",
   "group_look": "Aspect",

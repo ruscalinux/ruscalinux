@@ -286,6 +286,16 @@ else
         esac
     done
 
+    # RuscaDubbing sceglie la scheda grafica con la variabile
+    # GGML_VK_VISIBLE_DEVICES di ggml (rusca_whisper.py): deve esistere.
+    if [ "$BACKEND" = vulkan ] && \
+       ! grep -rqs GGML_VK_VISIBLE_DEVICES "$SORG/ggml/src/ggml-vulkan/"; then
+        die "whisper.cpp $TAG non ha piu' GGML_VK_VISIBLE_DEVICES: RuscaDubbing
+        non potrebbe scegliere la scheda grafica. Adatta rusca_whisper.py, oppure
+        costruisci la versione precedente:
+        RUSCAWHISPER_WHISPER_VERSION=<versione> ./make-deb.sh"
+    fi
+
     SENZA_RETE=()
     if unshare -rn true 2>/dev/null; then
         SENZA_RETE=(unshare -rn)

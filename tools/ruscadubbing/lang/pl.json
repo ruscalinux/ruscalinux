@@ -64,6 +64,8 @@
   "group_engine": "Silnik",
   "gpu": "Karta graficzna (Vulkan)",
   "gpu_sub": "Znacznie szybciej; wyłącz, jeśli sterownik sprawia problemy",
+  "gpu_device": "Używana karta graficzna",
+  "gpu_device_auto": "Automatycznie",
   "threads": "Wątki procesora",
   "threads_sub": "Ten komputer ma {n} rdzeni fizycznych: użyj tylu samo",
   "group_look": "Wygląd",

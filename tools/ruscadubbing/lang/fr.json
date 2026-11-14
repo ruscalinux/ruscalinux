@@ -64,6 +64,8 @@
   "group_engine": "Moteur",
   "gpu": "Carte graphique (Vulkan)",
   "gpu_sub": "Bien plus rapide ; désactivez-la si le pilote pose problème",
+  "gpu_device": "Carte graphique à utiliser",
+  "gpu_device_auto": "Automatique",
   "threads": "Threads du processeur",
   "threads_sub": "Cet ordinateur a {n} cœurs physiques : utilisez-en autant",
   "group_look": "Apparence",

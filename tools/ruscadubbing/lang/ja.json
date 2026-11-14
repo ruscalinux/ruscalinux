@@ -64,6 +64,8 @@
   "group_engine": "エンジン",
   "gpu": "グラフィックカード (Vulkan)",
   "gpu_sub": "はるかに高速。ドライバーに問題があればオフに",
+  "gpu_device": "使用するグラフィックカード",
+  "gpu_device_auto": "自動",
   "threads": "CPU スレッド",
   "threads_sub": "このコンピューターの物理コアは {n} 個です。同じ数を使用してください",
   "group_look": "外観",

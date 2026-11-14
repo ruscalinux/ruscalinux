@@ -18,7 +18,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TOOLS = os.path.join(REPO, "tools")
 COPIES = ["ruscallama/rusca_markdown.py", "ruscamark/rusca_markdown.py",
           "ruscawriter/src/ruscawriter/rusca_markdown.py",
-          "ruscatranslator/rusca_markdown.py"]
+          "ruscatranslator/rusca_markdown.py", "ruscaspeaking/rusca_markdown.py"]
 sys.path.insert(0, os.path.join(TOOLS, "ruscallama"))
 import rusca_markdown as md  # noqa: E402
 
@@ -58,6 +58,27 @@ class Copies(unittest.TestCase):
             with open(os.path.join(TOOLS, p), "rb") as f:
                 digests.add(hashlib.sha256(f.read()).hexdigest())
         self.assertEqual(len(digests), 1, "le copie di rusca_markdown.py sono diverse")
+
+
+class Speech(unittest.TestCase):
+    """speech_blocks(): il documento come lo legge RuscaSpeaking."""
+
+    def test_blocks(self):
+        doc = ("# Titolo **forte**\n\nUn [link](https://esempio.it), `codice`, $x^2$ "
+               "e una nota[^1].\n\n1. primo\n2. secondo\n\n- [x] fatto\n\n> citata\n\n"
+               "| A | B |\n|---|---|\n| 1 | due |\n\n$$\\alpha$$\n\n```\nprint()\n```\n\n"
+               "---\n\n![logo](logo.png)\n\n[^1]: La nota.\n")
+        self.assertEqual(md.speech_blocks(doc), [
+            ("heading", "Titolo forte"), ("text", "Un link, codice, x² e una nota."),
+            ("item", "1. primo"), ("item", "2. secondo"), ("item", "fatto"),
+            ("quote", "citata"), ("table", "A, B"), ("table", "1, due"), ("math", "α"),
+            ("code", "print()"), ("break", ""), ("text", "logo"), ("note", "La nota.")])
+
+    def test_never_fails(self):
+        for text in ("", "\n\n", "**", "[^1]", "| a |\n|---|", "$$", "> ", "- ", "```"):
+            for kind, body in md.speech_blocks(text):
+                self.assertNotIn("\n", body)
+                self.assertTrue(body.strip() or kind in ("break", "code"))
 
 
 class CommonMark(unittest.TestCase):

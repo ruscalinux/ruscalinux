@@ -64,6 +64,8 @@
   "group_engine": "Bộ máy",
   "gpu": "Card đồ họa (Vulkan)",
   "gpu_sub": "Nhanh hơn nhiều; hãy tắt nếu trình điều khiển gây lỗi",
+  "gpu_device": "Card đồ họa sử dụng",
+  "gpu_device_auto": "Tự động",
   "threads": "Luồng CPU",
   "threads_sub": "Máy tính này có {n} nhân vật lý: hãy dùng bằng chừng ấy",
   "group_look": "Giao diện",

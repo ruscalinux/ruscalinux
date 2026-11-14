@@ -60,6 +60,7 @@ Video e audio che **FFmpeg** sa leggere: MP4, MKV, WebM, MOV, AVI, MPEG, MP3, WA
 | Modello | Scelta tra i modelli trovati nelle cartelle dei modelli |
 | Apri la cartella dei modelli | Apre `~/.local/share/ruscawhisper/models/` nel gestore dei file |
 | Scheda grafica (Vulkan) | Molto più veloce; spenta per impostazione predefinita perché alcuni driver si bloccano |
+| Scheda da usare | Con più schede grafiche (per esempio quella integrata e una NVIDIA o AMD): **Automatica** lascia scegliere al motore, altrimenti si usa la scheda indicata. Se la scheda scelta non c’è più, si torna alla scelta automatica |
 | Thread della CPU | Consigliati tanti quanti i core fisici |
 
 Le impostazioni sono in `~/.config/ruscadubbing/settings.json`.
@@ -98,7 +99,8 @@ Le impostazioni sono in `~/.config/ruscadubbing/settings.json`.
 | «Nessun parlato riconosciuto» | Nel file non c'è voce, o la lingua scelta non è quella parlata |
 | Testo in una lingua sbagliata | Scegli la lingua a mano invece di **Rileva la lingua** |
 | Molto lento | Usa un modello più piccolo, oppure accendi **Scheda grafica (Vulkan)** nelle Preferenze |
-| Si blocca con la scheda grafica | Spegni **Scheda grafica (Vulkan)** |
+| Si blocca con la scheda grafica | Prova un’altra scheda in **Scheda da usare**, oppure spegni **Scheda grafica (Vulkan)** |
+| Lento anche con la scheda grafica | Forse lavora la scheda integrata: scegli quella dedicata in **Scheda da usare**. Il **Registro del motore** dice quale scheda è stata usata |
 
 Per provare il motore dal terminale: `/usr/lib/ruscawhisper-engine/whisper-cli --version`.
 

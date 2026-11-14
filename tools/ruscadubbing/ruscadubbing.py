@@ -18,6 +18,7 @@ import json
 import os
 import re
 import sys
+import threading
 
 import gi
 gi.require_version("Gtk", "4.0")
@@ -60,7 +61,7 @@ MEDIA_PATTERNS = ("mp4", "mkv", "webm", "mov", "avi", "m4v", "mpg", "mpeg", "ogv
                   "wmv", "flv", "3gp", "mp3", "wav", "flac", "ogg", "oga", "opus",
                   "m4a", "aac", "wma", "aiff", "mka", "amr")
 DEFAULTS = {
-    "model": "", "gpu": False, "threads": whisper.physical_cores(),
+    "model": "", "gpu": False, "gpu_device": "", "threads": whisper.physical_cores(),
     "language": "", "font_size": 0, "width": 760, "height": 620,
     "maximized": False, "theme": "system",
 }
@@ -340,6 +341,10 @@ class DubbingWindow(FontSizeMixin, Adw.ApplicationWindow):
         self.models = []
         self.model_row = None
         self._row_models = []
+        self.devices = []               # schede grafiche (whisper.list_devices)
+        self.device_row = None
+        self._device_updating = False
+        self._devices_loading = False
         self._model_updating = False
         self._models_timer = 0
         self._pulse_timer = 0
@@ -700,7 +705,7 @@ class DubbingWindow(FontSizeMixin, Adw.ApplicationWindow):
         self.stack.set_visible_child_name("ready")
         try:
             self.transcriber.start(self.media, self.cfg["model"], self.cfg["language"],
-                                   self.cfg["threads"], self.cfg["gpu"])
+                                   self.cfg["threads"], self.cfg["gpu"], self.cfg["gpu_device"])
         except whisper.WhisperError as e:
             self._show_error(_(e.key), e.detail)
             return
@@ -840,8 +845,14 @@ class DubbingWindow(FontSizeMixin, Adw.ApplicationWindow):
 
         eng = Adw.PreferencesGroup(title=_("group_engine"))
         gpu = Adw.SwitchRow(title=_("gpu"), subtitle=_("gpu_sub"), active=self.cfg["gpu"])
-        gpu.connect("notify::active", lambda r, _p: self._set("gpu", r.get_active()))
+        gpu.connect("notify::active", self._on_gpu)
         eng.add(gpu)
+        self.device_row = Adw.ComboRow(title=_("gpu_device"), use_subtitle=True,
+                                       sensitive=self.cfg["gpu"])
+        self._fill_device_row()
+        self.device_row.connect("notify::selected", self._on_device)
+        eng.add(self.device_row)
+        self._load_devices()
         threads = Adw.SpinRow.new_with_range(1, max(1, os.cpu_count() or 1), 1)
         threads.set_title(_("threads"))
         threads.set_subtitle(_("threads_sub", n=whisper.physical_cores()))
@@ -852,8 +863,63 @@ class DubbingWindow(FontSizeMixin, Adw.ApplicationWindow):
 
         dialog = Adw.PreferencesDialog(title=_("preferences").rstrip("…"))
         dialog.add(page)
-        dialog.connect("closed", lambda _d: setattr(self, "model_row", None))
+        dialog.connect("closed", self._on_preferences_closed)
         dialog.present(self)
+
+    def _on_preferences_closed(self, _dialog):
+        self.model_row = None
+        self.device_row = None
+
+    # ── schede grafiche ───────────────────────────────────────────────────
+    def _on_gpu(self, row, _pspec):
+        self._set("gpu", row.get_active())
+        if self.device_row is not None:
+            self.device_row.set_sensitive(row.get_active())
+
+    def _load_devices(self):
+        """Legge le schede in un thread: interrogare Vulkan può richiedere
+        un secondo, e la riga si riempie quando arrivano."""
+        if self._devices_loading:
+            return
+        self._devices_loading = True
+
+        def work():
+            devices = whisper.list_devices()
+            GLib.idle_add(self._devices_loaded, devices)
+        threading.Thread(target=work, daemon=True).start()
+
+    def _devices_loaded(self, devices):
+        self._devices_loading = False
+        self.devices = devices
+        self._fill_device_row()
+        return False
+
+    def _fill_device_row(self):
+        row = self.device_row
+        if row is None:
+            return
+        labels = [d["label"] for d in self.devices]
+        items = [_("gpu_device_auto")] + [
+            f"{d['label']} ({max(1, round(d['mib'] / 1024))} GB)" if d["mib"] else d["label"]
+            for d in self.devices]
+        saved = self.cfg["gpu_device"]
+        # Una scheda salvata ma non (ancora) trovata resta in elenco, così la
+        # scelta non si perde mentre l'elenco si carica o se la scheda manca.
+        if saved and saved not in labels:
+            labels.append(saved)
+            items.append(saved)
+        self._row_devices = labels
+        self._device_updating = True
+        row.set_model(Gtk.StringList.new(items))
+        row.set_selected(labels.index(saved) + 1 if saved in labels else 0)
+        self._device_updating = False
+
+    def _on_device(self, row, _pspec):
+        if self._device_updating:
+            return
+        i = row.get_selected()
+        labels = getattr(self, "_row_devices", [])
+        self._set("gpu_device", labels[i - 1] if 0 < i <= len(labels) else "")
 
     def _on_theme(self, row, _pspec):
         self._set("theme", THEMES[row.get_selected()])

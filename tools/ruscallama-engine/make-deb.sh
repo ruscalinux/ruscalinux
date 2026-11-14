@@ -85,9 +85,17 @@ SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-$(date +%s)}"
 LIBDIR="usr/lib/${PKG}"            # binari e librerie private
 PROFILE="usr.lib.ruscallama-engine.llama-server"
 
+# Opzioni di llama-tts usate da RuscaSpeaking (rusca_tts.py): controllate
+# come quelle di llama-server.
+OPZIONI_TTS="-m -mm -p -o -s -t --tts-lang --tts-speaker-file --tts-voice -ngl
+  --device --no-mmproj-offload --list-devices"
+
 # Solo questi finiscono nel pacchetto: llama-server per i programmi,
-# llama-cli e llama-bench per diagnosticare e misurare dal terminale.
-KEEP_BINARIES="llama-server llama-cli llama-bench"
+# llama-cli e llama-bench per diagnosticare e misurare dal terminale,
+# llama-tts per la sintesi vocale (RuscaSpeaking, e dal terminale).
+# L'elenco fa parte della firma della cache: aggiungere un programma
+# ricompila llama.cpp invece di riusare una compilazione che non lo ha.
+KEEP_BINARIES="llama-server llama-cli llama-bench llama-tts"
 
 die() { echo "ERRORE: $*" >&2; exit 1; }
 say() { echo "==> $*"; }
@@ -251,7 +259,7 @@ VULKAN_FLAG=$([ "$BACKEND" = vulkan ] && echo ON || echo OFF)
 # La firma della cache non dipende dalla cartella in cui si lavora
 # (dpkg-buildflags aggiunge -ffile-prefix-map=<cartella corrente>=.).
 FLAGS_FIRMA=$(printf '%s %s' "$CFLAGS_DEB" "$LDFLAGS_DEB" | sed 's/-ffile-prefix-map=[^ ]*//g')
-OPZIONI="tag=$TAG commit=$COMMIT backend=$BACKEND native=OFF openssl=OFF ui=OFF shared=ON flags=$FLAGS_FIRMA"
+OPZIONI="tag=$TAG commit=$COMMIT backend=$BACKEND native=OFF openssl=OFF ui=OFF shared=ON programmi=$KEEP_BINARIES flags=$FLAGS_FIRMA"
 FIRMA=$(printf '%s' "$OPZIONI" | sha256sum | cut -c1-16)
 STAGE_CACHE="$CACHE/stage-${LLAMA_CPP_VERSION}-${BACKEND}-${FIRMA}"
 
@@ -319,7 +327,9 @@ else
     touch "$STAGE_CACHE/.completo"
     rm -rf "$BUILD"
 fi
-[ -f "$STAGE_CACHE/bin/llama-server" ] || die "llama-server mancante nella compilazione"
+for b in $KEEP_BINARIES; do
+    [ -f "$STAGE_CACHE/bin/$b" ] || die "$b mancante nella compilazione"
+done
 
 # Niente OpenSSL ne' curl nei binari: senza, il motore non scarica via HTTPS.
 RETE=$(cd "$STAGE_CACHE/bin" && for f in *; do [ -L "$f" ] && continue
@@ -342,6 +352,19 @@ done
         Adatta i programmi, oppure costruisci la versione precedente:
         RUSCALLAMA_LLAMA_VERSION=<versione> ./make-deb.sh"
 say "llama-server accetta tutte le opzioni usate dai programmi"
+
+# Lo stesso per llama-tts, che RuscaSpeaking avvia una volta per frase.
+AIUTO=$(LD_LIBRARY_PATH="$STAGE_CACHE/bin" VK_ICD_FILENAMES=/dev/null \
+        VK_DRIVER_FILES=/dev/null timeout 60 "$STAGE_CACHE/bin/llama-tts" --help 2>&1 || true)
+MANCANO=""
+for o in $OPZIONI_TTS; do
+    grep -qE -- "(^|[ ,])$o([ ,=]|\$)" <<< "$AIUTO" || MANCANO="$MANCANO $o"
+done
+[ -z "$MANCANO" ] || die "llama-tts di llama.cpp $TAG non riconosce opzioni usate
+        da RuscaSpeaking:$MANCANO
+        Adatta rusca_tts.py, oppure costruisci la versione precedente:
+        RUSCALLAMA_LLAMA_VERSION=<versione> ./make-deb.sh"
+say "llama-tts accetta tutte le opzioni usate da RuscaSpeaking"
 # Le librerie si cercano solo nella cartella privata del pacchetto: un
 # percorso della macchina di build nei binari sarebbe un errore.
 if command -v readelf >/dev/null; then
@@ -409,6 +432,13 @@ Per provare il motore dal terminale:
 
     /$LIBDIR/llama-cli --version
     /$LIBDIR/llama-bench -m modello.gguf
+
+Sintesi vocale (modello TTS in GGUF e il suo mmproj, per esempio
+Qwen3-TTS, Pocket TTS o Soprano; il motore non scarica modelli, quindi
+-hf non funziona):
+
+    /$LIBDIR/llama-tts -m modello-tts.gguf -mm mmproj-modello-tts.gguf \
+        -p "Ciao a tutti" --output voce.wav
 README
 gzip -9n "$DOC/README.md"
 
@@ -519,6 +549,7 @@ $PKG ($VER) unstable; urgency=medium
   * Controllo che llama-server accetti le opzioni usate da RuscaLLama e
     RuscaTranslator.
   * Binari e librerie in /$LIBDIR; profilo AppArmor in complain.
+  * Aggiunto llama-tts, per la sintesi vocale dal terminale.
 
  -- $MAINT  $(LC_ALL=C date -Ru -d "@$SOURCE_DATE_EPOCH")
 CHANGELOG
@@ -529,7 +560,7 @@ printf 'Source: %s\n\nPackage: %s\nArchitecture: %s\n' "$PKG" "$PKG" "$ARCH" \
     > "$TMP/shlib/debian/control"
 SHLIBS=$(cd "$TMP/shlib" && dpkg-shlibdeps -O -l"$ROOT/$LIBDIR" \
     -e"$ROOT/$LIBDIR/llama-server" -e"$ROOT/$LIBDIR/llama-cli" \
-    -e"$ROOT/$LIBDIR/llama-bench" \
+    -e"$ROOT/$LIBDIR/llama-bench" -e"$ROOT/$LIBDIR/llama-tts" \
     $(find "$ROOT/$LIBDIR" -type f -name '*.so*' -printf ' -e%p') 2>/dev/null \
     | sed -n 's/^shlibs:Depends=//p')
 [ -n "$SHLIBS" ] || die "dpkg-shlibdeps non ha calcolato le dipendenze"
@@ -550,7 +581,8 @@ Installed-Size: $(du -sk --exclude=DEBIAN "$ROOT" | cut -f1)
 Description: language model engine for RuscaLLama and RuscaTranslator
  Runs local language models (GGUF files) for the RuscaLinux OS Tools
  RuscaLLama and RuscaTranslator. Contains llama-server, plus llama-cli
- and llama-bench for diagnostics.
+ and llama-bench for diagnostics and llama-tts for speech synthesis, used
+ by RuscaSpeaking.
  .
  This is llama.cpp $TAG, an external component (MIT license,
  $UPSTREAM), built from unmodified source with the

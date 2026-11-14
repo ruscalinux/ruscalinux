@@ -64,6 +64,8 @@
   "group_engine": "Moottori",
   "gpu": "Näytönohjain (Vulkan)",
   "gpu_sub": "Paljon nopeampi; poista käytöstä, jos ajuri aiheuttaa ongelmia",
+  "gpu_device": "Käytettävä näytönohjain",
+  "gpu_device_auto": "Automaattinen",
   "threads": "Suoritinsäikeet",
   "threads_sub": "Tässä tietokoneessa on {n} fyysistä ydintä: käytä yhtä monta",
   "group_look": "Ulkoasu",

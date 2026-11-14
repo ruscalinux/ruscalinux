@@ -64,6 +64,8 @@
   "group_engine": "Engine",
   "gpu": "Grafische kaart (Vulkan)",
   "gpu_sub": "Veel sneller; zet uit als de driver problemen geeft",
+  "gpu_device": "Te gebruiken grafische kaart",
+  "gpu_device_auto": "Automatisch",
   "threads": "CPU-threads",
   "threads_sub": "Deze computer heeft {n} fysieke kernen: gebruik er evenveel",
   "group_look": "Uiterlijk",
