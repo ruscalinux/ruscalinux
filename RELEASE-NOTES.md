@@ -63,7 +63,7 @@
   the RuscaLinux certificate must be enrolled once: see `INSTALL.md`. Older cards (GTX 900, GTX 1000) use the free drivers.
   Laptops with two graphics cards run the desktop on the integrated
   graphics and use the NVIDIA card for the programs that ask for it.
-- **ruscallama-engine** is llama.cpp 0.9.0, the latest stable release, built
+- **ruscallama-engine** is llama.cpp 1.0.0, the latest stable release, built
   from source with Vulkan for NVIDIA, AMD and Intel graphics. It is built
   without HTTPS support and without its web interface, so it cannot download
   anything: nothing is sent over the internet.
