@@ -51,6 +51,13 @@ for comando in dpkg-deb python3; do
     fi
 done
 
+# Il banner dell'installer si ridisegna a ogni build con la versione di
+# release.conf (branding/generators/ruscalinux-banner.py): serve Pillow.
+if ! python3 -c "import PIL" 2> /dev/null; then
+    echo "ERRORE: manca Pillow per Python.  Installalo con:  sudo apt install python3-pil"
+    exit 1
+fi
+
 # Driver NVIDIA (steps/40-nvidia.sh, docs/NVIDIA.md): openssl crea la chiave
 # di firma dei moduli, unsquashfs controlla che la chiave privata non sia
 # finita nella ISO.
@@ -130,6 +137,15 @@ if [ -n "$MOTORE" ] && [ -n "$ULTIMA" ] && \
     ./make-debs.sh
 fi
 
+# Lo stesso per il motore di riconoscimento vocale (whisper.cpp).
+MOTORE=$(ls local/extra_debs/ruscawhisper-engine-*.deb 2> /dev/null | head -n 1)
+ULTIMA=$(bash tools/ruscawhisper-engine/ultima-versione.sh 2> /dev/null | cut -d ' ' -f 1 || true)
+if [ -n "$MOTORE" ] && [ -n "$ULTIMA" ] && \
+   ! dpkg-deb -f "$MOTORE" Description | grep -qF "whisper.cpp $ULTIMA,"; then
+    echo "    whisper.cpp $ULTIMA e' piu' recente del motore impacchettato: ricostruisco i pacchetti"
+    ./make-debs.sh
+fi
+
 # Controlla che ci siano davvero. Una ISO senza una utility si costruisce
 # lo stesso, e te ne accorgeresti solo dopo l'avvio.
 #
@@ -177,6 +193,10 @@ for file in steps/*.sh; do
         "$file" > ".gen/$(basename "$file")"
 done
 
+# Banner dell'installer grafico, con questa versione: .gen/banner.png.
+# Lo usa steps/30-custom.sh.
+python3 branding/generators/ruscalinux-banner.py "$VERSION" .gen/banner.png
+
 
 # --- 4. Prepara la configurazione di live-build ----------------------------
 
@@ -219,12 +239,16 @@ sudo lb build
 cd ..
 
 # live-build aggiunge da solo "-amd64.hybrid" al nome che gli abbiamo dato.
-ISO="ruscalinux-$VERSION-$ARCH.hybrid.iso"
+# La ISO resta ibrida (si scrive tale e quale su una chiavetta), ma nel nome
+# ".hybrid" non serve a chi scarica: si toglie.
+ISO="ruscalinux-$VERSION-$ARCH.iso"
+ISO_LB="ruscalinux-$VERSION-$ARCH.hybrid.iso"
 
-if [ ! -f ".work/$ISO" ]; then
+if [ ! -f ".work/$ISO_LB" ]; then
     echo "ERRORE: la ISO non e' stata prodotta. Guarda i messaggi qui sopra."
     exit 1
 fi
+mv -f ".work/$ISO_LB" ".work/$ISO"
 
 # La chiave privata di firma dei moduli NVIDIA non deve essere nella ISO.
 # L'hook la cancella; qui si controlla.

@@ -13,7 +13,7 @@ set -e
 cd "$(dirname "$0")"
 . ./release.conf
 
-ISO=".work/ruscalinux-$VERSION-$ARCH.hybrid.iso"
+ISO=".work/ruscalinux-$VERSION-$ARCH.iso"
 DISCO=".work/disco-di-prova.qcow2"
 MEMORIA_UEFI=".work/uefi-vars.fd"
 

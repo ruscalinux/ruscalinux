@@ -5,7 +5,7 @@ set -e
 # adwaita-prugna, ruscalinux-backgrounds-it, ruscalinux-fonts, ruscalinux-theme,
 # ruscalinux-shell-theme e le utility di
 # tools/ (ruscacleaner, ruscahub, ruscamark, ruscawriter, ruscallama-engine, ruscallama,
-# ruscatranslator)
+# ruscatranslator, ruscawhisper-engine, ruscadubbing)
 cp local/extra_debs/*.deb .work/config/packages.chroot/
 
 # IMPOSTAZIONE splash.png BINARY
@@ -139,6 +139,11 @@ download-updates-notify=false
 
 [org.gnome.shell]
 disable-user-extensions=false
+# Pannello (dash): Firefox, Thunderbird, File, Editor di testo, Calcolatrice.
+# Senza questa chiave vale l'elenco di GNOME, che finisce con Aiuto (yelp),
+# nascosto piu' sotto. E' un valore predefinito: vale per gli utenti nuovi e
+# per chi non ha mai cambiato i preferiti.
+favorite-apps=['firefox-esr.desktop', 'thunderbird.desktop', 'org.gnome.Nautilus.desktop', 'org.gnome.TextEditor.desktop', 'org.gnome.Calculator.desktop']
 
 # PRIVACY E SICUREZZA
 # Valori predefiniti; l'utente puo' cambiarli da Impostazioni.
@@ -1285,10 +1290,13 @@ chmod +x .work/config/hooks/normal/9991-replace-debian-logos.hook.chroot
 # ---------------------------------------------------------------------------
 # FIX 4 — BANNER GRAFICO INSTALLER GTK (vinaccia, "RuscaLinux @VERSION@")
 # ---------------------------------------------------------------------------
-BANNER_SRC="local/banner.png"
+# Il banner con la versione lo disegna build.sh a ogni build
+# (branding/generators/ruscalinux-banner.py), in .gen/banner.png.
+BANNER_SRC=".gen/banner.png"
 
 if [ ! -f "$BANNER_SRC" ]; then
-    echo "ERRORE: $BANNER_SRC non trovato! Assicurati di aver salvato l'immagine generata."
+    echo "ERRORE: $BANNER_SRC non trovato: lo crea build.sh con"
+    echo "        branding/generators/ruscalinux-banner.py"
     exit 1
 fi
 
@@ -1808,8 +1816,8 @@ chmod +x .work/config/hooks/installer/9000-offline-apt.hook.installer
 mkdir -p .work/config/includes.installer/usr/share/graphics/
 
 # Copiamo il banner sovrascrivendo i loghi di default (chiaro e scuro)
-cp local/banner.png .work/config/includes.installer/usr/share/graphics/logo_debian.png
-cp local/banner.png .work/config/includes.installer/usr/share/graphics/logo_debian_dark.png
+cp "$BANNER_SRC" .work/config/includes.installer/usr/share/graphics/logo_debian.png
+cp "$BANNER_SRC" .work/config/includes.installer/usr/share/graphics/logo_debian_dark.png
 
 # ---------------------------------------------------------------------------
 # TEMA INSTALLER DEBIAN — ACCENTI PRUGNA (v@VERSION@, rev. 3 — GTK2)
@@ -2042,6 +2050,9 @@ EOF
 # giapponese, che lo apre dalle preferenze della sorgente di input
 # (Impostazioni -> Tastiera); il pacchetto ha gia' una seconda voce,
 # ibus-setup-mozc-jp.desktop, nascosta dal menu, per quell'uso.
+# Anche "Aiuto" (yelp.desktop): l'icona non serve nel menu ne' nel pannello.
+# Yelp resta installato: F1 e le voci "Aiuto" dei
+# programmi continuano ad aprire i manuali.
 #
 # Non si tocca il file del pacchetto: si scrive una copia con NoDisplay=true
 # in /usr/local/share/applications, che in XDG_DATA_DIRS ha precedenza su
@@ -2094,6 +2105,7 @@ for f in /usr/share/applications/display-im*.desktop \
          /usr/share/applications/texdoctk.desktop \
          /usr/share/applications/org.gnome.Snapshot.desktop \
          /usr/share/applications/org.gnome.Extensions.desktop \
+         /usr/share/applications/yelp.desktop \
          /usr/share/applications/mpv.desktop \
          /usr/share/applications/setup-mozc.desktop; do
     [ -e "$f" ] || continue

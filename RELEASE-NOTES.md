@@ -55,6 +55,12 @@
   (Ukrainian and Russian, Simplified and Traditional Chinese, European and
   Brazilian Portuguese). Models are not included: copy a GGUF file into
   `~/.local/share/ruscallama/models/`.
+- **Speech to text.** RuscaDubbing transcribes a video or audio file with a
+  Whisper model that runs on your own computer and saves the text as
+  Markdown and the subtitles as SRT. Its engine, **ruscawhisper-engine**, is
+  whisper.cpp built from source with Vulkan and without any network code.
+  Models are not included: copy a ggml file (for example
+  `ggml-large-v3-turbo.bin`) into `~/.local/share/ruscawhisper/models/`.
 - **NVIDIA graphics, optional.** The image includes the NVIDIA driver
   @NVIDIA@, with open kernel modules, for GTX 16, RTX 20 and later cards,
   RTX 50 included. RuscaLinux still starts and installs with the free
@@ -63,6 +69,8 @@
   the RuscaLinux certificate must be enrolled once: see `INSTALL.md`. Older cards (GTX 900, GTX 1000) use the free drivers.
   Laptops with two graphics cards run the desktop on the integrated
   graphics and use the NVIDIA card for the programs that ask for it.
+- **NVIDIA driver 620.** The optional NVIDIA driver moves from the 595
+  branch to the new 620 branch.
 - **ruscallama-engine** is llama.cpp 1.0.0, the latest stable release, built
   from source with Vulkan for NVIDIA, AMD and Intel graphics. It is built
   without HTTPS support and without its web interface, so it cannot download
@@ -91,6 +99,14 @@
   the same sky with stardust trails behind the paper planes, sparkles, and a
   ring of light shaped like the emblem. Choose it in Settings → Appearance.
 - New boot splash.
+- **Only RuscaLinux artwork.** The Debian desktop themes that nothing used
+  (wallpapers, lock screens, boot splash and GRUB backgrounds) are no longer
+  on the disk, and the Debian logo left in a few icons is now the RuscaLinux
+  one. The Debian Reference guide is no longer installed.
+- The **Extensions** app no longer appears in the app grid. It is still
+  installed, and extensions work as before.
+- **Shorter image name**: `@ISO@`, without `.hybrid`. The image is still a
+  hybrid ISO and is written to a USB stick in the same way.
 - Removed: the uBlock Origin extension for Firefox.
 
 ## The image
@@ -122,7 +138,7 @@ sha256sum -c SHA256SUMS
 ## Build it yourself
 
 ```sh
-sudo apt install live-build openssl squashfs-tools
+sudo apt install live-build python3-pil openssl squashfs-tools
 ./build.sh
 ```
 

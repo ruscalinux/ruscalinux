@@ -1,0 +1,65 @@
+/* RuscaLinux OS Tools — style.css — 1.99.3 — GPL-3.0
+ * Tema comune Prugna/Rosa. File identico in tutti i tool: si modifica una
+ * volta sola e si copia. Ridefinisce solo i colori di libadwaita (>= 1.6),
+ * non la forma dei widget. Contrasti verificati: vedi le specifiche, sez. 4.2.
+ *
+ * Le classi .rusca-light / .rusca-dark sono messe sulle finestre dal
+ * programma, seguendo Adw.StyleManager:dark. Non si usa
+ * @media (prefers-color-scheme) perché il modo in cui GTK la valuta per i
+ * fogli di stile delle applicazioni cambia tra GTK 4.18 (trixie) e 4.20+:
+ * con le classi il risultato è lo stesso su tutte le versioni.
+ */
+
+.rusca-light {
+  --window-bg-color: #fbf4f7;
+  --window-fg-color: #2d0a1d;
+  --view-bg-color: #ffffff;
+  --view-fg-color: #2d0a1d;
+  --headerbar-bg-color: #f6e4ec;
+  --headerbar-fg-color: #2d0a1d;
+  --sidebar-bg-color: #f6e4ec;
+  --sidebar-fg-color: #2d0a1d;
+  --card-bg-color: #ffffff;
+  --card-fg-color: #2d0a1d;
+  --dialog-bg-color: #fbf4f7;
+  --dialog-fg-color: #2d0a1d;
+  --popover-bg-color: #ffffff;
+  --popover-fg-color: #2d0a1d;
+  --accent-bg-color: #7a2357;
+  --accent-fg-color: #ffffff;
+  --accent-color: #7a2357;
+}
+
+.rusca-dark {
+  --window-bg-color: #2d0a1d;
+  --window-fg-color: #fff7f0;
+  --view-bg-color: #230716;
+  --view-fg-color: #fff7f0;
+  --headerbar-bg-color: #3a1028;
+  --headerbar-fg-color: #fff7f0;
+  --sidebar-bg-color: #260818;
+  --sidebar-fg-color: #fff7f0;
+  --card-bg-color: #40132c;
+  --card-fg-color: #fff7f0;
+  --dialog-bg-color: #3a1028;
+  --dialog-fg-color: #fff7f0;
+  --popover-bg-color: #3a1028;
+  --popover-fg-color: #fff7f0;
+  --accent-bg-color: #f2a7c8;
+  --accent-fg-color: #2d0a1d;
+  --accent-color: #f5b8d3;
+}
+
+/* Area di benvenuto con gradiente hero: testo crema, contrasto >= 7,7:1 */
+.rusca-hero {
+  background-image: linear-gradient(135deg, #8a2b5f 0%, #2d0a1d 100%);
+  color: #fff7f0;
+  border-radius: 12px;
+  padding: 18px 24px;
+}
+
+/* Fascia decorativa del marchio: NON inserire testo */
+.rusca-brand-band {
+  background-image: linear-gradient(90deg, #f8d7e6 0%, #2d0a1d 100%);
+  min-height: 4px;
+}

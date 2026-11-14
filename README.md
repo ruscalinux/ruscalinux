@@ -10,8 +10,8 @@ Website: <https://www.ruscalinux.org/> · Downloads: [SourceForge](https://sourc
 ## Build it
 
 ```sh
-sudo apt install live-build python3 openssl squashfs-tools qemu-system-x86 qemu-utils ovmf
-./build.sh          # produces .work/ruscalinux-<version>-amd64.hybrid.iso
+sudo apt install live-build python3 python3-pil openssl squashfs-tools qemu-system-x86 qemu-utils ovmf
+./build.sh          # produces .work/ruscalinux-<version>-amd64.iso
 ./test.sh           # boots it in QEMU
 ```
 

@@ -108,8 +108,9 @@ ovmf
 # Test dei tool: rilettura dei PDF prodotti da RuscaWriter
 python3-pypdf
 
-# Compilare ruscallama-engine (llama.cpp con il backend Vulkan):
-# vedi tools/ruscallama-engine/README.md
+# Compilare ruscallama-engine (llama.cpp) e ruscawhisper-engine
+# (whisper.cpp) con il backend Vulkan: vedi tools/ruscallama-engine/README.md
+# e tools/ruscawhisper-engine/README.md
 cmake
 wget
 libvulkan-dev

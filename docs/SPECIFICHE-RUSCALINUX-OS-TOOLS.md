@@ -58,6 +58,8 @@ Si trova nel repository in `docs/SPECIFICHE-RUSCALINUX-OS-TOOLS.md`. In caso di 
 | RuscaLLama | Chat con modelli linguistici locali | Assistente IA | `org.ruscalinux.RuscaLLama` | `ruscallama` | No |
 | RuscaTranslator | Traduzione di documenti Markdown, con RAG ottimizzato per italiano ↔ inglese | Traduttore | `org.ruscalinux.RuscaTranslator` | `ruscatranslator` | No |
 | ruscallama-engine | Motore che esegue i modelli per RuscaLLama e RuscaTranslator: **llama.cpp, software esterno** | Componente di sistema, senza interfaccia | — | `ruscallama-engine` | — |
+| RuscaDubbing | Trascrizione di video e audio in testo (Markdown) e sottotitoli (SRT) | Riconoscimento vocale | `org.ruscalinux.RuscaDubbing` | `ruscadubbing` | No |
+| ruscawhisper-engine | Motore di riconoscimento vocale di RuscaDubbing: **whisper.cpp, software esterno** | Componente di sistema, senza interfaccia | — | `ruscawhisper-engine` | — |
 
 ### 1.1 Gli strumenti di intelligenza artificiale
 
@@ -111,6 +113,24 @@ python3 -m unittest tests/test_rusca_markdown.py tests/test_ruscamark_markdown.p
 
 **Stato nella versione 1.99.2.** Tutti i programmi che leggono Markdown usano il motore comune: RuscaLLama per la chat, la conversazione salvata in HTML (`render_html()`) e il salvataggio dei blocchi di codice (`code_blocks()`); RuscaMark per anteprima, export HTML, export PDF (`MarkdownDoc`) e resa live (`live_elements()`); RuscaWriter per tutti gli export, l’anteprima e l’evidenziazione (`book_blocks()`, `highlight_spans()`); RuscaTranslator per dividere i documenti da tradurre (`block_ranges()`). Fanno eccezione solo gli strumenti per riga della regola 1 e l’export TXT di RuscaWriter, che scrive il sorgente Markdown con formule e tabelle convertite in testo.
 
+### 1.3 Il riconoscimento vocale
+
+RuscaDubbing trasforma il parlato di un video o di un file audio in testo, con modelli **Whisper** in formato ggml che girano sul computer dell’utente, tramite **ruscawhisper-engine**.
+
+- **ruscawhisper-engine è whisper.cpp** (<https://github.com/ggml-org/whisper.cpp>), software esterno con licenza MIT, copyright The ggml authors. RuscaLinux lo compila dal sorgente senza modificarne il codice, con il backend Vulkan, con le stesse regole di ruscallama-engine (sezioni 6 e 7). Il pacchetto contiene solo `whisper-cli` (legge un file audio e scrive la trascrizione) e `whisper-bench`: niente `whisper-server`, niente libcurl, niente microfono (SDL), nessun collegamento alle librerie di FFmpeg. La build controlla che nei binari non ci sia codice di rete.
+- Il pacchetto del motore non ha interfaccia: lo dichiara la finestra Informazioni di RuscaDubbing, nel gruppo “Componenti esterni”.
+- I modelli non fanno parte dei pacchetti: sono file `.bin` (per esempio `ggml-large-v3-turbo.bin`) che l’utente copia in `~/.local/share/ruscawhisper/models/` o l’amministratore in `/usr/share/ruscawhisper/models/`. RuscaDubbing apre la cartella dal menu principale e dalle Preferenze, e si accorge da solo dei modelli nuovi (`Gio.FileMonitor`). Ogni modello ha la propria licenza, che l’utente deve rispettare.
+- Il modulo `rusca_whisper.py` avvia i due programmi di una trascrizione, uno dopo l’altro: `/usr/bin/ffmpeg` (pacchetto Debian, dipendenza di `ruscadubbing`), che estrae la prima traccia audio e la porta a WAV, 16 kHz, mono; poi `whisper-cli`, che scrive la trascrizione in JSON. Partono, lavorano su un file ed escono: **non resta acceso nessun server e non si apre nessuna porta**, nemmeno su 127.0.0.1.
+- Uscita: **Markdown** (titolo con il nome del file e testo a paragrafi: uno nuovo dopo una pausa di almeno due secondi, o a fine frase quando il paragrafo è già lungo) e **SRT** (un sottotitolo per segmento). Il nome proposto è quello del file di partenza, nella stessa cartella.
+- RuscaDubbing scrive Markdown ma non lo interpreta, quindi non include `rusca_markdown.py`. Il parlato resta testo: i caratteri che il motore Markdown comune leggerebbe come formattazione, e gli indirizzi che renderebbe link, sono protetti (`escape_markdown()`); il test lo verifica proprio con `rusca_markdown.py`.
+- Lingue del parlato: quelle della sezione 9 con i codici di Whisper (24 voci, perché Whisper ha un solo cinese e un solo portoghese), più “Rileva la lingua”, che vale anche per le altre lingue che il modello conosce. Al primo avvio è scelta la lingua dell’interfaccia.
+
+**Test.** `tests/test_ruscadubbing.py` controlla i formati di uscita, la lettura di ciò che scrive `whisper-cli` e l’intero percorso di una trascrizione (compresi errore, interruzione e pulizia dei file di lavoro) con due programmi finti al posto di `ffmpeg` e di `whisper-cli`: non servono né il motore né un modello. Senza PyGObject si salta.
+
+```bash
+python3 -m unittest tests/test_ruscadubbing.py
+```
+
 Gli identificatori di ogni tool devono coincidere tra loro (vedi sezione 5.2).
 
 Fino alla versione 1.99.1 RuscaMark usava l’App ID `org.ruscalinux.ruscamark`. Dalla 1.99.2 usa `org.ruscalinux.RuscaMark`: l’aggiornamento del pacchetto rimuove il vecchio file `.desktop`, e la metainfo dichiara il vecchio identificativo con `<replaces>` perché GNOME Software riconosca l’applicazione. Le impostazioni restano in `~/.config/ruscamark/`, che prende il nome dal comando e non dall’App ID. Il nome del tool e la parte finale dell’App ID usano la stessa grafia CamelCase: `RuscaMark` → `org.ruscalinux.RuscaMark`.
@@ -127,7 +147,7 @@ Fino alla versione 1.99.1 RuscaMark usava l’App ID `org.ruscalinux.ruscamark`.
 | Libreria GNOME | libadwaita (>= 1.7) |
 | Markdown | CommonMark 0.30 con le estensioni della sezione 1.2, tramite `python3-markdown-it` (>= 3.0), `python3-mdit-py-plugins` (>= 0.4) e `python3-linkify-it` (>= 2.0) |
 | Distro base | Debian Stable |
-| Formato pacchetti | deb, `Architecture: all` (`amd64` per ruscallama-engine, che è compilato) |
+| Formato pacchetti | deb, `Architecture: all` (`amd64` per ruscallama-engine e ruscawhisper-engine, che sono compilati) |
 | Versione tool | 1.99.3 |
 
 Regole tecniche:
@@ -622,12 +642,15 @@ Componenti esterni in uso:
 |---|---|---|---|---|
 | EB Garamond e Courier Prime (caratteri tipografici) | inclusi nei sorgenti | SIL Open Font License 1.1 | `tools/ruscawriter/assets/`, installati in `/usr/share/ruscawriter/assets/` con il testo della licenza | RuscaWriter |
 | llama.cpp (con ggml e le librerie che include: nlohmann/json e cpp-httplib MIT, xxHash BSD-2-Clause, stb, miniaudio, sha1 e sha256 di pubblico dominio) | ultima release stabile al momento della build (1.99.2: 0.9.0; 1.99.3: 1.0.0), scritta nella descrizione del pacchetto e in `/usr/share/doc/ruscallama-engine/README.md.gz` | MIT | Compilato nel pacchetto `ruscallama-engine`, in `/usr/lib/ruscallama-engine/` | RuscaLLama, RuscaTranslator |
+| whisper.cpp (con ggml e le librerie compilate nei programmi impacchettati: sgemm di llamafile, MIT; miniaudio, pubblico dominio o MIT-0; stb_vorbis, pubblico dominio o MIT) | ultima release stabile al momento della build (1.99.3: 1.9.5), scritta nella descrizione del pacchetto e in `/usr/share/doc/ruscawhisper-engine/README.md.gz` | MIT | Compilato nel pacchetto `ruscawhisper-engine`, in `/usr/lib/ruscawhisper-engine/` | RuscaDubbing |
 | Regola dell’evidenziato, porting del plugin markdown-it-mark (© Vitaly Puzrin e Alex Kocharin) con la struttura della regola del barrato di markdown-it-py (© ExecutableBookProject) | — | MIT (Expat) | `markdown_it_mark.py`, file a sé accanto a `rusca_markdown.py`; dichiarato nel file `copyright` del pacchetto, nella finestra Informazioni e nei manuali | RuscaLLama, RuscaMark, RuscaWriter, RuscaTranslator |
 | Esempi della specifica CommonMark (© John MacFarlane) | 0.30 | CC BY-SA 4.0 | `tests/data/commonmark-0.30-spec.json`, con `README.md`; solo per i test, non installati da nessun pacchetto | Test di `rusca_markdown.py` |
 
 markdown-it-py, mdit-py-plugins e linkify-it-py (licenza MIT) non sono inclusi: sono dipendenze dei pacchetti, installate da Debian.
 
-Il file `copyright` di `ruscallama-engine` riporta tutte queste licenze; solo lo script di costruzione e il profilo AppArmor sono di RuscaLinux (GPL-3.0).
+I file `copyright` di `ruscallama-engine` e di `ruscawhisper-engine` riportano tutte queste licenze; solo gli script di costruzione e i profili AppArmor sono di RuscaLinux (GPL-3.0).
+
+FFmpeg non è incluso: RuscaDubbing usa il comando `ffmpeg` del pacchetto Debian, che è una sua dipendenza.
 
 ---
 
@@ -661,6 +684,12 @@ Il suffisso `ruscalinux` nel nome del file indica che il pacchetto appartiene al
 7. dipendenze calcolate con `dpkg-shlibdeps`;
 8. compilazione tenuta in cache (`~/.cache/ruscalinux/ruscallama-engine/`): le build successive rifanno solo il pacchetto;
 9. dipendenze di costruzione: `build-essential cmake pkg-config dpkg-dev wget git libvulkan-dev glslc spirv-headers`.
+
+**Eccezione: ruscawhisper-engine.** È fatto come ruscallama-engine e segue gli stessi nove punti, con whisper.cpp al posto di llama.cpp: file `ruscawhisper-engine-ruscalinux_<versione>_amd64.deb`, variabile `RUSCAWHISPER_WHISPER_VERSION`, binari in `/usr/lib/ruscawhisper-engine/`, cache in `~/.cache/ruscalinux/ruscawhisper-engine/`, stesse dipendenze di costruzione. Cambiano tre cose:
+
+1. si compilano solo `whisper-cli` e `whisper-bench`, con `WHISPER_BUILD_SERVER=OFF`, `WHISPER_CURL=OFF`, `WHISPER_SDL2=OFF` e `WHISPER_COMMON_FFMPEG=OFF`; la build si ferma se i binari usano OpenSSL o curl, o se tra i simboli che richiedono c’è una funzione per aprire connessioni (`socket`, `connect`, `bind`, `listen`, `accept`, `getaddrinfo`…);
+2. whisper.cpp tiene le librerie di altri autori in `examples/`, non in `vendor/`: la build si ferma se in `examples/` compare un file che non è negli elenchi di `make-deb.sh`;
+3. oltre a controllare che `whisper-cli` accetti le opzioni usate da RuscaDubbing, la build gli fa trascrivere l’audio di prova del sorgente con il modello di prova (senza pesi) e controlla che scriva il JSON.
 
 Esempio di output:
 
@@ -815,7 +844,7 @@ Tedesco, russo e francese possono essere fino al 40% più lunghi dell’inglese;
 |---|---|
 | RuscaWriter | Sì, sempre (ortografia e sillabazione del PDF) |
 | RuscaMark | Sì, se è presente il controllo ortografico |
-| RuscaCleaner, RuscaHub, RuscaLLama, RuscaTranslator | No |
+| RuscaCleaner, RuscaHub, RuscaLLama, RuscaTranslator, RuscaDubbing | No |
 
 Pacchetti: `hunspell-en-gb` (ortografia) e `hyphen-en-gb` (sillabazione, particolarmente consigliato per RuscaWriter, che lo usa con `python3-pyphen`).
 
@@ -861,6 +890,18 @@ Regole aggiuntive per gli strumenti di intelligenza artificiale:
 | Conversazioni | Restano in memoria; si salvano solo su richiesta |
 | Dati di RuscaTranslator | Voci personali in `~/.config/ruscatranslator/`, memoria di traduzione e glossari in `~/.local/share/ruscatranslator/` |
 | Avviso all’utente | I manuali ricordano che le risposte e le traduzioni automatiche vanno verificate |
+
+Regole aggiuntive per il riconoscimento vocale (RuscaDubbing):
+
+| Regola | Come è applicata |
+|---|---|
+| Nessuna rete, nemmeno locale | `whisper-cli` è avviato una volta per file e non ha codice di rete (lo controlla la build del motore); RuscaDubbing non usa moduli di rete e non apre porte |
+| FFmpeg legge solo file locali | `ffmpeg` sempre con `-protocol_whitelist file`: anche se il file scelto è una playlist che nomina indirizzi, non li apre |
+| Programmi esterni | `/usr/bin/ffmpeg` e `/usr/lib/ruscawhisper-engine/whisper-cli`, con percorso assoluto e lista di argomenti |
+| Audio di lavoro | In `~/.cache/ruscadubbing/` con permessi 0700; cancellato alla fine di ogni trascrizione, all’avvio e alla chiusura |
+| Il file di partenza | Mai modificato; i risultati si salvano solo su richiesta, dove sceglie l’utente |
+| Confinamento | Profilo AppArmor per `whisper-cli`, in modalità complain: nega la rete, `.ssh`, `.gnupg`, `.config`, profili di Firefox e Thunderbird |
+| Avviso all’utente | Il manuale ricorda che la trascrizione automatica va riletta |
 
 Dichiarazione:
 
@@ -917,7 +958,7 @@ Un tool è pronto quando:
 11. Ha identificatori coerenti tra loro (sezioni 1 e 5.2).
 12. Ha file `.desktop` e metainfo validi, con `StartupWMClass` uguale all’App ID.
 13. Ha icona SVG e icona simbolica.
-14. Ha `make-deb.sh` che produce un solo `ruscafoo-ruscalinux_<versione>_all.deb` (o `_amd64.deb` per ruscallama-engine) e `SHA256SUMS` in `build-deb/`.
+14. Ha `make-deb.sh` che produce un solo `ruscafoo-ruscalinux_<versione>_all.deb` (o `_amd64.deb` per ruscallama-engine e ruscawhisper-engine) e `SHA256SUMS` in `build-deb/`.
 15. Ha la versione uguale a `VERSION` di `release.conf`.
 16. È licenziato GPL-3.0, con componenti esterni dichiarati.
 17. Non usa rete, telemetria o comandi pericolosi (per RuscaLLama e RuscaTranslator: rete solo verso 127.0.0.1, sezione 11).
@@ -1037,6 +1078,17 @@ Tra italiano e inglese il programma usa una base di conoscenza linguistica, un g
 
 Entrambi i programmi usano **ruscallama-engine**, cioè llama.cpp, software esterno con licenza MIT. Tutto resta sul computer.
 
+## 🎙️ RuscaDubbing
+
+Trascrizione di video e audio in testo e sottotitoli, con un modello Whisper che gira su questo computer.
+
+1. Copiare un modello Whisper in formato ggml (per esempio `ggml-large-v3-turbo.bin`) in `~/.local/share/ruscawhisper/models/` (dal menu principale: “Apri la cartella dei modelli”).
+2. Aprire il video o l’audio (Ctrl+O) o trascinarlo sulla finestra.
+3. Scegliere la lingua parlata (o “Rileva la lingua”) e premere “Trascrivi” (Ctrl+Invio).
+4. Salvare il testo in Markdown (Ctrl+S) e i sottotitoli in SRT (Ctrl+E).
+
+RuscaDubbing usa **ruscawhisper-engine**, cioè whisper.cpp, software esterno con licenza MIT, e FFmpeg per leggere l’audio. Non usa la rete. La trascrizione automatica va riletta.
+
 ## 🧯 Risoluzione dei problemi
 
 Se un tool non si avvia:
@@ -1081,6 +1133,8 @@ Tutti i dati elaborati dai RuscaLinux OS Tools rimangono in locale. Nessun dato 
 | RuscaLLama | Chat with local language models |
 | RuscaTranslator | Translation of Markdown documents, with a RAG optimized for Italian ↔ English |
 | ruscallama-engine | Engine that runs the models: llama.cpp, an external component (MIT) |
+| RuscaDubbing | Transcription of video and audio into text (Markdown) and subtitles (SRT) |
+| ruscawhisper-engine | Speech recognition engine: whisper.cpp, an external component (MIT) |
 
 ## 🚀 Requirements
 
@@ -1191,6 +1245,17 @@ Translation of Markdown documents between the 26 languages of RuscaLinux OS Tool
 Between Italian and English the program uses a linguistic knowledge base, a document glossary and the memory of saved translations.
 
 Both programs use **ruscallama-engine**, that is llama.cpp, an external component under the MIT license. Everything stays on the computer.
+
+## 🎙️ RuscaDubbing
+
+Transcription of video and audio into text and subtitles, with a Whisper model that runs on this computer.
+
+1. Copy a Whisper model in ggml format (for example `ggml-large-v3-turbo.bin`) into `~/.local/share/ruscawhisper/models/` (from the main menu: "Open the Models Folder").
+2. Open the video or audio file (Ctrl+O) or drag it onto the window.
+3. Choose the spoken language (or "Detect language") and press "Transcribe" (Ctrl+Enter).
+4. Save the text as Markdown (Ctrl+S) and the subtitles as SRT (Ctrl+E).
+
+RuscaDubbing uses **ruscawhisper-engine**, that is whisper.cpp, an external component under the MIT license, and FFmpeg to read the audio. It does not use the network. Automatic transcription must be reviewed.
 
 ## 🌍 Language support
 

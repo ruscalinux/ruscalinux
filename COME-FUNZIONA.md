@@ -48,13 +48,16 @@ spiegato in [`docs/NVIDIA.md`](docs/NVIDIA.md).
 ## Cosa serve sulla macchina
 
 ```sh
-sudo apt install live-build python3 openssl squashfs-tools qemu-system-x86 qemu-utils ovmf
+sudo apt install live-build python3 python3-pil openssl squashfs-tools qemu-system-x86 qemu-utils ovmf
 ```
 
 `openssl` e `squashfs-tools` servono al driver NVIDIA: il primo crea la
 chiave di firma dei moduli, il secondo controlla che non finisca nella ISO.
 
 `python3` serve agli script dei tool per controllare traduzioni e sorgenti.
+`python3-pil` (Pillow) serve a ridisegnare il banner dell'installer con la
+versione di `release.conf`, a ogni build
+(`branding/generators/ruscalinux-banner.py`).
 La rete non serve più per preparare i pacchetti: si costruisce tutto qui.
 
 ## Cosa fa build.sh, in ordine
@@ -64,7 +67,8 @@ La rete non serve più per preparare i pacchetti: si costruisce tutto qui.
 2. Lancia `make-debs.sh` se manca `local/extra_debs/` o se qualcosa in
    `branding/` o `tools/` è più recente dei pacchetti.
 3. Verifica che ci sia un pacchetto per ogni utility di `tools/`.
-4. Copia `steps/*.sh` in `.gen/` sostituendo `@VERSION@` col numero vero.
+4. Copia `steps/*.sh` in `.gen/` sostituendo `@VERSION@` col numero vero, e
+   disegna in `.gen/banner.png` il banner dell'installer con la versione.
 5. Esegue i tre step, che preparano `.work/`.
 6. Lancia `lb build` e calcola lo sha256 della ISO.
 
