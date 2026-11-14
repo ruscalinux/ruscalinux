@@ -118,6 +118,17 @@ cp local/ruscalinux-logo.svg .work/config/includes.chroot_after_packages/usr/sha
 mkdir -p .work/config/includes.chroot_after_packages/usr/share/icons/hicolor/256x256/apps/
 cp local/ruscalinux-logo.png .work/config/includes.chroot_after_packages/usr/share/icons/hicolor/256x256/apps/ruscalinux-logo.png
 
+# FASTFETCH CON L'EMBLEMA DI RUSCALINUX
+# Fastfetch sceglie il logo da ID di os-release; "ruscalinux" non lo conosce
+# e ripiega su ID_LIKE=debian. Le impostazioni di sistema
+# (/etc/xdg/fastfetch/config.jsonc) gli danno l'emblema, disegnato a
+# caratteri in local/fastfetch/ruscalinux.txt. Il file di un utente
+# (~/.config/fastfetch/config.jsonc) ha la precedenza.
+mkdir -p .work/config/includes.chroot_after_packages/usr/share/ruscalinux/fastfetch/
+cp local/fastfetch/ruscalinux.txt .work/config/includes.chroot_after_packages/usr/share/ruscalinux/fastfetch/ruscalinux.txt
+mkdir -p .work/config/includes.chroot_after_packages/etc/xdg/fastfetch/
+cp local/fastfetch/config.jsonc .work/config/includes.chroot_after_packages/etc/xdg/fastfetch/config.jsonc
+
 # IMPOSTA SFONDI PREDEFINITI DI GNOME E PERSONALIZZAZIONI
 # Accento, tema GTK 3 e icone NON si impostano qui: li imposta il pacchetto
 # ruscalinux-theme (branding/theme/90_ruscalinux-theme.gschema.override).

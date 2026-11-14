@@ -1,0 +1,67 @@
+// RuscaLinux — impostazioni di sistema di fastfetch.
+//
+// Fastfetch non conosce ID=ruscalinux di /etc/os-release e mostrerebbe il
+// logo di Debian (ID_LIKE=debian): qui si usa l'emblema di RuscaLinux, in
+// /usr/share/ruscalinux/fastfetch/ruscalinux.txt. Colori: $1 l'emblema,
+// $2 l'aeroplanino. I moduli sono quelli predefiniti di fastfetch 2.40
+// (fastfetch --gen-config): un file di impostazioni senza "modules" non
+// mostrerebbe nessuna informazione.
+//
+// Sorgente: local/fastfetch/ del repository di RuscaLinux, copiato da
+// steps/30-custom.sh. Un utente puo' scrivere il proprio
+// ~/.config/fastfetch/config.jsonc (fastfetch --gen-config), che ha la
+// precedenza su questo file.
+{
+    "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
+    "logo": {
+        "type": "file",
+        "source": "/usr/share/ruscalinux/fastfetch/ruscalinux.txt",
+        // #c8508a, rosa prugna: contrasto di circa 4:1 sia su fondo chiaro
+        // sia su fondo scuro. #8c8c8c: grigio, sopra 3:1 su entrambi.
+        "color": {
+            "1": "38;2;200;80;138",
+            "2": "38;2;140;140;140"
+        },
+        "padding": {
+            "top": 1,
+            "right": 3
+        }
+    },
+    "display": {
+        "color": {
+            "keys": "38;2;200;80;138",
+            "title": "38;2;200;80;138"
+        }
+    },
+    "modules": [
+        "title",
+        "separator",
+        "os",
+        "host",
+        "kernel",
+        "uptime",
+        "packages",
+        "shell",
+        "display",
+        "de",
+        "wm",
+        "wmtheme",
+        "theme",
+        "icons",
+        "font",
+        "cursor",
+        "terminal",
+        "terminalfont",
+        "cpu",
+        "gpu",
+        "memory",
+        "swap",
+        "disk",
+        "localip",
+        "battery",
+        "poweradapter",
+        "locale",
+        "break",
+        "colors"
+    ]
+}
