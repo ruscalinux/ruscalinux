@@ -97,10 +97,10 @@ ISO entra solo il certificato pubblico,
 `NVIDIA_PIN` in `release.conf` è il suffisso del pacchetto
 `nvidia-driver-pinning-*`:
 
-- un ramo (`595`) segue gli aggiornamenti di quel ramo: **è la scelta di
+- un ramo (`620`) segue gli aggiornamenti di quel ramo: **è la scelta di
   RuscaLinux**, così ogni build prende l'ultima versione con le sue
   correzioni;
-- una versione esatta (`595.112.07`) fissa il driver: serve solo se una
+- una versione esatta (`620.70.06`) fissa il driver: serve solo se una
   versione nuova del ramo desse problemi.
 
 Con il ramo, due build fatte in giorni diversi possono avere driver diversi.

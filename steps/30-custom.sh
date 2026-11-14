@@ -619,9 +619,10 @@ chmod +x .work/config/hooks/normal/9992-remove-skel-face.hook.chroot
 # ---------------------------------------------------------------------------
 # APPLICAZIONI NASCOSTE NEL MENU DI GNOME (v@VERSION@)
 # ---------------------------------------------------------------------------
-# Totem (Video), Eye of GNOME (eog) e la Guida di riferimento Debian restano
-# installati ma non compaiono nella griglia delle applicazioni ne' nella
-# ricerca. eog resta il visualizzatore predefinito delle immagini (vedi
+# Totem (Video) e Eye of GNOME (eog) restano installati ma non compaiono
+# nella griglia delle applicazioni ne' nella ricerca. La Guida di riferimento
+# Debian, se la rimozione in 9993-remove-debian-artwork non e' riuscita,
+# resta installata e viene nascosta anche lei. eog resta il visualizzatore predefinito delle immagini (vedi
 # APPLICAZIONI PREDEFINITE): si apre facendo doppio clic su un'immagine.
 #
 # Non si modificano i file .desktop in /usr/share/applications: il prossimo
@@ -658,28 +659,175 @@ EOF
 chmod +x .work/config/hooks/normal/9994-hide-apps.hook.chroot
 
 # ---------------------------------------------------------------------------
-# RIMOZIONE SFONDI DEBIAN DAL SELETTORE DI GNOME (v@VERSION@)
+# PULIZIA DI CIO' CHE E' DI DEBIAN E NON SERVE (v@VERSION@)
 # ---------------------------------------------------------------------------
-# In Impostazioni → Sfondo devono restare solo gli sfondi GNOME (pacchetto
-# gnome-backgrounds) e quelli RuscaLinux. Gli sfondi Debian (Ceratopsian
-# ecc.) vengono registrati nel selettore da desktop-base tramite file XML
-# in /usr/share/gnome-background-properties/: rimuoviamo esattamente quelli
-# di proprietà di desktop-base, enumerandoli con dpkg -L (robusto rispetto
-# ai nomi, che cambiano a ogni release Debian). Le immagini restano su
-# disco ma non compaiono più nel selettore; il pacchetto non viene rimosso
-# perché fornisce altri componenti di sistema.
+# RuscaLinux ha i propri sfondi, il proprio tema Plymouth, il proprio tema
+# GRUB e il proprio logo: la grafica di Debian resterebbe sul disco senza
+# che niente la usi. Questo hook la toglie, in quattro passi.
+#
+#  1. Pacchetti: la guida di riferimento Debian e gli strumenti che parlano
+#     con i servizi di Debian (segnalazione di bug, statistiche d'uso), che
+#     su RuscaLinux non servono. Ogni rimozione e' prima simulata: se apt
+#     volesse togliere anche un pacchetto fuori da questo elenco, non si
+#     rimuove niente e la build lo scrive.
+#  2. Grafica di desktop-base: i temi (Ceratopsian, Emerald, Homeworld...),
+#     con i loro sfondi, schermate di blocco, temi Plymouth e sfondi GRUB,
+#     e le voci che li mettono in Impostazioni -> Sfondo. I file si trovano
+#     con dpkg -L, non per nome: i temi cambiano a ogni versione di Debian.
+#     Il pacchetto desktop-base resta installato, perche' altri pacchetti lo
+#     richiedono, e resta la cartella dei loghi (debian-logos), che GDM
+#     legge per la schermata di accesso: 9991-replace-debian-logos ci ha
+#     gia' messo il logo RuscaLinux.
+#  3. Alternative: desktop-base registra i propri file con
+#     update-alternatives (sfondo, tema, sfondo GRUB...). Le scelte rimaste
+#     senza file si tolgono, cosi' non restano collegamenti verso il nulla.
+#  4. Logo: lo swirl che resta nelle icone (emblem-debian, debian-swirl,
+#     distributor-logo) e in Plymouth (debian-logo.png) si sostituisce con
+#     il logo RuscaLinux. Si sostituisce e non si cancella: lo script di
+#     Plymouth per l'initramfs e le alternative delle icone cercano quei file.
+#
+# I temi Plymouth di Debian si tolgono solo se quello attivo e' "ruscalinux"
+# (lo imposta 9990-set-plymouth-theme): se non lo fosse, si lasciano e la
+# build lo scrive, perche' il sistema deve comunque avviarsi.
+#
+# Gira dopo 9990 e 9991 e prima di 9994-hide-apps.
 # ---------------------------------------------------------------------------
-cat <<'EOF' > .work/config/hooks/normal/9993-remove-debian-wallpapers.hook.chroot
+cat <<'EOF' > .work/config/hooks/normal/9993-remove-debian-artwork.hook.chroot
 #!/bin/sh
 set -e
-dpkg -L desktop-base 2>/dev/null \
-    | grep '^/usr/share/gnome-background-properties/' \
-    | while read -r F; do
-        [ -f "$F" ] && rm -f "$F" || true
+
+LOGO_SVG=/usr/share/icons/hicolor/scalable/apps/ruscalinux-logo.svg
+LOGO_PNG=/usr/share/icons/hicolor/256x256/apps/ruscalinux-logo.png
+
+# --- 1. Pacchetti -----------------------------------------------------------
+# L'ordine conta: prima chi dipende, poi le sue librerie.
+ELENCO="$(dpkg-query -W -f '${Package}\n' 'debian-reference*' 2>/dev/null || true)
+debian-faq
+doc-debian
+reportbug
+python3-reportbug
+installation-report
+popularity-contest"
+
+for PKG in $ELENCO; do
+    dpkg-query -W -f '${db:Status-Status}' "$PKG" 2>/dev/null | grep -qx installed || continue
+    VIA=$(apt-get -s -o APT::Get::AutomaticRemove=false purge "$PKG" 2>/dev/null \
+            | awk '$1 == "Purg" || $1 == "Remv" { print $2 }')
+    if [ -z "$VIA" ]; then
+        echo "ATTENZIONE: $PKG: simulazione della rimozione fallita, resta installato" >&2
+        continue
+    fi
+    ALTRI=""
+    for P in $VIA; do
+        echo "$ELENCO" | grep -qxF "$P" || ALTRI="$ALTRI $P"
     done
+    if [ -n "$ALTRI" ]; then
+        echo "ATTENZIONE: $PKG resta installato: toglierlo rimuoverebbe anche$ALTRI" >&2
+        continue
+    fi
+    if apt-get purge --assume-yes -o APT::Get::AutomaticRemove=false "$PKG" > /dev/null; then
+        echo "pacchetto rimosso: $PKG"
+    else
+        echo "ATTENZIONE: rimozione di $PKG fallita" >&2
+    fi
+done
+
+# --- 2. Grafica di desktop-base --------------------------------------------
+FILE_DB=$(dpkg -L desktop-base 2>/dev/null || true)
+if [ -z "$FILE_DB" ]; then
+    echo "desktop-base non installato: nessuna grafica Debian da togliere"
+fi
+
+# Temi Plymouth: solo se quello attivo e' il nostro.
+ATTIVO=$(plymouth-set-default-theme 2>/dev/null || true)
+if [ "$ATTIVO" = "ruscalinux" ]; then
+    echo "$FILE_DB" | grep -E '^/usr/share/plymouth/themes/[^/]+$' | while read -r T; do
+        [ -e "$T" ] || [ -L "$T" ] || continue
+        # Mai il nostro tema ne' i due di ripiego di Plymouth.
+        case "$(basename "$T")" in ruscalinux|details|text) continue ;; esac
+        rm -rf "$T"
+        echo "tema Plymouth Debian rimosso: $(basename "$T")"
+    done
+else
+    echo "ATTENZIONE: il tema Plymouth attivo e' '${ATTIVO:-nessuno}', non 'ruscalinux':" \
+         "i temi Plymouth di Debian restano" >&2
+fi
+
+# Voci di Impostazioni -> Sfondo e sfondi per KDE.
+echo "$FILE_DB" | grep -E '^/usr/share/(gnome-background-properties|wallpapers)/[^/]+$' | while read -r F; do
+    [ -e "$F" ] || [ -L "$F" ] || continue
+    rm -rf "$F"
+    echo "sfondo Debian tolto dal selettore: $(basename "$F")"
+done
+
+# Le cartelle dei temi: sfondi, blocco schermo, accesso, GRUB, Plymouth.
+# Se i temi Plymouth sono rimasti (vedi sopra), resta la loro cartella.
+echo "$FILE_DB" | grep -E '^/usr/share/desktop-base/[^/]+-theme$' | while read -r D; do
+    [ -e "$D" ] || [ -L "$D" ] || continue
+    if [ "$ATTIVO" = "ruscalinux" ] || [ -L "$D" ]; then
+        rm -rf "$D"
+    else
+        find "$D" -mindepth 1 -maxdepth 1 ! -name plymouth -exec rm -rf {} +
+    fi
+    echo "tema Debian rimosso: $(basename "$D")"
+done
+
+# --- 3. Alternative rimaste senza file --------------------------------------
+# update-alternatives scarta da solo le scelte il cui file non c'e' piu':
+# se al gruppo ne restano altre si lascia scegliere a lui, altrimenti il
+# gruppo si toglie.
+update-alternatives --get-selections 2>/dev/null | while read -r NOME STATO SCELTA; do
+    case "$SCELTA" in
+        /usr/share/desktop-base/*|/usr/share/plymouth/themes/*) ;;
+        *) continue ;;
+    esac
+    [ -e "$SCELTA" ] && continue
+    if update-alternatives --query "$NOME" 2>/dev/null | grep -q '^Alternative: '; then
+        update-alternatives --quiet --auto "$NOME" 2>/dev/null || true
+        echo "alternativa aggiornata: $NOME"
+    else
+        update-alternatives --quiet --remove-all "$NOME" 2>/dev/null || true
+        echo "alternativa tolta: $NOME"
+    fi
+done
+# Collegamenti del pacchetto che ora non portano piu' a niente.
+for DIR in /usr/share/images/desktop-base /usr/share/desktop-base; do
+    [ -d "$DIR" ] || continue
+    find "$DIR" -maxdepth 1 -xtype l -print -delete | sed 's/^/collegamento rimosso: /'
+done
+
+# --- 4. Lo swirl che resta ---------------------------------------------------
+if [ -f "$LOGO_SVG" ] && [ -f "$LOGO_PNG" ]; then
+    for DIR in /usr/share/icons /usr/share/pixmaps /usr/share/plymouth; do
+        [ -d "$DIR" ] || continue
+        find "$DIR" -type f \( -name 'emblem-debian*' -o -name 'debian-swirl*' \
+                -o -name 'debian-logo*' -o -name 'distributor-logo*' \) | while read -r F; do
+            case "$F" in
+                *.svg)
+                    cp "$LOGO_SVG" "$F" ;;
+                *.png)
+                    # Nelle icone la misura sta nel percorso (.../64x64/...).
+                    LATO=$(echo "$F" | sed -n 's|.*/\([0-9][0-9]*\)x[0-9][0-9]*/.*|\1|p')
+                    if [ -n "$LATO" ] && command -v convert > /dev/null 2>&1 \
+                       && convert "$LOGO_PNG" -resize "${LATO}x${LATO}" "$F.nuovo" 2>/dev/null; then
+                        mv "$F.nuovo" "$F"
+                    else
+                        rm -f "$F.nuovo"
+                        cp "$LOGO_PNG" "$F"
+                    fi ;;
+                *) continue ;;
+            esac
+            chmod 644 "$F"
+            echo "logo sostituito: $F"
+        done
+    done
+else
+    echo "ATTENZIONE: logo RuscaLinux non trovato, lo swirl Debian resta" >&2
+fi
+
 exit 0
 EOF
-chmod +x .work/config/hooks/normal/9993-remove-debian-wallpapers.hook.chroot
+chmod +x .work/config/hooks/normal/9993-remove-debian-artwork.hook.chroot
 
 # ---------------------------------------------------------------------------
 # DISATTIVAZIONE TOUR DI BENVENUTO — OVUNQUE (v@VERSION@)
@@ -1945,6 +2093,7 @@ mkdir -p /usr/local/share/applications
 for f in /usr/share/applications/display-im*.desktop \
          /usr/share/applications/texdoctk.desktop \
          /usr/share/applications/org.gnome.Snapshot.desktop \
+         /usr/share/applications/org.gnome.Extensions.desktop \
          /usr/share/applications/mpv.desktop \
          /usr/share/applications/setup-mozc.desktop; do
     [ -e "$f" ] || continue

@@ -21,7 +21,7 @@ vi release.conf     # VERSION="2.0"
 ./test.sh
 ```
 
-Il driver NVIDIA segue il ramo scritto in `NVIDIA_PIN` (`"595"`): ogni
+Il driver NVIDIA segue il ramo scritto in `NVIDIA_PIN` (`"620"`): ogni
 build prende l'ultima versione del ramo. Alla fine `build.sh` stampa la
 versione installata (riga `nvidia`): prima di pubblicare controlla che sia
 quella provata su hardware vero. La stessa versione finisce da sola nelle
