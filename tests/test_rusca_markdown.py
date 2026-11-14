@@ -18,7 +18,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TOOLS = os.path.join(REPO, "tools")
 COPIES = ["ruscallama/rusca_markdown.py", "ruscamark/rusca_markdown.py",
           "ruscawriter/src/ruscawriter/rusca_markdown.py",
-          "ruscatranslator/rusca_markdown.py", "ruscaspeaking/rusca_markdown.py"]
+          "ruscatranslator/rusca_markdown.py", "ruscanarrator/rusca_markdown.py"]
 sys.path.insert(0, os.path.join(TOOLS, "ruscallama"))
 import rusca_markdown as md  # noqa: E402
 
@@ -61,7 +61,7 @@ class Copies(unittest.TestCase):
 
 
 class Speech(unittest.TestCase):
-    """speech_blocks(): il documento come lo legge RuscaSpeaking."""
+    """speech_blocks(): il documento come lo legge RuscaNarrator."""
 
     def test_blocks(self):
         doc = ("# Titolo **forte**\n\nUn [link](https://esempio.it), `codice`, $x^2$ "

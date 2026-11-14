@@ -85,14 +85,14 @@ SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-$(date +%s)}"
 LIBDIR="usr/lib/${PKG}"            # binari e librerie private
 PROFILE="usr.lib.ruscallama-engine.llama-server"
 
-# Opzioni di llama-tts usate da RuscaSpeaking (rusca_tts.py): controllate
+# Opzioni di llama-tts usate da RuscaNarrator (rusca_tts.py): controllate
 # come quelle di llama-server.
 OPZIONI_TTS="-m -mm -p -o -s -t --tts-lang --tts-speaker-file --tts-voice -ngl
   --device --no-mmproj-offload --list-devices"
 
 # Solo questi finiscono nel pacchetto: llama-server per i programmi,
 # llama-cli e llama-bench per diagnosticare e misurare dal terminale,
-# llama-tts per la sintesi vocale (RuscaSpeaking, e dal terminale).
+# llama-tts per la sintesi vocale (RuscaNarrator, e dal terminale).
 # L'elenco fa parte della firma della cache: aggiungere un programma
 # ricompila llama.cpp invece di riusare una compilazione che non lo ha.
 KEEP_BINARIES="llama-server llama-cli llama-bench llama-tts"
@@ -353,7 +353,7 @@ done
         RUSCALLAMA_LLAMA_VERSION=<versione> ./make-deb.sh"
 say "llama-server accetta tutte le opzioni usate dai programmi"
 
-# Lo stesso per llama-tts, che RuscaSpeaking avvia una volta per frase.
+# Lo stesso per llama-tts, che RuscaNarrator avvia una volta per frase.
 AIUTO=$(LD_LIBRARY_PATH="$STAGE_CACHE/bin" VK_ICD_FILENAMES=/dev/null \
         VK_DRIVER_FILES=/dev/null timeout 60 "$STAGE_CACHE/bin/llama-tts" --help 2>&1 || true)
 MANCANO=""
@@ -361,10 +361,10 @@ for o in $OPZIONI_TTS; do
     grep -qE -- "(^|[ ,])$o([ ,=]|\$)" <<< "$AIUTO" || MANCANO="$MANCANO $o"
 done
 [ -z "$MANCANO" ] || die "llama-tts di llama.cpp $TAG non riconosce opzioni usate
-        da RuscaSpeaking:$MANCANO
+        da RuscaNarrator:$MANCANO
         Adatta rusca_tts.py, oppure costruisci la versione precedente:
         RUSCALLAMA_LLAMA_VERSION=<versione> ./make-deb.sh"
-say "llama-tts accetta tutte le opzioni usate da RuscaSpeaking"
+say "llama-tts accetta tutte le opzioni usate da RuscaNarrator"
 # Le librerie si cercano solo nella cartella privata del pacchetto: un
 # percorso della macchina di build nei binari sarebbe un errore.
 if command -v readelf >/dev/null; then
@@ -582,7 +582,7 @@ Description: language model engine for RuscaLLama and RuscaTranslator
  Runs local language models (GGUF files) for the RuscaLinux OS Tools
  RuscaLLama and RuscaTranslator. Contains llama-server, plus llama-cli
  and llama-bench for diagnostics and llama-tts for speech synthesis, used
- by RuscaSpeaking.
+ by RuscaNarrator.
  .
  This is llama.cpp $TAG, an external component (MIT license,
  $UPSTREAM), built from unmodified source with the

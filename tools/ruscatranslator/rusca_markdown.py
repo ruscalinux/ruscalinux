@@ -35,7 +35,7 @@ Blocchi restituiti da parse_blocks():
 Le formule LaTeX diventano testo Unicode (², ≈, √, α, ⁄ …) con <sup>/<sub>
 di Pango dove Unicode non basta: nessuna dipendenza in più.
 
-Per chi legge il documento ad alta voce (RuscaSpeaking):
+Per chi legge il documento ad alta voce (RuscaNarrator):
     speech_blocks(markdown)  [(tipo, testo)] da leggere, senza marcatori
 
 Per chi non usa Pango (RuscaWriter: PDF, EPUB, ODT, DOCX, testo):

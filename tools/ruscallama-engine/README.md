@@ -16,7 +16,7 @@ Motore di inferenza di RuscaLLama e RuscaTranslator: **llama.cpp**, software est
 | `/usr/lib/ruscallama-engine/llama-server` | Il motore che RuscaLLama e RuscaTranslator avviano, solo su 127.0.0.1 |
 | `/usr/lib/ruscallama-engine/llama-cli` | Chat dal terminale, per diagnosticare |
 | `/usr/lib/ruscallama-engine/llama-bench` | Misura la velocità di un modello |
-| `/usr/lib/ruscallama-engine/llama-tts` | Sintesi vocale con un modello TTS in GGUF e il suo mmproj: la usa RuscaSpeaking, una volta per frase, e si può usare dal terminale. La build controlla che accetti le opzioni usate da RuscaSpeaking (`OPZIONI_TTS`) |
+| `/usr/lib/ruscallama-engine/llama-tts` | Sintesi vocale con un modello TTS in GGUF e il suo mmproj: la usa RuscaNarrator, una volta per frase, e si può usare dal terminale. La build controlla che accetti le opzioni usate da RuscaNarrator (`OPZIONI_TTS`) |
 
 Esempio di sintesi vocale (il motore non scarica modelli, quindi `-hf` non funziona: i file vanno copiati a mano):
 

@@ -62,14 +62,14 @@
   Models are not included: copy a ggml file (for example
   `ggml-large-v3-turbo.bin`) into `~/.local/share/ruscawhisper/models/`.
   On computers with more than one graphics card you choose which one to use.
-- **Text to speech.** RuscaSpeaking reads a Markdown document aloud, or SRT
+- **Text to speech.** RuscaNarrator reads a Markdown document aloud, or SRT
   subtitles following their timing, with a speech synthesis model that runs
   on your own computer, and saves the audio as WAV, FLAC, Opus or MP3. It
   uses llama-tts from ruscallama-engine and opens no network port. Create a
   Voice lets you try the model's voices and keep one, so every sentence is
   read with the same voice. Models
   are not included: copy a GGUF model with its mmproj (for example
-  Qwen3-TTS) into `~/.local/share/ruscaspeaking/models/`.
+  Qwen3-TTS) into `~/.local/share/ruscanarrator/models/`.
 - **NVIDIA graphics, optional.** The image includes the NVIDIA driver
   @NVIDIA@, with open kernel modules, for GTX 16, RTX 20 and later cards,
   RTX 50 included. RuscaLinux still starts and installs with the free
@@ -84,7 +84,7 @@
   from source with Vulkan for NVIDIA, AMD and Intel graphics. It is built
   without HTTPS support and without its web interface, so it cannot download
   anything: nothing is sent over the internet. It now includes **llama-tts**
-  for speech synthesis, used by RuscaSpeaking and from the terminal.
+  for speech synthesis, used by RuscaNarrator and from the terminal.
 - **SMPlayer** replaces VLC as the video player.
 - **Foliate** reads EPUB and other e-books, with a clean reading view.
 - **Magic wallpaper** redrawn for contrast: a rose-mauve background halfway
