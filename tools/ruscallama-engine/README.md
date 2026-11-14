@@ -58,7 +58,7 @@ Senza rete si usa la versione più recente già scaricata e registrata, con un a
 
 1. **Commit.** Il commit scritto nell’archivio deve essere quello a cui punta il tag su GitHub.
 2. **Impronta.** La prima volta che una versione viene costruita, la sua impronta SHA-256 viene scritta in `checksums/`; le build successive della stessa versione devono trovare lo stesso archivio. Il file nuovo va aggiunto al repository (`git add`): `make-debs.sh` lo ricorda.
-3. **Età.** Una release uscita da meno di 14 giorni viene costruita lo stesso, con un avviso: prova RuscaLLama e RuscaTranslator prima di pubblicare la ISO.
+3. **Età.** Una release uscita da meno di 14 giorni viene costruita lo stesso, con un avviso: prova RuscaLLama, RuscaTranslator e RuscaNarrator prima di pubblicare la ISO.
 4. **Librerie incluse.** Se llama.cpp aggiunge una cartella in `vendor/` la build si ferma: va dichiarata nel file `copyright` (in `make-deb.sh`), nelle specifiche e in `VENDOR_DICHIARATI`.
 5. **Niente rete.** La compilazione gira senza rete (`unshare -rn`), e i binari non devono essere collegati a OpenSSL, libcrypto o curl.
 6. **Opzioni.** `llama-server --help` deve elencare tutte le opzioni usate dai due programmi (`OPZIONI_USATE` in `make-deb.sh`): se un’opzione sparisce, la build si ferma invece di produrre un motore che non parte. Quando i programmi cominciano a usare un’opzione nuova, va aggiunta all’elenco.

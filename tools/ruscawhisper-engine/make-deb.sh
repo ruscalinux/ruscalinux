@@ -222,9 +222,14 @@ else
 fi
 if [ -n "$DATA_RELEASE" ]; then
     GIORNI=$(( ( $(date -u +%s) - $(date -u -d "$DATA_RELEASE" +%s) ) / 86400 ))
-    say "Release del $DATA_RELEASE ($GIORNI giorni fa)"
+    case "$GIORNI" in
+        0) FA="oggi"; DA="uscita oggi" ;;
+        1) FA="1 giorno fa"; DA="uscita da 1 giorno" ;;
+        *) FA="$GIORNI giorni fa"; DA="uscita da $GIORNI giorni" ;;
+    esac
+    say "Release del $DATA_RELEASE ($FA)"
     if [ "$GIORNI" -lt "$GIORNI_MINIMI" ]; then
-        avviso "whisper.cpp $TAG e' uscita da $GIORNI giorni (meno di $GIORNI_MINIMI).
+        avviso "whisper.cpp $TAG e' $DA (meno di $GIORNI_MINIMI giorni).
             Prova RuscaTranscriber prima di pubblicare la ISO;
             per costruire la versione precedente:
             RUSCAWHISPER_WHISPER_VERSION=<versione> ./make-deb.sh"

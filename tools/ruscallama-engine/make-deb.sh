@@ -55,7 +55,8 @@ VER="1.99.3"                       # = VERSION in release.conf
 
 # Una release piu' giovane di cosi' viene costruita lo stesso, ma con un
 # avviso: le prime correzioni di una release arrivano di solito nei primi
-# giorni. Prima di pubblicare la ISO, prova RuscaLLama e RuscaTranslator.
+# giorni. Prima di pubblicare la ISO, prova RuscaLLama, RuscaTranslator e
+# RuscaNarrator.
 GIORNI_MINIMI=14
 
 # Opzioni di llama-server usate da RuscaLLama e RuscaTranslator
@@ -221,10 +222,15 @@ else
 fi
 if [ -n "$DATA_RELEASE" ]; then
     GIORNI=$(( ( $(date -u +%s) - $(date -u -d "$DATA_RELEASE" +%s) ) / 86400 ))
-    say "Release del $DATA_RELEASE ($GIORNI giorni fa)"
+    case "$GIORNI" in
+        0) FA="oggi"; DA="uscita oggi" ;;
+        1) FA="1 giorno fa"; DA="uscita da 1 giorno" ;;
+        *) FA="$GIORNI giorni fa"; DA="uscita da $GIORNI giorni" ;;
+    esac
+    say "Release del $DATA_RELEASE ($FA)"
     if [ "$GIORNI" -lt "$GIORNI_MINIMI" ]; then
-        avviso "llama.cpp $TAG e' uscita da $GIORNI giorni (meno di $GIORNI_MINIMI).
-            Prova RuscaLLama e RuscaTranslator prima di pubblicare la ISO;
+        avviso "llama.cpp $TAG e' $DA (meno di $GIORNI_MINIMI giorni).
+            Prova RuscaLLama, RuscaTranslator e RuscaNarrator prima di pubblicare la ISO;
             per costruire la versione precedente:
             RUSCALLAMA_LLAMA_VERSION=<versione> ./make-deb.sh"
     fi
