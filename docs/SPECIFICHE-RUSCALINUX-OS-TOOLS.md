@@ -61,6 +61,7 @@ Si trova nel repository in `docs/SPECIFICHE-RUSCALINUX-OS-TOOLS.md`. In caso di 
 | RuscaTranscriber | Trascrizione di video e audio in testo (Markdown) e sottotitoli (SRT) | Riconoscimento vocale | `org.ruscalinux.RuscaTranscriber` | `ruscatranscriber` | No |
 | ruscawhisper-engine | Motore di riconoscimento vocale di RuscaTranscriber: **whisper.cpp, software esterno** | Componente di sistema, senza interfaccia | — | `ruscawhisper-engine` | — |
 | RuscaNarrator | Lettura ad alta voce di documenti Markdown e di sottotitoli SRT (rispettandone i tempi) | Sintesi vocale | `org.ruscalinux.RuscaNarrator` | `ruscanarrator` | No |
+| RuscaCat | Un gatto filosofo animato con cui si parla a voce: ascolta, risponde e parla con i motori locali | Assistente vocale | `org.ruscalinux.RuscaCat` | `ruscacat` | No |
 
 ### 1.1 Gli strumenti di intelligenza artificiale
 
@@ -68,10 +69,10 @@ RuscaLLama e RuscaTranslator usano modelli linguistici in formato GGUF che giran
 
 - **ruscallama-engine è llama.cpp** (<https://github.com/ggml-org/llama.cpp>), software esterno con licenza MIT, copyright The ggml authors. RuscaLinux lo compila dal sorgente senza modificarne il codice, con il backend Vulkan (NVIDIA, AMD, Intel, con ripiego sulla CPU), **senza HTTPS** (`LLAMA_OPENSSL=OFF`) e senza interfaccia web: il motore non può scaricare modelli da Hugging Face né da altri siti. La versione è l’ultima release stabile di llama.cpp, verificata con il commit del tag e con un’impronta SHA-256 (sezioni 6 e 7).
 - Il pacchetto del motore non ha interfaccia, quindi non ha traduzioni, icona né finestra Informazioni: lo dichiarano le finestre Informazioni di RuscaLLama e RuscaTranslator, nel gruppo “Componenti esterni”.
-- Programmi del pacchetto, in `/usr/lib/ruscallama-engine/`: `llama-server`, l’unico che i programmi avviano; `llama-cli` e `llama-bench` per diagnosticare e misurare dal terminale; `llama-tts` per la sintesi vocale, con modelli TTS in GGUF e il loro mmproj (per esempio Qwen3-TTS, Pocket TTS, Soprano): lo avvia RuscaNarrator (sezione 1.4), e si può usare dal terminale. La build controlla che `llama-tts` accetti le opzioni usate da RuscaNarrator (`OPZIONI_TTS`). L’elenco (`KEEP_BINARIES` in `make-deb.sh`) fa parte della firma della cache di compilazione: aggiungere un programma ricompila llama.cpp.
+- Programmi del pacchetto, in `/usr/lib/ruscallama-engine/`: `llama-server`, che avviano RuscaLLama, RuscaTranslator e RuscaCat; `llama-cli` e `llama-bench` per diagnosticare e misurare dal terminale; `llama-tts` per la sintesi vocale, con modelli TTS in GGUF e il loro mmproj (per esempio Qwen3-TTS, Pocket TTS, Soprano): lo avviano RuscaNarrator (sezione 1.4) e RuscaCat (sezione 1.5), e si può usare dal terminale. La build controlla che `llama-tts` accetti le opzioni usate da RuscaNarrator (`OPZIONI_TTS`). L’elenco (`KEEP_BINARIES` in `make-deb.sh`) fa parte della firma della cache di compilazione: aggiungere un programma ricompila llama.cpp.
 - I modelli non fanno parte dei pacchetti: l’utente li copia in `~/.local/share/ruscallama/models/` o l’amministratore in `/usr/share/ruscallama/models/`. Ogni modello ha la propria licenza, che l’utente deve rispettare.
-- Il modulo `rusca_engine.py`, che avvia e interroga il motore, è identico nei due programmi, come `style.css` (si modifica una volta e si copia).
-- Il modulo `rusca_markdown.py`, motore Markdown comune (sezione 1.2), è identico in RuscaLLama, RuscaMark, RuscaWriter (`src/ruscawriter/`), RuscaTranslator e RuscaNarrator, con la stessa regola; accanto c’è `markdown_it_mark.py`, componente esterno usato dal motore (sezione 6), anch’esso identico nei cinque programmi. RuscaTranslator mostra il Markdown come sorgente: il motore gli serve per dividere i documenti da tradurre senza spezzare un blocco.
+- Il modulo `rusca_engine.py`, che avvia e interroga il motore, è identico in RuscaLLama, RuscaTranslator e RuscaCat, come `style.css` (si modifica una volta e si copia).
+- Il modulo `rusca_markdown.py`, motore Markdown comune (sezione 1.2), è identico in RuscaLLama, RuscaMark, RuscaWriter (`src/ruscawriter/`), RuscaTranslator, RuscaNarrator e RuscaCat, con la stessa regola; accanto c’è `markdown_it_mark.py`, componente esterno usato dal motore (sezione 6), anch’esso identico nei sei programmi. RuscaTranslator mostra il Markdown come sorgente: il motore gli serve per dividere i documenti da tradurre senza spezzare un blocco.
 - Gli editor di RuscaMark e RuscaWriter mostrano tabelle, formule e immagini come Markdown sorgente; la resa completa è nell’anteprima. RuscaWriter usa il modulo `rusca_liveblocks.py` per i riquadri delle immagini dell’anteprima.
 
 ### 1.2 Il motore Markdown
@@ -113,7 +114,7 @@ Regole:
 python3 -m unittest tests/test_rusca_markdown.py tests/test_ruscamark_markdown.py tests/test_ruscatranslator_markdown.py
 ```
 
-**Stato nella versione 1.99.2.** Tutti i programmi che leggono Markdown usano il motore comune: RuscaLLama per la chat, la conversazione salvata in HTML (`render_html()`) e il salvataggio dei blocchi di codice (`code_blocks()`); RuscaMark per anteprima, export HTML, export PDF (`MarkdownDoc`) e resa live (`live_elements()`); RuscaWriter per tutti gli export, l’anteprima e l’evidenziazione (`book_blocks()`, `highlight_spans()`); RuscaTranslator per dividere i documenti da tradurre (`block_ranges()`); RuscaNarrator per sapere che cosa leggere ad alta voce (`speech_blocks()`). Fanno eccezione solo gli strumenti per riga della regola 1 e l’export TXT di RuscaWriter, che scrive il sorgente Markdown con formule e tabelle convertite in testo.
+**Stato nella versione 1.99.2.** Tutti i programmi che leggono Markdown usano il motore comune: RuscaLLama per la chat, la conversazione salvata in HTML (`render_html()`) e il salvataggio dei blocchi di codice (`code_blocks()`); RuscaMark per anteprima, export HTML, export PDF (`MarkdownDoc`) e resa live (`live_elements()`); RuscaWriter per tutti gli export, l’anteprima e l’evidenziazione (`book_blocks()`, `highlight_spans()`); RuscaTranslator per dividere i documenti da tradurre (`block_ranges()`); RuscaNarrator per sapere che cosa leggere ad alta voce (`speech_blocks()`); RuscaCat, tramite `rusca_tts.py`, per togliere i marcatori dalle risposte del gatto prima di mostrarle e di leggerle. Fanno eccezione solo gli strumenti per riga della regola 1 e l’export TXT di RuscaWriter, che scrive il sorgente Markdown con formule e tabelle convertite in testo.
 
 ### 1.3 Il riconoscimento vocale
 
@@ -157,6 +158,35 @@ Durante lo sviluppo della 1.99.3 RuscaNarrator si chiamava RuscaSpeaking (App ID
 
 ```bash
 python3 -m unittest tests/test_ruscanarrator.py
+```
+
+### 1.5 Il gatto parlante
+
+RuscaCat è **Martino** (in inglese **Martin**), un gatto nero dagli occhiali tondi con cui si parla a voce: un filosofo heideggeriano, scontroso e cinico ma in fondo buono. Non ha motori né modelli propri: usa quelli degli altri strumenti, nelle loro cartelle.
+
+| Passo | Come | Modulo |
+|---|---|---|
+| Ascolta | `/usr/bin/ffmpeg -f pulse` legge la sorgente predefinita di GNOME (PipeWire) e scrive campioni grezzi a 16 kHz, mono; il rilevamento del parlato decide inizio e fine della frase | `rusca_mic.py` (proprio) |
+| Capisce | `whisper-cli` di ruscawhisper-engine trascrive la frase; modelli di RuscaTranscriber | `rusca_whisper.py`, identico a quello di RuscaTranscriber |
+| Risponde | `llama-server` di ruscallama-engine, in streaming, con la personalità del gatto (chiave `persona` di `lang/`); modelli di RuscaLLama | `rusca_engine.py`, identico a quello di RuscaLLama |
+| Parla | `llama-tts` di ruscallama-engine, una frase per volta; modelli e voci create di RuscaNarrator | `rusca_tts.py`, identico a quello di RuscaNarrator |
+| Si muove | Disegno Cairo, nessuna immagine esterna | `cat_view.py` (proprio) |
+
+- **Moduli comuni.** `rusca_whisper.py` e `rusca_tts.py` sono copie identiche (si modificano nel programma d’origine e si copiano), come `rusca_engine.py`, `rusca_markdown.py`, `markdown_it_mark.py` e `style.css`. RuscaCat ne cambia solo la cartella di lavoro (`WORK_DIR`), così non tocca i file di RuscaTranscriber e RuscaNarrator aperti insieme.
+- **Rilevamento del parlato** (`SpeechDetector`). Blocchi di 30 ms. Il rumore di fondo si misura nei primi 450 ms (il quinto blocco più silenzioso), poi scende subito e sale piano (circa 3 s), solo fuori dal parlato. Il parlato comincia dopo 150 ms sopra la soglia (rumore più un margine di 21 − 1,5 × sensibilità dB, sensibilità da 1 a 10, predefinita 5) e finisce dopo la pausa di fine frase (da 0,5 a 3 s, predefinita 0,9 s); si tengono 300 ms prima e circa 200 ms dopo. Meno di 240 ms di voce è un rumore; oltre 30 s la frase si chiude.
+- **Un passo alla volta.** Il microfono è chiuso mentre il gatto trascrive, pensa e parla, così non sente se stesso; con «Ascolta di nuovo dopo ogni risposta» (predefinito) si riapre alla fine. **Zitto** (Esc) ferma risposta, voce e trascrizione; il testo già arrivato resta nella conversazione.
+- **Voce in streaming.** `SentenceSplitter` divide la risposta che arriva: la prima frase parte subito (o alla prima virgola dopo 60 caratteri), le altre hanno almeno 40 caratteri e al massimo 240; «3.5» non chiude una frase. Mentre una frase si ascolta, `llama-tts` prepara la successiva. Il testo letto e mostrato passa da `markdown_pieces()`: niente marcatori.
+- **Bocca.** L’inviluppo del WAV (volume ogni 20 ms, da 0 a 1) si legge all’ora di `Gtk.MediaFile.get_timestamp()`. La riproduzione usa `Gtk.MediaFile`, quindi serve `libgtk-4-media-gstreamer`; se manca o non funziona, il gatto risponde per iscritto.
+- **Trascrizioni da scartare.** Frasi fatte solo di suoni («[Musica]») e le frasi tipiche che Whisper «sente» sul silenzio (titoli di coda dei sottotitoli) si scartano, solo quando sono tutta la frase.
+- **Personalità.** Il prompt di sistema è la chiave `persona` della lingua dell’interfaccia, con `{name}` (chiave `cat_name`) e `{language}` (la lingua della conversazione). Risposte brevi, senza Markdown né emoji, al massimo 400 token; il gatto ricorda gli ultimi 24 scambi. Il sarcasmo non è mai crudele, e il prompt chiede di lasciarlo da parte e indicare un aiuto concreto se qualcuno parla di farsi del male.
+- **Lingua della conversazione.** Una sola, per ascolto (`-l` di whisper-cli), risposta e voce (`--tts-lang`): le dieci lingue di Qwen3-TTS (sezione 1.4). Al primo avvio quella dell’interfaccia, se c’è.
+- **Motore.** Scheda grafica e thread valgono per i tre motori; la scheda si salva per descrizione (`llama-server --list-devices`) e a whisper-cli passa con `GGML_VK_VISIBLE_DEVICES` se il nome coincide, altrimenti decide il motore. Modello linguistico, contesto, scheda e thread si applicano alla chiusura delle Preferenze, riavviando `llama-server`.
+- **Animazioni ridotte.** Con `gtk-enable-animations` spento il gatto non si muove da solo (coda, respiro, ciglia, puntini) e mentre parla tiene la bocca aperta a metà. Gli stati si distinguono per forma (occhi, orecchie, segni accanto alla testa), non per colore, e sono scritti sotto il disegno e nell’etichetta accessibile.
+
+**Test.** `tests/test_ruscacat.py` controlla le copie dei moduli comuni, l’assenza di moduli di rete nei moduli propri, il rilevamento del parlato su audio sintetico (pause, rumori brevi, stanza rumorosa, sensibilità, frasi lunghe), l’inviluppo, la divisione in frasi, le trascrizioni da scartare, il microfono con un FFmpeg finto e le traduzioni; senza PyGObject o GTK 4 le parti relative si saltano.
+
+```bash
+python3 -m unittest tests/test_ruscacat.py
 ```
 
 Gli identificatori di ogni tool devono coincidere tra loro (vedi sezione 5.2).
@@ -611,7 +641,7 @@ Comment[it]=Breve descrizione in italiano
 Exec=ruscafoo %U
 Icon=org.ruscalinux.RuscaFoo
 Terminal=false
-Categories=GNOME;GTK;Utility;
+Categories=GNOME;GTK;Utility;X-RuscaLinux-Tools;
 Keywords=keyword;another;
 Keywords[it]=parola;altra;
 StartupNotify=true
@@ -619,6 +649,8 @@ StartupWMClass=org.ruscalinux.RuscaFoo
 ```
 
 `Comment` e `Keywords` vanno tradotti in tutte le lingue della sezione 9 (`Comment[xx]=`), presi dai file di `lang/`. Il file va validato con `desktop-file-validate`.
+
+Fra le `Categories` di ogni tool c’è sempre **`X-RuscaLinux-Tools`**: è la categoria della cartella **RuscaLinux-Tools** della griglia delle applicazioni di GNOME, che raccoglie tutti i tool. La cartella la crea, una volta per utente e dopo le cartelle di GNOME, lo script `/usr/lib/ruscalinux/ruscalinux-tools-folder` della ISO (scritto da `steps/30-custom.sh`, avviato da `/etc/xdg/autostart/`): un elenco di cartelle predefinito con dconf impedirebbe a GNOME Shell 48 di creare le sue (Sistema, Utilità). Un tool nuovo entra nella cartella da solo, grazie alla categoria. I componenti senza interfaccia (ruscallama-engine, ruscawhisper-engine) non hanno file `.desktop`.
 
 ### 5.4 Metainfo AppStream
 
@@ -669,16 +701,16 @@ Componenti esterni in uso:
 | Componente | Versione | Licenza | Dove | Usato da |
 |---|---|---|---|---|
 | EB Garamond e Courier Prime (caratteri tipografici) | inclusi nei sorgenti | SIL Open Font License 1.1 | `tools/ruscawriter/assets/`, installati in `/usr/share/ruscawriter/assets/` con il testo della licenza | RuscaWriter |
-| llama.cpp (con ggml e le librerie che include: nlohmann/json e cpp-httplib MIT, xxHash BSD-2-Clause, stb, miniaudio, sha1 e sha256 di pubblico dominio) | ultima release stabile al momento della build (1.99.2: 0.9.0; 1.99.3: 1.0.0), scritta nella descrizione del pacchetto e in `/usr/share/doc/ruscallama-engine/README.md.gz` | MIT | Compilato nel pacchetto `ruscallama-engine`, in `/usr/lib/ruscallama-engine/` | RuscaLLama, RuscaTranslator, RuscaNarrator (`llama-tts`) |
-| whisper.cpp (con ggml e le librerie compilate nei programmi impacchettati: sgemm di llamafile, MIT; miniaudio, pubblico dominio o MIT-0; stb_vorbis, pubblico dominio o MIT) | ultima release stabile al momento della build (1.99.3: 1.9.5), scritta nella descrizione del pacchetto e in `/usr/share/doc/ruscawhisper-engine/README.md.gz` | MIT | Compilato nel pacchetto `ruscawhisper-engine`, in `/usr/lib/ruscawhisper-engine/` | RuscaTranscriber |
-| Regola dell’evidenziato, porting del plugin markdown-it-mark (© Vitaly Puzrin e Alex Kocharin) con la struttura della regola del barrato di markdown-it-py (© ExecutableBookProject) | — | MIT (Expat) | `markdown_it_mark.py`, file a sé accanto a `rusca_markdown.py`; dichiarato nel file `copyright` del pacchetto, nella finestra Informazioni e nei manuali | RuscaLLama, RuscaMark, RuscaWriter, RuscaTranslator, RuscaNarrator |
+| llama.cpp (con ggml e le librerie che include: nlohmann/json e cpp-httplib MIT, xxHash BSD-2-Clause, stb, miniaudio, sha1 e sha256 di pubblico dominio) | ultima release stabile al momento della build (1.99.2: 0.9.0; 1.99.3: 1.0.0), scritta nella descrizione del pacchetto e in `/usr/share/doc/ruscallama-engine/README.md.gz` | MIT | Compilato nel pacchetto `ruscallama-engine`, in `/usr/lib/ruscallama-engine/` | RuscaLLama, RuscaTranslator, RuscaNarrator (`llama-tts`), RuscaCat (`llama-server` e `llama-tts`) |
+| whisper.cpp (con ggml e le librerie compilate nei programmi impacchettati: sgemm di llamafile, MIT; miniaudio, pubblico dominio o MIT-0; stb_vorbis, pubblico dominio o MIT) | ultima release stabile al momento della build (1.99.3: 1.9.5), scritta nella descrizione del pacchetto e in `/usr/share/doc/ruscawhisper-engine/README.md.gz` | MIT | Compilato nel pacchetto `ruscawhisper-engine`, in `/usr/lib/ruscawhisper-engine/` | RuscaTranscriber, RuscaCat |
+| Regola dell’evidenziato, porting del plugin markdown-it-mark (© Vitaly Puzrin e Alex Kocharin) con la struttura della regola del barrato di markdown-it-py (© ExecutableBookProject) | — | MIT (Expat) | `markdown_it_mark.py`, file a sé accanto a `rusca_markdown.py`; dichiarato nel file `copyright` del pacchetto, nella finestra Informazioni e nei manuali | RuscaLLama, RuscaMark, RuscaWriter, RuscaTranslator, RuscaNarrator, RuscaCat |
 | Esempi della specifica CommonMark (© John MacFarlane) | 0.30 | CC BY-SA 4.0 | `tests/data/commonmark-0.30-spec.json`, con `README.md`; solo per i test, non installati da nessun pacchetto | Test di `rusca_markdown.py` |
 
 markdown-it-py, mdit-py-plugins e linkify-it-py (licenza MIT) non sono inclusi: sono dipendenze dei pacchetti, installate da Debian.
 
 I file `copyright` di `ruscallama-engine` e di `ruscawhisper-engine` riportano tutte queste licenze; solo gli script di costruzione e i profili AppArmor sono di RuscaLinux (GPL-3.0).
 
-FFmpeg non è incluso: RuscaTranscriber usa il comando `ffmpeg` del pacchetto Debian, che è una sua dipendenza.
+FFmpeg non è incluso: RuscaTranscriber, RuscaNarrator e RuscaCat usano il comando `ffmpeg` del pacchetto Debian, che è una loro dipendenza.
 
 ---
 
@@ -744,11 +776,13 @@ Description: Short description in English
 
 Per RuscaMark, se include il controllo ortografico, aggiungere la riga `Recommends` della sezione 10.
 
-RuscaLLama, RuscaMark, RuscaWriter, RuscaTranslator e RuscaNarrator, che includono `rusca_markdown.py` (sezione 1.2), aggiungono a `Depends`:
+RuscaLLama, RuscaMark, RuscaWriter, RuscaTranslator, RuscaNarrator e RuscaCat, che includono `rusca_markdown.py` (sezione 1.2), aggiungono a `Depends`:
 
 ```text
 python3-markdown-it (>= 3.0), python3-mdit-py-plugins (>= 0.4), python3-linkify-it (>= 2.0)
 ```
+
+RuscaCat dipende anche da `ruscallama-engine`, `ruscawhisper-engine`, `ffmpeg` e `libgtk-4-media-gstreamer` (riproduzione della voce con `Gtk.MediaFile`).
 
 Le stesse librerie sono nell’elenco dei pacchetti della ISO (`steps/20-packages.sh`, sezione “LIBS SUPPORT”): ogni dipendenza nuova di un tool va aggiunta anche lì.
 
@@ -872,7 +906,7 @@ Tedesco, russo e francese possono essere fino al 40% più lunghi dell’inglese;
 |---|---|
 | RuscaWriter | Sì, sempre (ortografia e sillabazione del PDF) |
 | RuscaMark | Sì, se è presente il controllo ortografico |
-| RuscaCleaner, RuscaHub, RuscaLLama, RuscaTranslator, RuscaTranscriber, RuscaNarrator | No |
+| RuscaCleaner, RuscaHub, RuscaLLama, RuscaTranslator, RuscaTranscriber, RuscaNarrator, RuscaCat | No |
 
 Pacchetti: `hunspell-en-gb` (ortografia) e `hyphen-en-gb` (sillabazione, particolarmente consigliato per RuscaWriter, che lo usa con `python3-pyphen`).
 
@@ -899,7 +933,7 @@ Recommends: hunspell-en-gb, hyphen-en-gb (RuscaWriter)
 
 Regole tecniche:
 
-1. Nessun modulo di rete nel codice (`urllib`, `http`, `socket`, `requests`, `Gio.SocketClient` e simili). **Unica eccezione:** RuscaLLama e RuscaTranslator parlano con il proprio motore tramite `http.client` e `socket`, solo verso `127.0.0.1`, attraverso `rusca_engine.py` (vedi sotto).
+1. Nessun modulo di rete nel codice (`urllib`, `http`, `socket`, `requests`, `Gio.SocketClient` e simili). **Unica eccezione:** RuscaLLama, RuscaTranslator e RuscaCat parlano con il proprio motore tramite `http.client` e `socket`, solo verso `127.0.0.1`, attraverso `rusca_engine.py` (vedi sotto).
 2. Nessuna esecuzione di comandi tramite shell (`shell=True`, `os.system`). Se serve un programma esterno, usare `subprocess` con lista di argomenti, percorsi assoluti e nessun input dell’utente non validato.
 3. Nessun privilegio di amministratore, salvo necessità reale documentata; in quel caso usare `pkexec` con una policy polkit dedicata e limitata.
 4. Preferire lo spostamento nel cestino all’eliminazione definitiva.
@@ -942,6 +976,18 @@ Regole aggiuntive per la sintesi vocale (RuscaNarrator):
 | Il documento di partenza | Mai modificato; l’audio si salva solo su richiesta, dove sceglie l’utente |
 | Voci create | In `~/.local/share/ruscanarrator/voices/`, solo quando l’utente sceglie «Tieni questa voce»; le prove scartate si cancellano |
 | Voci altrui | Il manuale chiede di usare come voce di riferimento la propria, o una voce che si ha il permesso di usare |
+
+Regole aggiuntive per il gatto parlante (RuscaCat):
+
+| Regola | Come è applicata |
+|---|---|
+| Microfono aperto solo quando serve | FFmpeg legge il microfono solo mentre il gatto ascolta: parte con «Ascolta» e si ferma quando il gatto trascrive, pensa o parla, con «Smetti di ascoltare» e alla chiusura |
+| Rete solo verso 127.0.0.1 | Solo `llama-server`, tramite `rusca_engine.py`, con le regole di RuscaLLama; `whisper-cli`, `llama-tts` e FFmpeg lavorano su file e non aprono porte; i moduli propri non usano moduli di rete (lo controlla il test) |
+| FFmpeg | Percorso assoluto, lista di argomenti, `-protocol_whitelist file`; per il microfono solo il dispositivo `pulse` |
+| Audio di lavoro | In `~/.cache/ruscacat/` con permessi 0700: la frase da trascrivere e la voce del gatto, cancellate appena usate, all’avvio e alla chiusura; il resto dell’audio resta in memoria |
+| Conversazioni | Restano in memoria; si salvano in Markdown solo su richiesta, con il testo protetto (`escape_markdown()`) |
+| Personalità | Il prompt vieta crudeltà, volgarità e consigli pericolosi, e chiede di indicare un aiuto concreto a chi parla di farsi del male |
+| Avviso all’utente | Il manuale ricorda che le risposte sono generate da un modello e vanno verificate, e che la voce di riferimento deve essere la propria o una voce che si ha il permesso di usare |
 
 Dichiarazione:
 
@@ -996,12 +1042,12 @@ Un tool è pronto quando:
 9. Ha la finestra “Informazioni” comune (sezione 3.10), con la riga “Nota di sviluppo” che apre la nota IA; la nota compare solo nei tre posti della sezione 12.2.
 10. Ha le traduzioni della sezione 9, con i ripieghi della sezione 9.2, fallback inglese e senza crash su chiavi mancanti; funziona in arabo (RTL).
 11. Ha identificatori coerenti tra loro (sezioni 1 e 5.2).
-12. Ha file `.desktop` e metainfo validi, con `StartupWMClass` uguale all’App ID.
+12. Ha file `.desktop` e metainfo validi, con `StartupWMClass` uguale all’App ID e la categoria `X-RuscaLinux-Tools` (sezione 5.3).
 13. Ha icona SVG e icona simbolica.
 14. Ha `make-deb.sh` che produce un solo `ruscafoo-ruscalinux_<versione>_all.deb` (o `_amd64.deb` per ruscallama-engine e ruscawhisper-engine) e `SHA256SUMS` in `build-deb/`.
 15. Ha la versione uguale a `VERSION` di `release.conf`.
 16. È licenziato GPL-3.0, con componenti esterni dichiarati.
-17. Non usa rete, telemetria o comandi pericolosi (per RuscaLLama e RuscaTranslator: rete solo verso 127.0.0.1, sezione 11; RuscaTranscriber e RuscaNarrator non usano la rete in nessun modo).
+17. Non usa rete, telemetria o comandi pericolosi (per RuscaLLama, RuscaTranslator e RuscaCat: rete solo verso 127.0.0.1, sezione 11; RuscaTranscriber e RuscaNarrator non usano la rete in nessun modo).
 18. Se mostra, converte o divide Markdown, usa `rusca_markdown.py` (sezione 1.2), e i test di `tests/` passano.
 
 ---
@@ -1140,6 +1186,17 @@ Lettura ad alta voce di documenti e sottotitoli, con un modello di sintesi vocal
 
 Con i sottotitoli ogni frase parte all’ora del suo sottotitolo. RuscaNarrator usa `llama-tts` di **ruscallama-engine** (llama.cpp, licenza MIT) e FFmpeg. Non usa la rete.
 
+## 🐈‍⬛ RuscaCat
+
+Una conversazione a voce con Martino, il gatto filosofo: scontroso, cinico, heideggeriano, ma in fondo buono.
+
+1. Servono i modelli degli altri strumenti: un modello linguistico GGUF (come per RuscaLLama), un modello Whisper (come per RuscaTranscriber) e un modello vocale con il suo mmproj (come per RuscaNarrator). Se mancano, una barra in alto apre la cartella giusta.
+2. Premere “Ascolta” (Ctrl+L) e parlare: quando si smette, Martino trascrive, pensa e risponde a voce. Poi ascolta di nuovo.
+3. In alternativa, scrivergli nella casella in basso. “Zitto” (Esc) lo interrompe.
+4. La conversazione si salva in Markdown dal menu principale (Ctrl+S).
+
+RuscaCat usa **ruscawhisper-engine** (whisper.cpp) e **ruscallama-engine** (llama.cpp), entrambi con licenza MIT, e FFmpeg per il microfono. Il microfono è aperto solo mentre il gatto ascolta; il modello linguistico ascolta solo su 127.0.0.1. Le risposte vanno verificate: Martino è un personaggio, non un esperto.
+
 ## 🧯 Risoluzione dei problemi
 
 Se un tool non si avvia:
@@ -1187,6 +1244,7 @@ Tutti i dati elaborati dai RuscaLinux OS Tools rimangono in locale. Nessun dato 
 | RuscaTranscriber | Transcription of video and audio into text (Markdown) and subtitles (SRT) |
 | ruscawhisper-engine | Speech recognition engine: whisper.cpp, an external component (MIT) |
 | RuscaNarrator | Reading Markdown documents and SRT subtitles (following their timing) aloud |
+| RuscaCat | An animated philosopher cat you talk to out loud: it listens, answers and speaks with the local engines |
 
 ## 🚀 Requirements
 
@@ -1319,6 +1377,17 @@ Reading documents and subtitles aloud, with a speech synthesis model that runs o
 4. Listen to the result and save it as WAV (Ctrl+S), FLAC, Opus or MP3.
 
 With subtitles every sentence starts at the time of its subtitle. RuscaNarrator uses `llama-tts` from **ruscallama-engine** (llama.cpp, MIT license) and FFmpeg. It does not use the network.
+
+## 🐈‍⬛ RuscaCat
+
+A spoken conversation with Martin, the philosopher cat: grumpy, cynical, Heideggerian, but kind at heart.
+
+1. It needs the other tools' models: a GGUF language model (as for RuscaLLama), a Whisper model (as for RuscaTranscriber) and a voice model with its mmproj (as for RuscaNarrator). If one is missing, a bar at the top opens the right folder.
+2. Press "Listen" (Ctrl+L) and speak: when you stop, Martin transcribes, thinks and answers out loud. Then he listens again.
+3. Or write to him in the box at the bottom. "Hush" (Esc) interrupts him.
+4. Save the conversation as Markdown from the main menu (Ctrl+S).
+
+RuscaCat uses **ruscawhisper-engine** (whisper.cpp) and **ruscallama-engine** (llama.cpp), both under the MIT license, and FFmpeg for the microphone. The microphone is open only while the cat listens; the language model listens only on 127.0.0.1. Check the answers: Martin is a character, not an expert.
 
 ## 🌍 Language support
 

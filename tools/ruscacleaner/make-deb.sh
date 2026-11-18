@@ -126,7 +126,7 @@ Exec=$PKG_NAME
 TryExec=$PKG_NAME
 Icon=$APP_ID
 Terminal=false
-Categories=GTK;GNOME;Utility;
+Categories=GTK;GNOME;Utility;X-RuscaLinux-Tools;
 StartupNotify=true
 StartupWMClass=$APP_ID
 DESKTOP

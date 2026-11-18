@@ -125,26 +125,24 @@ elif [ -n "$(find branding tools -name build-deb -prune -o \
     ./make-debs.sh
 fi
 
-# Motore dei modelli: make-deb.sh costruisce l'ultima release stabile di
-# llama.cpp. Se ne e' uscita una piu' nuova di quella gia' impacchettata, si
-# ricostruisce anche se in tools/ non e' cambiato nulla. Senza rete il
-# controllo si salta e resta il pacchetto che c'e'.
-MOTORE=$(ls local/extra_debs/ruscallama-engine-*.deb 2> /dev/null | head -n 1)
-ULTIMA=$(bash tools/ruscallama-engine/ultima-versione.sh 2> /dev/null | cut -d ' ' -f 1 || true)
-if [ -n "$MOTORE" ] && [ -n "$ULTIMA" ] && \
-   ! dpkg-deb -f "$MOTORE" Description | grep -qF "llama.cpp $ULTIMA,"; then
-    echo "    llama.cpp $ULTIMA e' piu' recente del motore impacchettato: ricostruisco i pacchetti"
-    ./make-debs.sh
-fi
-
-# Lo stesso per il motore di riconoscimento vocale (whisper.cpp).
-MOTORE=$(ls local/extra_debs/ruscawhisper-engine-*.deb 2> /dev/null | head -n 1)
-ULTIMA=$(bash tools/ruscawhisper-engine/ultima-versione.sh 2> /dev/null | cut -d ' ' -f 1 || true)
-if [ -n "$MOTORE" ] && [ -n "$ULTIMA" ] && \
-   ! dpkg-deb -f "$MOTORE" Description | grep -qF "whisper.cpp $ULTIMA,"; then
-    echo "    whisper.cpp $ULTIMA e' piu' recente del motore impacchettato: ricostruisco i pacchetti"
-    ./make-debs.sh
-fi
+# Motori: il make-deb.sh di ruscallama-engine e di ruscawhisper-engine
+# costruisce l'ultima release stabile di llama.cpp e di whisper.cpp. Se ne e'
+# uscita una piu' nuova di quella gia' impacchettata, si ricostruisce anche
+# se in tools/ non e' cambiato nulla (una volta sola: make-debs.sh rifa'
+# tutti e due i motori). Senza rete il controllo si salta e restano i
+# pacchetti che ci sono.
+for coppia in ruscallama-engine:llama.cpp ruscawhisper-engine:whisper.cpp; do
+    motore=${coppia%%:*}
+    progetto=${coppia#*:}
+    DEB=$(ls local/extra_debs/"$motore"-*.deb 2> /dev/null | head -n 1)
+    ULTIMA=$(bash "tools/$motore/ultima-versione.sh" 2> /dev/null | cut -d ' ' -f 1 || true)
+    if [ -n "$DEB" ] && [ -n "$ULTIMA" ] && \
+       ! dpkg-deb -f "$DEB" Description | grep -qF "$progetto $ULTIMA,"; then
+        echo "    $progetto $ULTIMA e' piu' recente del motore impacchettato: ricostruisco i pacchetti"
+        ./make-debs.sh
+        break
+    fi
+done
 
 # Controlla che ci siano davvero. Una ISO senza una utility si costruisce
 # lo stesso, e te ne accorgeresti solo dopo l'avvio.
@@ -209,6 +207,15 @@ sh .gen/10-config.sh
 sh .gen/20-packages.sh
 sh .gen/30-custom.sh
 sh .gen/40-nvidia.sh
+
+# Elenco dei file che gli includes mettono nel sistema, per l'hook
+# 9989-ruscalinux-diversions (steps/30-custom.sh): quelli che appartengono a
+# un pacchetto Debian vengono registrati con dpkg-divert. Si scrive qui,
+# dopo tutti i passi, perche' anche 40-nvidia.sh aggiunge includes.
+INCLUDES=.work/config/includes.chroot_after_packages
+mkdir -p "$INCLUDES/usr/share/ruscalinux"
+( cd "$INCLUDES" && find . \( -type f -o -type l \) | sed 's|^\.||' | sort ) \
+    > "$INCLUDES/usr/share/ruscalinux/includes.list"
 
 if [ "$SOLO_CONFIG" = "si" ]; then
     echo

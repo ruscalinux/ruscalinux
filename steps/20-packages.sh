@@ -26,6 +26,10 @@ gimp
 imagemagick
 gcolor3
 eog
+# Grafica vettoriale, sviluppo dei RAW delle fotocamere, modellazione 3D
+inkscape
+darktable
+blender
 
 # Ebooks
 gnome-epub-thumbnailer
@@ -43,6 +47,8 @@ easytag
 lame
 abcde
 mp3splt
+# Copia dei CD audio in MP3, Ogg, FLAC, Opus...
+asunder
 
 # Video
 smplayer
@@ -52,7 +58,11 @@ shotcut
 handbrake
 mkvtoolnix-gui
 mediainfo
+# MediaInfo con la finestra: le informazioni di un file audio o video
+mediainfo-gui
 guvcview
+# Editor di sottotitoli (SRT e altri formati)
+gaupol
 
 # Giochi
 aisleriot
@@ -71,6 +81,8 @@ pdftk
 weasyprint
 tree
 file-roller
+# Rinomina di molti file insieme
+gprename
 
 # Dischi e recupero: controllo e riparazione dei filesystem (fsck), stato dei
 # dischi (smartctl), copia di dischi danneggiati (ddrescue), recupero di
@@ -127,6 +139,9 @@ python3-gi-cairo
 python3-markdown-it
 python3-mdit-py-plugins
 python3-linkify-it
+
+# RuscaNarrator e RuscaCat: riproduzione della voce (Gtk.MediaFile)
+libgtk-4-media-gstreamer
 
 # RuscaWriter: sillabazione del PDF (Pyphen) e generatore di copertine (Pillow)
 python3-pyphen

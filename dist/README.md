@@ -21,10 +21,11 @@ moment it boots.
 - **Base** — Debian 13 stable, Linux 6.12 long-term kernel
 - **Desktop** — GNOME 48.7 on Wayland with custom Adwaita-Prugna icons and Plymouth boot splash
 - **Office** — LibreOffice 25.2 (Writer, Calc, Impress, Draw, Math, Base), Evince
-- **Multimedia** — SMPlayer, Audacity, OBS Studio, GIMP 3.0, Audacious, Brasero, EasyTAG, FFmpeg 7.1
+- **Multimedia** — SMPlayer, Audacity, OBS Studio, GIMP 3.0, Inkscape, darktable, Blender, Audacious, Asunder, Brasero, EasyTAG, Gaupol, MediaInfo, FFmpeg 7.1
+- **E-books and files** — Calibre, Foliate, GPRename
 - **Internet** — Firefox ESR 153, Thunderbird 140, qBittorrent
 - **Languages** — 40+ localizations bundled in the base image
-- **In-house tools** — RuscaMark (Markdown editor), RuscaWriter (book writing), RuscaHub (AppImage manager), RuscaCleaner (privacy cleanup), RuscaLLama and RuscaTranslator (local AI chat and translation)
+- **In-house tools** (in the RuscaLinux-Tools folder of the app grid) — RuscaMark (Markdown editor), RuscaWriter (book writing), RuscaHub (AppImage manager), RuscaCleaner (privacy cleanup), RuscaLLama and RuscaTranslator (local AI chat and translation)
 - **Graphics** — free drivers by default; NVIDIA driver @NVIDIA@ (GTX 16, RTX 20 and later) as an option in the boot menu
 - **Security** — AppArmor mandatory access control enabled by default
 - **Image** — hybrid ISO with live system + installer (including speech-synthesis option)

@@ -110,7 +110,7 @@ GenericName=AI Chat
 Exec=$PKG
 Icon=$APP_ID
 Terminal=false
-Categories=GNOME;GTK;Utility;
+Categories=GNOME;GTK;Utility;X-RuscaLinux-Tools;
 StartupNotify=true
 StartupWMClass=$APP_ID
 DESKTOP

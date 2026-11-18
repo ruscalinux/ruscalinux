@@ -5,7 +5,7 @@ set -e
 # adwaita-prugna, ruscalinux-backgrounds-it, ruscalinux-fonts, ruscalinux-theme,
 # ruscalinux-shell-theme e le utility di
 # tools/ (ruscacleaner, ruscahub, ruscamark, ruscawriter, ruscallama-engine, ruscallama,
-# ruscatranslator, ruscawhisper-engine, ruscatranscriber, ruscanarrator)
+# ruscatranslator, ruscawhisper-engine, ruscatranscriber, ruscanarrator, ruscacat)
 cp local/extra_debs/*.deb .work/config/packages.chroot/
 
 # IMPOSTAZIONE splash.png BINARY
@@ -85,8 +85,12 @@ EOF
 chmod +x .work/config/hooks/normal/9010-ruscalinux-grub-theme.hook.binary
 
 # NOME E VERSIONE DEL SISTEMA OPERATIVO
-mkdir -p .work/config/includes.chroot_after_packages/etc/
-cat <<EOF > .work/config/includes.chroot_after_packages/etc/os-release
+# Un solo file, /usr/lib/os-release, come in Debian: /etc/os-release e' il
+# collegamento di base-files che punta a lui (lo controlla l'hook
+# 9989-ruscalinux-diversions, che registra anche la sostituzione presso dpkg).
+# Lo leggono GDM, gnome-shell, gnome-initial-setup, fastfetch, lsb_release.
+mkdir -p .work/config/includes.chroot_after_packages/usr/lib/
+cat <<EOF > .work/config/includes.chroot_after_packages/usr/lib/os-release
 PRETTY_NAME="RuscaLinux @VERSION@"
 NAME="RuscaLinux"
 VERSION_ID="@VERSION@"
@@ -157,6 +161,11 @@ disable-user-extensions=false
 # predefinito: vale per gli utenti nuovi e per chi non ha mai cambiato i
 # preferiti.
 favorite-apps=['firefox-esr.desktop', 'thunderbird.desktop', 'org.gnome.Terminal.desktop', 'org.gnome.Nautilus.desktop', 'org.gnome.TextEditor.desktop', 'org.gnome.Calculator.desktop']
+# Tour di benvenuto (gnome-tour, il pallone aerostatico): gnome-shell lo
+# lancia al primo accesso di ogni utente se questa chiave e' vuota. Con un
+# valore predefinito non parte mai, ne' nella live ne' sul sistema
+# installato; l'utente puo' sempre aprirlo a mano.
+welcome-dialog-last-shown-version='9999.0'
 
 # PRIVACY E SICUREZZA
 # Valori predefiniti; l'utente puo' cambiarli da Impostazioni.
@@ -181,6 +190,91 @@ mkdir -p .work/config/hooks/normal/
 cat <<EOF > .work/config/hooks/normal/9999-compile-schemas.hook.chroot
 #!/bin/sh
 glib-compile-schemas /usr/share/glib-2.0/schemas/
+EOF
+
+# ---------------------------------------------------------------------------
+# CARTELLA "RuscaLinux-Tools" NELLA GRIGLIA DELLE APPLICAZIONI
+#
+# Tutti i RuscaLinux OS Tools stanno in una cartella. GNOME Shell 48 crea le
+# sue cartelle (Sistema, Utilita') al primo accesso di ogni utente, ma solo
+# se l'elenco delle cartelle e' vuoto (js/ui/appDisplay.js,
+# _ensureDefaultFolders): un elenco predefinito messo con dconf gli
+# impedirebbe di crearle. Per questo, come per nvidia-settings
+# (steps/40-nvidia.sh), uno script avviato all'accesso aggiunge la cartella
+# DOPO che GNOME ha creato le sue, una volta sola per utente: se l'utente la
+# rinomina, la svuota o la elimina, la sua scelta resta.
+#
+# La cartella raccoglie le applicazioni per categoria: ogni tool ha
+# X-RuscaLinux-Tools fra le Categories del suo .desktop (scritto dal suo
+# make-deb.sh), quindi un tool nuovo ci entra da solo, senza toccare questo
+# script. Per sicurezza si elencano anche i .desktop org.ruscalinux.* gia'
+# installati.
+mkdir -p .work/config/includes.chroot_after_packages/usr/lib/ruscalinux \
+         .work/config/includes.chroot_after_packages/etc/xdg/autostart
+cat <<'EOF' > .work/config/includes.chroot_after_packages/usr/lib/ruscalinux/ruscalinux-tools-folder
+#!/bin/sh
+# RuscaLinux — mette i RuscaLinux OS Tools nella cartella "RuscaLinux-Tools"
+# della griglia delle applicazioni di GNOME, una volta per utente. Scritto da
+# steps/30-custom.sh; avviato da
+# /etc/xdg/autostart/ruscalinux-tools-folder.desktop.
+
+ID=RuscaLinux-Tools
+CARTELLE=org.gnome.desktop.app-folders
+CARTELLA="org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/$ID/"
+FATTO="${XDG_CONFIG_HOME:-$HOME/.config}/ruscalinux/ruscalinux-tools-folder.fatto"
+
+[ -e "$FATTO" ] && exit 0
+[ "$(id -u)" -ge 1000 ] || exit 0                         # utenti di sistema (GDM, g-i-s)
+command -v gsettings > /dev/null || exit 0
+
+# Al primo accesso GNOME Shell crea le sue cartelle mentre parte: si aspetta
+# che l'elenco esista (al massimo un minuto).
+i=0
+while [ "$(gsettings get "$CARTELLE" folder-children)" = "@as []" ]; do
+    i=$((i + 1))
+    [ "$i" -gt 60 ] && exit 0                      # si riprova al prossimo accesso
+    sleep 1
+done
+
+# I tool gia' installati, oltre alla categoria.
+APPS=""
+for f in /usr/share/applications/org.ruscalinux.*.desktop; do
+    [ -e "$f" ] || continue
+    APPS="${APPS:+$APPS, }'$(basename "$f")'"
+done
+
+gsettings set "$CARTELLA" name "$ID"
+gsettings set "$CARTELLA" translate false
+gsettings set "$CARTELLA" categories "['X-RuscaLinux-Tools']"
+gsettings set "$CARTELLA" apps "[$APPS]"
+
+FIGLI=$(gsettings get "$CARTELLE" folder-children)
+case "$FIGLI" in
+    *"'$ID'"*) ;;                                  # c'e' gia'
+    *) gsettings set "$CARTELLE" folder-children "${FIGLI%]}, '$ID']" ;;
+esac
+
+# Qualche secondo dopo, quando GNOME ha applicato tutto, si azzerano le
+# posizioni salvate: GNOME ridispone le icone in ordine alfabetico, senza
+# buchi dove stavano i tool. Succede solo qui, al primo accesso dell'utente:
+# non c'e' ancora una disposizione personale da perdere.
+sleep 5
+gsettings reset org.gnome.shell app-picker-layout
+
+mkdir -p "$(dirname "$FATTO")"
+touch "$FATTO"
+EOF
+chmod +x .work/config/includes.chroot_after_packages/usr/lib/ruscalinux/ruscalinux-tools-folder
+
+cat <<'EOF' > .work/config/includes.chroot_after_packages/etc/xdg/autostart/ruscalinux-tools-folder.desktop
+[Desktop Entry]
+Type=Application
+Name=RuscaLinux-Tools folder
+Comment=Puts the RuscaLinux OS Tools in their folder of the app grid, once per user
+Exec=/usr/lib/ruscalinux/ruscalinux-tools-folder
+OnlyShowIn=GNOME;
+NoDisplay=true
+X-GNOME-Autostart-enabled=true
 EOF
 
 # ---------------------------------------------------------------------------
@@ -506,10 +600,9 @@ Hidden=true
 HIDDEN
 done
 
-# NB: il TOUR di benvenuto è disattivato OVUNQUE (live e installato) dal
-# hook build-time 9994-disable-welcome-tour, che imposta il default di
-# sistema dconf org.gnome.shell welcome-dialog-last-shown-version. Qui nel
-# componente live non serve fare nulla per il tour.
+# NB: il TOUR di benvenuto è disattivato OVUNQUE (live e installato) dalla
+# chiave org.gnome.shell welcome-dialog-last-shown-version in
+# 99_ruscalinux-backgrounds-it.gschema.override. Qui non serve altro.
 
 
 # Avvio del launcher: NON via autostart .desktop. Su GNOME/Wayland di
@@ -619,58 +712,148 @@ EOF
 chmod +x .work/config/includes.chroot_after_packages/usr/lib/live/config/2000-ruscalinux-gis
 
 # ---------------------------------------------------------------------------
+# I FILE DI DEBIAN SOSTITUITI DA RUSCALINUX, REGISTRATI PRESSO DPKG
+# ---------------------------------------------------------------------------
+# Alcuni file che gli includes mettono nel sistema (os-release, l'emblema del
+# distributore...) prendono il posto di file di pacchetti Debian. dpkg non lo
+# sa: reinstallando o aggiornando il pacchetto rimetterebbe il file Debian, e
+# dpkg --verify li segnala come modificati. Questo hook li registra con
+# dpkg-divert --no-rename: il file resta quello di RuscaLinux e, se il
+# pacchetto arrivasse di nuovo, il suo file andrebbe in
+# /usr/lib/ruscalinux/debian-originali/ invece di sovrascriverlo.
+#
+# L'elenco dei file degli includes lo scrive build.sh dopo tutti i passi
+# (anche 40-nvidia.sh aggiunge includes) in
+# /usr/share/ruscalinux/includes.list. Si registrano solo i file che
+# appartengono davvero a un pacchetto. Restano fuori i conffile (/etc/issue,
+# /etc/issue.net...): dpkg protegge gia' le loro modifiche, e una diversione
+# su un conffile confonderebbe i suoi controlli.
+#
+# Gira prima di 9991 e 9993, che sostituiscono i loghi con dpkg-divert per
+# conto proprio.
+# ---------------------------------------------------------------------------
+cat <<'EOF' > .work/config/hooks/normal/9989-ruscalinux-diversions.hook.chroot
+#!/bin/sh
+set -e
+ELENCO=/usr/share/ruscalinux/includes.list
+ORIGINALI=/usr/lib/ruscalinux/debian-originali
+
+if [ ! -f "$ELENCO" ]; then
+    echo "ATTENZIONE: manca $ELENCO, nessuna diversione registrata" >&2
+    exit 0
+fi
+
+# /etc/os-release resta il collegamento di base-files verso
+# ../usr/lib/os-release, che e' il file di RuscaLinux.
+if [ ! -L /etc/os-release ]; then
+    ln -sf ../usr/lib/os-release /etc/os-release
+    echo "/etc/os-release: di nuovo collegamento a /usr/lib/os-release"
+fi
+
+while read -r F; do
+    [ -f "$F" ] && [ ! -L "$F" ] || continue
+    [ -z "$(dpkg-divert --listpackage "$F")" ] || continue    # gia' registrato
+    PKG=$(dpkg-query -S "$F" 2> /dev/null | sed -n '1s/: .*//p') || true
+    [ -n "$PKG" ] || continue                                    # e' solo nostro
+    case "$PKG" in *,*) PKG=${PKG%%,*} ;; esac
+    if dpkg-query -W -f '${Conffiles}\n' "$PKG" 2> /dev/null | awk '{ print $1 }' | grep -qxF "$F"; then
+        echo "conffile di $PKG, lasciato a dpkg: $F"
+        continue
+    fi
+    mkdir -p "$(dirname "$ORIGINALI$F")"
+    dpkg-divert --local --no-rename --divert "$ORIGINALI$F" --add "$F" > /dev/null
+    echo "file di $PKG sostituito da RuscaLinux: $F"
+done < "$ELENCO"
+exit 0
+EOF
+chmod +x .work/config/hooks/normal/9989-ruscalinux-diversions.hook.chroot
+
+# ---------------------------------------------------------------------------
 # RIMOZIONE AVATAR DEBIAN DA /etc/skel (v@VERSION@)
 # ---------------------------------------------------------------------------
 # Requisito 3: niente icone Debian nella home. In trixie il pacchetto
 # desktop-base installa /etc/skel/.face e /etc/skel/.face.icon (lo swirl
 # Debian): vengono copiati nella home di OGNI utente creato (utente live,
-# utente oem del d-i, utente creato da g-i-s al primo avvio). Rimuovendoli
-# dallo skel a build-time spariscono ovunque.
+# utente oem del d-i, utente creato da g-i-s al primo avvio). Togliendoli
+# dallo skel a build-time spariscono ovunque. Si tolgono con dpkg-divert
+# --rename (vanno in /usr/lib/ruscalinux/debian-originali/), cosi' una
+# reinstallazione di desktop-base non li rimette nello skel.
 # ---------------------------------------------------------------------------
 cat <<'EOF' > .work/config/hooks/normal/9992-remove-skel-face.hook.chroot
 #!/bin/sh
 set -e
-rm -f /etc/skel/.face /etc/skel/.face.icon
+for F in /etc/skel/.face /etc/skel/.face.icon; do
+    [ -e "$F" ] || [ -L "$F" ] || continue
+    if [ -z "$(dpkg-divert --listpackage "$F")" ] && dpkg-query -S "$F" > /dev/null 2>&1; then
+        mkdir -p "/usr/lib/ruscalinux/debian-originali/etc/skel"
+        dpkg-divert --local --rename --divert "/usr/lib/ruscalinux/debian-originali$F" --add "$F" > /dev/null
+        echo "avatar Debian tolto dallo skel: $F"
+    else
+        rm -f "$F"
+    fi
+done
 EOF
 chmod +x .work/config/hooks/normal/9992-remove-skel-face.hook.chroot
 
 # ---------------------------------------------------------------------------
 # APPLICAZIONI NASCOSTE NEL MENU DI GNOME (v@VERSION@)
 # ---------------------------------------------------------------------------
-# Totem (Video) e Eye of GNOME (eog) restano installati ma non compaiono
-# nella griglia delle applicazioni ne' nella ricerca. La Guida di riferimento
-# Debian, se la rimozione in 9993-remove-debian-artwork non e' riuscita,
-# resta installata e viene nascosta anche lei. eog resta il visualizzatore predefinito delle immagini (vedi
-# APPLICAZIONI PREDEFINITE): si apre facendo doppio clic su un'immagine.
+# Restano installate ma non compaiono nella griglia delle applicazioni ne'
+# nella ricerca:
+#  • per pacchetto: Totem (Video) ed Eye of GNOME (eog), che resta il
+#    visualizzatore predefinito delle immagini (vedi APPLICAZIONI
+#    PREDEFINITE) e si apre con un doppio clic; la Guida di riferimento
+#    Debian, se la rimozione in 9993-remove-debian-artwork non e' riuscita.
+#    I file si trovano con dpkg -L, non per nome: cosi' funziona anche se
+#    Debian li rinomina, e comprende tutte le lingue della guida.
+#  • per file: la GUI "display" di ImageMagick (una finestra Motif degli anni
+#    Novanta; i nomi variano: display-im6.q16, display-im7...), TeXdoctk se
+#    c'e' texlive, Snapshot, Estensioni, mpv, "Mozc Setup" (chi scrive in
+#    giapponese lo apre dalle preferenze della sorgente di input; il
+#    pacchetto ha gia' ibus-setup-mozc-jp.desktop, nascosto, per quell'uso)
+#    e "Aiuto" (yelp): Yelp resta installato, F1 e le voci "Aiuto" dei
+#    programmi continuano ad aprire i manuali.
 #
 # Non si modificano i file .desktop in /usr/share/applications: il prossimo
 # aggiornamento del pacchetto li riscriverebbe. Se ne mette invece una copia
 # con NoDisplay=true in /usr/local/share/applications, che nella precedenza
 # XDG viene prima di /usr/share e sopravvive agli aggiornamenti. La copia
-# conserva Exec e MimeType: "Apri con" continua a funzionare e eog resta
-# utilizzabile come visualizzatore predefinito (NoDisplay nasconde l'icona,
-# non l'associazione ai tipi di file).
-#
-# I file si trovano con dpkg -L, non per nome: cosi' funziona anche se
-# Debian li rinomina, e comprende tutte le lingue della guida
-# (debian-reference-it, -en, ...).
+# conserva Exec e MimeType: "Apri con" continua a funzionare (NoDisplay
+# nasconde l'icona, non l'associazione ai tipi di file).
 # ---------------------------------------------------------------------------
 cat <<'EOF' > .work/config/hooks/normal/9994-hide-apps.hook.chroot
 #!/bin/sh
 set -e
 DEST=/usr/local/share/applications
 mkdir -p "$DEST"
+
+nascondi() {                      # nascondi FILE.desktop [PACCHETTO]
+    [ -f "$1" ] || return 0
+    # Copia con NoDisplay=true subito dopo la prima intestazione
+    # [Desktop Entry] (non dentro una [Desktop Action ...] in fondo al file),
+    # senza un eventuale NoDisplay gia' presente.
+    grep -v '^NoDisplay=' "$1" | sed '0,/^\[Desktop Entry\]/s//[Desktop Entry]\nNoDisplay=true/' \
+        > "$DEST/$(basename "$1")"
+    echo "nascosto nel menu: $(basename "$1")${2:+ ($2)}"
+}
+
 for PKG in totem eog $(dpkg-query -W -f '${Package}\n' 'debian-reference*' 2>/dev/null); do
     dpkg -L "$PKG" 2>/dev/null | grep '^/usr/share/applications/.*\.desktop$' |
     while read -r F; do
-        [ -f "$F" ] || continue
-        # Copia con NoDisplay=true subito dopo l'intestazione [Desktop Entry]
-        # (e senza un eventuale NoDisplay gia' presente).
-        grep -v '^NoDisplay=' "$F" | sed '0,/^\[Desktop Entry\]/s//[Desktop Entry]\nNoDisplay=true/' \
-            > "$DEST/$(basename "$F")"
-        echo "nascosto nel menu: $(basename "$F") ($PKG)"
+        nascondi "$F" "$PKG"
     done
 done
+
+for F in /usr/share/applications/display-im*.desktop \
+         /usr/share/applications/texdoctk.desktop \
+         /usr/share/applications/org.gnome.Snapshot.desktop \
+         /usr/share/applications/org.gnome.Extensions.desktop \
+         /usr/share/applications/yelp.desktop \
+         /usr/share/applications/mpv.desktop \
+         /usr/share/applications/setup-mozc.desktop; do
+    nascondi "$F"
+done
+
 command -v update-desktop-database >/dev/null && update-desktop-database -q "$DEST" || true
 exit 0
 EOF
@@ -703,6 +886,9 @@ chmod +x .work/config/hooks/normal/9994-hide-apps.hook.chroot
 #     distributor-logo) e in Plymouth (debian-logo.png) si sostituisce con
 #     il logo RuscaLinux. Si sostituisce e non si cancella: lo script di
 #     Plymouth per l'initramfs e le alternative delle icone cercano quei file.
+#     La sostituzione passa da dpkg-divert (funzione sostituisci, come in
+#     9991): i nomi restano quelli di Debian, ma dpkg sa che il contenuto e'
+#     di RuscaLinux, e una reinstallazione dei pacchetti non lo rimette.
 #
 # I temi Plymouth di Debian si tolgono solo se quello attivo e' "ruscalinux"
 # (lo imposta 9990-set-plymouth-theme): se non lo fosse, si lasciano e la
@@ -716,6 +902,23 @@ set -e
 
 LOGO_SVG=/usr/share/icons/hicolor/scalable/apps/ruscalinux-logo.svg
 LOGO_PNG=/usr/share/icons/hicolor/256x256/apps/ruscalinux-logo.png
+
+# Mette un file RuscaLinux al posto di uno di un pacchetto Debian con
+# dpkg-divert: l'originale va in /usr/lib/ruscalinux/debian-originali/
+# (fuori dalle cartelle delle icone e dei temi, dove nessuno lo cerca) e
+# dpkg sa che il file e' stato sostituito, quindi un'eventuale
+# reinstallazione del pacchetto non rimette il logo Debian. Un file che non
+# appartiene a nessun pacchetto si sovrascrive e basta.
+#   sostituisci FILE_NUOVO DESTINAZIONE      (FILE_NUOVO resta dov'e')
+sostituisci() {
+    NUOVO=$1 F=$2
+    if [ -z "$(dpkg-divert --listpackage "$F")" ] && dpkg-query -S "$F" > /dev/null 2>&1; then
+        ORIGINALE="/usr/lib/ruscalinux/debian-originali$F"
+        mkdir -p "$(dirname "$ORIGINALE")"
+        dpkg-divert --local --rename --divert "$ORIGINALE" --add "$F" > /dev/null
+    fi
+    cp "$NUOVO" "$F"
+}
 
 # --- 1. Pacchetti -----------------------------------------------------------
 # L'ordine conta: prima chi dipende, poi le sue librerie.
@@ -822,17 +1025,18 @@ if [ -f "$LOGO_SVG" ] && [ -f "$LOGO_PNG" ]; then
                 -o -name 'debian-logo*' -o -name 'distributor-logo*' \) | while read -r F; do
             case "$F" in
                 *.svg)
-                    cp "$LOGO_SVG" "$F" ;;
+                    sostituisci "$LOGO_SVG" "$F" ;;
                 *.png)
                     # Nelle icone la misura sta nel percorso (.../64x64/...).
                     LATO=$(echo "$F" | sed -n 's|.*/\([0-9][0-9]*\)x[0-9][0-9]*/.*|\1|p')
+                    RIDOTTO=$(mktemp --suffix=.png)
                     if [ -n "$LATO" ] && command -v convert > /dev/null 2>&1 \
-                       && convert "$LOGO_PNG" -resize "${LATO}x${LATO}" "$F.nuovo" 2>/dev/null; then
-                        mv "$F.nuovo" "$F"
+                       && convert "$LOGO_PNG" -resize "${LATO}x${LATO}" "$RIDOTTO" 2>/dev/null; then
+                        sostituisci "$RIDOTTO" "$F"
                     else
-                        rm -f "$F.nuovo"
-                        cp "$LOGO_PNG" "$F"
-                    fi ;;
+                        sostituisci "$LOGO_PNG" "$F"
+                    fi
+                    rm -f "$RIDOTTO" ;;
                 *) continue ;;
             esac
             chmod 644 "$F"
@@ -847,65 +1051,7 @@ exit 0
 EOF
 chmod +x .work/config/hooks/normal/9993-remove-debian-artwork.hook.chroot
 
-# ---------------------------------------------------------------------------
-# DISATTIVAZIONE TOUR DI BENVENUTO — OVUNQUE (v@VERSION@)
-# ---------------------------------------------------------------------------
-# Il "tour" (gnome-tour, il pallone aerostatico "Welcome to RuscaLinux")
-# NON è un autostart .desktop: è gnome-shell a lanciarlo al primo login di
-# ogni utente quando la chiave GSettings
-#   org.gnome.shell welcome-dialog-last-shown-version
-# è vuota. Per disattivarlo in modo definitivo e per TUTTI gli utenti
-# (sessione live E sistema installato) impostiamo quella chiave come
-# default di sistema tramite dconf: gnome-shell la trova già valorizzata e
-# non mostra mai il tour. Metodo pulito, non distruttivo (l'utente può
-# comunque riavviare il tour manualmente se vuole).
-# ---------------------------------------------------------------------------
-cat <<'EOF' > .work/config/hooks/normal/9994-disable-welcome-tour.hook.chroot
-#!/bin/sh
-set -e
 
-# Profilo dconf di sistema: assicura che i default "local" siano letti.
-mkdir -p /etc/dconf/profile /etc/dconf/db/local.d
-if [ ! -e /etc/dconf/profile/user ]; then
-    printf 'user-db:user\nsystem-db:local\n' > /etc/dconf/profile/user
-elif ! grep -q '^system-db:local' /etc/dconf/profile/user; then
-    printf 'system-db:local\n' >> /etc/dconf/profile/user
-fi
-
-# Default di sistema: tour già "visto".
-cat > /etc/dconf/db/local.d/00-ruscalinux-no-tour <<'DCONF'
-[org/gnome/shell]
-welcome-dialog-last-shown-version='9999.0'
-DCONF
-
-# Compila il db dconf. Se dconf non fosse disponibile in questa fase del
-# chroot, non è un problema: glib/dconf lo rigenerano, e comunque il
-# keyfile resta in /etc/dconf/db/local.d per la compilazione successiva.
-dconf update 2>/dev/null || true
-exit 0
-EOF
-chmod +x .work/config/hooks/normal/9994-disable-welcome-tour.hook.chroot
-
-
-# ---------------------------------------------------------------------------
-# FIX A — /usr/lib/os-release (target reale del symlink Debian)
-# Senza questo, GDM/gnome-shell che leggono /usr/lib/os-release
-# vedono ancora "Debian GNU/Linux 13 (trixie)"
-# ---------------------------------------------------------------------------
-mkdir -p .work/config/includes.chroot_after_packages/usr/lib/
-cat <<EOF > .work/config/includes.chroot_after_packages/usr/lib/os-release
-PRETTY_NAME="RuscaLinux @VERSION@"
-NAME="RuscaLinux"
-VERSION_ID="@VERSION@"
-VERSION="@VERSION@"
-VERSION_CODENAME=trixie
-ID=ruscalinux
-ID_LIKE=debian
-LOGO="ruscalinux-logo"
-HOME_URL="https://www.ruscalinux.org/"
-SUPPORT_URL="https://www.ruscalinux.org/support"
-BUG_REPORT_URL="https://bugs.ruscalinux.org/"
-EOF
 
 # ---------------------------------------------------------------------------
 # FIX B — dconf dedicato per GDM (sovrascrive desktop-base)
@@ -936,8 +1082,10 @@ set -e
 chmod 644 /usr/share/icons/hicolor/scalable/apps/ruscalinux-logo.svg || true
 chmod 644 /usr/share/icons/hicolor/256x256/apps/ruscalinux-logo.png || true
 
-# Rigenera la cache delle icone hicolor
-gtk-update-icon-cache -f /usr/share/icons/hicolor/ 2>/dev/null || true
+# Rigenera le cache delle icone dopo tutte le sostituzioni (9991, 9993):
+# hicolor (logo RuscaLinux) e vendor (emblema del distributore).
+gtk-update-icon-cache -f -t /usr/share/icons/hicolor 2>/dev/null || true
+gtk-update-icon-cache -f -t /usr/share/icons/vendor 2>/dev/null || true
 
 # Compila il database dconf per GDM (fix logo schermata di login)
 dconf update 2>/dev/null || true
@@ -955,6 +1103,10 @@ cat > .work/config/includes.chroot_after_packages/etc/default/grub.d/99-ruscalin
 GRUB_THEME=/boot/grub/themes/ruscalinux/theme.txt
 GRUB_BACKGROUND=/boot/grub/themes/ruscalinux/console.png
 GRUB_GFXMODE=1920x1080,1280x720,auto
+# CRITICO: senza "splash" nel cmdline del kernel, Plymouth non mostra mai il
+# tema grafico anche se l'initramfs lo contiene. Vale per il sistema
+# installato (la live ha la sua riga di avvio in 10-config.sh).
+GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"
 GRUBCFG
 
 # ---------------------------------------------------------------------------
@@ -1069,10 +1221,8 @@ cat > .work/config/includes.chroot_after_packages/etc/locale.conf <<EOF
 LANG=en_US.UTF-8
 EOF
 
-# 2) /etc/default/locale — read by Debian and pam_env
-cat > .work/config/includes.chroot_after_packages/etc/default/locale <<EOF
-LANG=en_US.UTF-8
-EOF
+# 2) /etc/default/locale — read by Debian and pam_env: lo scrive l'hook
+#    0010-locale-multi (con update-locale), che gira dopo gli includes.
 
 # 3) /etc/environment — NON impostare LANG qui: pam_env lo propagherebbe a
 #    TUTTE le sessioni PAM sovrascrivendo la lingua scelta dall'utente in
@@ -1099,31 +1249,9 @@ XSession=gnome
 SystemAccount=true
 EOF
 
-# 6) Hook that ensures en_US.UTF-8 is generated and localectl is consistent
-cat > .work/config/hooks/normal/0011-force-english-locale.hook.chroot <<'EOF'
-#!/bin/sh
-set -e
-
-# Fallback: ensure en_US.UTF-8 is present (hook 0010 should have done this
-# already). Rigenera i locali SOLO se davvero mancava, per non ripetere
-# l'intera generazione dei 49 locali una seconda volta.
-if [ -f /etc/locale.gen ] && ! grep -q '^en_US.UTF-8' /etc/locale.gen; then
-    echo 'en_US.UTF-8 UTF-8' >> /etc/locale.gen
-    locale-gen
-fi
-
-# System default is English; users can choose their language in GNOME Settings
-update-locale LANG=en_US.UTF-8 || true
-
-# localectl parla con systemd-localed via D-Bus: nel chroot di build systemd
-# non è PID 1 e stampava in rosso "System has not been booted with systemd…".
-# Va eseguito solo se systemd è effettivamente attivo (/run/systemd/system);
-# nel chroot bastano update-locale e /etc/locale.conf.
-if [ -d /run/systemd/system ] && command -v localectl >/dev/null 2>&1; then
-    localectl set-locale LANG=en_US.UTF-8 || true
-fi
-EOF
-chmod +x .work/config/hooks/normal/0011-force-english-locale.hook.chroot
+# 6) (rimosso) l'hook 0011-force-english-locale ripeteva cio' che fa gia'
+#    0010-locale-multi: en_US.UTF-8 e' sempre nell'elenco dei locali, e
+#    update-locale e' gia' stato lanciato; localectl nel chroot non gira mai.
 
 # 7) (rimosso) l'override org.gnome.system.locale region='en_US.UTF-8' è stato
 # eliminato: in gnome-control-center la sezione "Regione e lingua" legge questo
@@ -1273,16 +1401,33 @@ cat <<'EOF' > .work/config/hooks/normal/9991-replace-debian-logos.hook.chroot
 #!/bin/sh
 set -e
 
-gtk-update-icon-cache -f -t /usr/share/icons/hicolor || true
-gtk-update-icon-cache -f -t /usr/share/icons/vendor || true
+# Mette un file RuscaLinux al posto di uno di un pacchetto Debian con
+# dpkg-divert: l'originale va in /usr/lib/ruscalinux/debian-originali/
+# (fuori dalle cartelle delle icone e dei temi, dove nessuno lo cerca) e
+# dpkg sa che il file e' stato sostituito, quindi un'eventuale
+# reinstallazione del pacchetto non rimette il logo Debian. Un file che non
+# appartiene a nessun pacchetto si sovrascrive e basta.
+#   sostituisci FILE_NUOVO DESTINAZIONE      (FILE_NUOVO resta dov'e')
+sostituisci() {
+    NUOVO=$1 F=$2
+    if [ -z "$(dpkg-divert --listpackage "$F")" ] && dpkg-query -S "$F" > /dev/null 2>&1; then
+        ORIGINALE="/usr/lib/ruscalinux/debian-originali$F"
+        mkdir -p "$(dirname "$ORIGINALE")"
+        dpkg-divert --local --rename --divert "$ORIGINALE" --add "$F" > /dev/null
+    fi
+    cp "$NUOVO" "$F"
+}
+
+# Le cache delle icone si rigenerano una volta sola, alla fine, in
+# 9999-zz-branding-finalize.
 
 # 1. Sostituisce brutalmente tutti i loghi, intercettando ogni SVG/PNG nelle cartelle login di Debian
 if [ -d /usr/share/desktop-base ]; then
     find -L /usr/share/desktop-base -type f \( -name "*logo*.svg" -o -name "*logo*.png" -o -path "*/login/*.svg" -o -path "*/login/*.png" \) | while read -r f; do
         if echo "$f" | grep -q "\.svg$"; then
-            cp /usr/share/icons/hicolor/scalable/apps/ruscalinux-logo.svg "$f" 2>/dev/null || true
+            sostituisci /usr/share/icons/hicolor/scalable/apps/ruscalinux-logo.svg "$f" 2>/dev/null || true
         elif echo "$f" | grep -q "\.png$"; then
-            cp /usr/share/plymouth/themes/ruscalinux/logo.png "$f" 2>/dev/null || true
+            sostituisci /usr/share/plymouth/themes/ruscalinux/logo.png "$f" 2>/dev/null || true
         fi
     done
 fi
@@ -1291,9 +1436,9 @@ fi
 if [ -d /usr/share/icons ]; then
     find -L /usr/share/icons -type f \( -name "start-here*.svg" -o -name "start-here*.png" -o -name "gnome-logo*.svg" -o -name "gnome-logo*.png" \) | while read -r f; do
         if echo "$f" | grep -q "\.svg$"; then
-            cp /usr/share/icons/hicolor/scalable/apps/ruscalinux-logo.svg "$f" 2>/dev/null || true
+            sostituisci /usr/share/icons/hicolor/scalable/apps/ruscalinux-logo.svg "$f" 2>/dev/null || true
         elif echo "$f" | grep -q "\.png$"; then
-            cp /usr/share/plymouth/themes/ruscalinux/logo.png "$f" 2>/dev/null || true
+            sostituisci /usr/share/plymouth/themes/ruscalinux/logo.png "$f" 2>/dev/null || true
         fi
     done
 fi
@@ -1377,53 +1522,84 @@ for d in bin sbin lib lib32 lib64 libx32; do
 done
 
 # ===========================================================================
-# FIX — HOSTNAME PREDEFINITO DAL MODELLO DELLA MACCHINA (DMI / SMBIOS)
+# FIX — HOSTNAME DAL MODELLO DELLA MACCHINA (DMI / SMBIOS)
 # ===========================================================================
-# Il debian-installer usa "debian" come hostname predefinito perché la rete
-# è disabilitata. Leggiamo il modello dal firmware e lo proponiamo come
-# default. L'utente può comunque modificarlo nella schermata dell'installer.
+# Il debian-installer usa "debian" come hostname predefinito perche' la rete
+# e' disabilitata. Lo script legge il modello dal firmware (per esempio
+# "Latitude 5420" -> latitude-5420, "ThinkPad X1 Carbon Gen 9" ->
+# thinkpad-x1-carbon-gen-9) e lo da' a netcfg; se il firmware non dice
+# niente di utile, il nome e' "ruscalinux". La domanda non compare: come il
+# resto dell'installazione, il nome si sceglie da solo, e si cambia dopo in
+# Impostazioni -> Sistema -> Informazioni.
+#
+# Perche' nelle prime versioni non funzionava: ruscalinux-postinstall.sh
+# scriveva comunque "ruscalinux" in /etc/hostname a fine installazione,
+# cancellando il nome scelto qui. Ora lo fa solo se netcfg ha lasciato un
+# nome di ripiego (debian, localhost...).
+#
+# Gira nell'installer (busybox): niente classi di caratteri in tr, solo
+# intervalli. DMI=cartella permette di provarlo su file finti.
 # ---------------------------------------------------------------------------
 cat > .work/config/includes.binary/set-hostname.sh <<'EOF'
 #!/bin/sh
 # Chiamato da preseed/early_command. Legge il modello da DMI/SMBIOS e
-# imposta netcfg/get_hostname + netcfg/hostname tramite debconf-set-selections.
-set -e
+# imposta netcfg/get_hostname e netcfg/hostname con debconf-set-selections.
+DMI=${DMI:-/sys/class/dmi/id}
 
-PRODUCT=""
-for f in /sys/class/dmi/id/product_family \
-         /sys/class/dmi/id/product_name \
-         /sys/class/dmi/id/board_name; do
-    [ -r "$f" ] || continue
-    val=$(head -1 "$f" 2>/dev/null | tr -d '\n')
-    case "$val" in
-        ""|" "|"To Be Filled By O.E.M."|"To be filled by O.E.M."|\
-        "System Product Name"|"System Version"|"Default string"|\
-        "Not Specified"|"Not Applicable"|"None"|"Unknown"|"OEM")
-            continue
-            ;;
+leggi() {
+    [ -r "$DMI/$1" ] || return 0
+    head -n 1 "$DMI/$1" 2> /dev/null | tr -d '\r\n'
+}
+
+# Valori segnaposto dei produttori: non descrivono la macchina.
+inutile() {
+    case "$(printf '%s' "$1" | tr 'A-Z' 'a-z' | tr -s ' ')" in
+        ""|" "|"to be filled by o.e.m."|"to be filled by oem"|"system product name"|\
+        "system version"|"system manufacturer"|"default string"|"not specified"|\
+        "not applicable"|"none"|"unknown"|"oem"|"o.e.m."|"invalid"|"type1productconfigid"|\
+        "type2 - board product name1"|"0123456789"|"123456789"|"x.x"|"1.0"|"none none")
+            return 0 ;;
     esac
-    PRODUCT="$val"
+    return 1
+}
+
+# Lenovo scrive il nome commerciale in product_version (in product_name c'e'
+# il codice del modello, come 20XW00K1IX); gli altri in product_name.
+case "$(leggi sys_vendor | tr 'a-z' 'A-Z')" in
+    LENOVO*) CAMPI="product_version product_family product_name board_name" ;;
+    *)       CAMPI="product_name product_family product_version board_name" ;;
+esac
+
+MODELLO=""
+for campo in $CAMPI; do
+    valore=$(leggi "$campo")
+    inutile "$valore" && continue
+    MODELLO=$valore
     break
 done
 
-HOST=""
-if [ -n "$PRODUCT" ]; then
-    # minuscolo, solo [a-z0-9], niente spazi/trattini, max 30 caratteri
-    HOST=$(printf '%s' "$PRODUCT" \
-        | tr '[:upper:]' '[:lower:]' \
-        | tr -cd 'a-z0-9' \
-        | cut -c1-30)
-    # se inizia con cifra, anteponi "pc"
-    case "$HOST" in
-        [0-9]*) HOST="pc${HOST}" ;;
-    esac
+# Nome valido (RFC 1123): minuscole, cifre e trattini, non all'inizio ne'
+# alla fine; spazi e simboli diventano un trattino. Al massimo 30
+# caratteri, tagliati fra due parole e non a meta' di una.
+HOST=$(printf '%s' "$MODELLO" | tr 'A-Z' 'a-z' | tr -c 'a-z0-9' '-' | tr -s '-' \
+       | sed -e 's/^-*//' -e 's/-*$//')
+if [ "${#HOST}" -gt 30 ]; then
+    HOST=$(printf '%s' "$HOST" | cut -c 1-31 | sed 's/-[^-]*$//' | cut -c 1-30)
 fi
+case "$HOST" in
+    [0-9]*) HOST="pc-$HOST" ;;          # un nome fatto di sole cifre confonde
+esac
+[ -n "$HOST" ] || HOST=ruscalinux
 
-[ -z "$HOST" ] && HOST=ruscalinux
-
-echo "d-i netcfg/get_hostname string $HOST" | debconf-set-selections
-echo "d-i netcfg/hostname     string $HOST" | debconf-set-selections
-echo "d-i netcfg/get_domain   string"        | debconf-set-selections
+echo "RuscaLinux: hostname $HOST (modello: ${MODELLO:-sconosciuto})"
+# Anche per il post-install, nel caso netcfg (con la rete disattivata) non
+# scrivesse /etc/hostname sul disco: il late_command lo copia in /target/tmp.
+printf '%s\n' "$HOST" > /tmp/ruscalinux-hostname
+debconf-set-selections <<SEL
+d-i netcfg/get_hostname string $HOST
+d-i netcfg/hostname string $HOST
+d-i netcfg/get_domain string
+SEL
 EOF
 chmod +x .work/config/includes.binary/set-hostname.sh
 
@@ -1460,6 +1636,8 @@ d-i clock-setup/utc boolean true
 d-i clock-setup/ntp boolean false
 
 # --- Rete: disabilitata ---
+# Hostname: "ruscalinux" e' solo il ripiego. preseed/early_command lancia
+# set-hostname.sh, che lo sostituisce con il nome del modello della macchina.
 d-i netcfg/enable boolean false
 d-i netcfg/dhcp_options select Do not configure the network at this time
 d-i netcfg/get_hostname string ruscalinux
@@ -1568,6 +1746,7 @@ d-i preseed/late_command string \
     cp /cdrom/ruscalinux-postinstall.sh /target/tmp/ruscalinux-postinstall.sh ; \
     chmod +x /target/tmp/ruscalinux-postinstall.sh ; \
     if grep -qw rusca.driver=nvidia /proc/cmdline ; then touch /target/tmp/ruscalinux-driver-nvidia ; fi ; \
+    if [ -f /tmp/ruscalinux-hostname ] ; then cp /tmp/ruscalinux-hostname /target/tmp/ruscalinux-hostname ; fi ; \
     in-target /tmp/ruscalinux-postinstall.sh || true
 
 # --- Fine installazione ---
@@ -1603,15 +1782,29 @@ fi
 update-initramfs -u -k all || true
 
 # ===========================================================================
-# HOSTNAME — override diretto, sovrascrive qualunque cosa abbia impostato
-# il Debian Installer (incluso il fallback "debian" di netcfg).
+# HOSTNAME — quello scelto dall'installer dal modello della macchina (vedi
+# set-hostname.sh). Se in /etc/hostname c'e' un nome di ripiego (debian,
+# localhost...), si usa quello calcolato da set-hostname.sh, che il
+# late_command copia in /tmp; se manca anche quello, "ruscalinux".
+# /etc/hosts deve avere lo stesso nome su 127.0.1.1.
 # ===========================================================================
-echo "ruscalinux" > /etc/hostname
-if grep -q "^127\.0\.1\.1" /etc/hosts; then
-    sed -i "s/^127\.0\.1\.1.*/127.0.1.1\truscalinux/" /etc/hosts
-else
-    echo "127.0.1.1\truscalinux" >> /etc/hosts
+ripiego() {
+    case "$1" in ""|debian|localhost|localhost.localdomain|unassigned-hostname) return 0 ;; esac
+    return 1
+}
+NOME=$(head -n 1 /etc/hostname 2>/dev/null | tr -d ' \t\r')
+if ripiego "$NOME"; then
+    NOME=$(head -n 1 /tmp/ruscalinux-hostname 2>/dev/null | tr -d ' \t\r')
+    ripiego "$NOME" && NOME=ruscalinux
 fi
+rm -f /tmp/ruscalinux-hostname
+echo "$NOME" > /etc/hostname
+if grep -q "^127\.0\.1\.1" /etc/hosts; then
+    sed -i "s/^127\.0\.1\.1.*/127.0.1.1\t$NOME/" /etc/hosts
+else
+    printf '127.0.1.1\t%s\n' "$NOME" >> /etc/hosts
+fi
+echo ">>> Hostname: $NOME"
 
 # ===========================================================================
 # MODALITÀ OEM: FORZA GNOME INITIAL SETUP COMPLETO AL PRIMO AVVIO
@@ -1629,23 +1822,9 @@ if [ -n "$IUSER" ]; then
     rm -f "/var/lib/AccountsService/users/$IUSER" 2>/dev/null || true
 fi
 
-# Force GDM and GNOME Initial Setup to use English
-mkdir -p /var/lib/AccountsService/users/
-
-# GDM user on Debian is "Debian-gdm"
-cat > /var/lib/AccountsService/users/Debian-gdm <<EOF
-[User]
-Language=en_US.UTF-8
-XSession=gnome
-SystemAccount=true
-EOF
-
-# System user used to launch GNOME Initial Setup at first boot
-cat > /var/lib/AccountsService/users/gnome-initial-setup <<EOF
-[User]
-XSession=gnome
-SystemAccount=true
-EOF
+# GDM e GNOME Initial Setup in inglese: i loro file AccountsService
+# (Debian-gdm, gnome-initial-setup) sono gia' nel sistema copiato dalla live
+# (steps/30-custom.sh, FIX 3-BIS).
 
 # Preserva la lingua scelta dall'utente nel Debian Installer.
 # Il Debian Installer ha già scritto LANG in /etc/default/locale;
@@ -1737,16 +1916,8 @@ AUTOUNIT
 
 systemctl enable ruscalinux-autologin.service 2>/dev/null || true
 
-# GRUB background + quiet splash via grub.d
-# CRITICO: senza "splash" nel cmdline del kernel, Plymouth non mostra
-# mai il tema grafico anche se l'initramfs lo contiene correttamente.
-mkdir -p /etc/default/grub.d/
-cat > /etc/default/grub.d/99-ruscalinux.cfg <<'GRUBCFG'
-GRUB_THEME=/boot/grub/themes/ruscalinux/theme.txt
-GRUB_BACKGROUND=/boot/grub/themes/ruscalinux/console.png
-GRUB_GFXMODE=1920x1080,1280x720,auto
-GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"
-GRUBCFG
+# GRUB: tema e "quiet splash" sono in /etc/default/grub.d/99-ruscalinux.cfg,
+# gia' nel sistema copiato dalla live (steps/30-custom.sh, FIX 1).
 update-grub || true
 
 # Disabilita repository e aggiornamenti automatici
@@ -2053,29 +2224,6 @@ Pin-Priority: -1
 EOF
 
 # ---------------------------------------------------------------------------
-# NASCONDI DAL MENU GNOME LE VOCI DI SERVIZIO
-#
-# Alcuni pacchetti installano voci di menu che non hanno senso per l'utente
-# finale: la GUI "display" di ImageMagick (una finestra Motif degli anni
-# Novanta) e TeXdoctk se texlive e' presente. ImageMagick resta installato e
-# pienamente funzionante da riga di comando: nascondiamo solo l'icona.
-# Anche "Mozc Setup" (setup-mozc.desktop): serve solo a chi scrive in
-# giapponese, che lo apre dalle preferenze della sorgente di input
-# (Impostazioni -> Tastiera); il pacchetto ha gia' una seconda voce,
-# ibus-setup-mozc-jp.desktop, nascosta dal menu, per quell'uso.
-# Anche "Aiuto" (yelp.desktop): l'icona non serve nel menu ne' nel pannello.
-# Yelp resta installato: F1 e le voci "Aiuto" dei
-# programmi continuano ad aprire i manuali.
-#
-# Non si tocca il file del pacchetto: si scrive una copia con NoDisplay=true
-# in /usr/local/share/applications, che in XDG_DATA_DIRS ha precedenza su
-# /usr/share. Cosi' dpkg resta coerente e un eventuale aggiornamento del
-# pacchetto non riporta l'icona.
-#
-# I nomi dei file variano tra versioni (display-im6.q16, display-im7...),
-# quindi l'hook enumera quelli realmente presenti invece di indovinarli.
-# ---------------------------------------------------------------------------
-# ---------------------------------------------------------------------------
 # NOMI STABILI PER GLI SFONDI PREDEFINITI
 #
 # I file esportati dal generatore hanno il seed nel nome
@@ -2108,34 +2256,7 @@ for variant in mid dark; do
 done
 EOF
 
-cat <<'EOF' > .work/config/hooks/normal/9993-hide-menu-entries.hook.chroot
-#!/bin/sh
-set -e
-
-mkdir -p /usr/local/share/applications
-
-for f in /usr/share/applications/display-im*.desktop \
-         /usr/share/applications/texdoctk.desktop \
-         /usr/share/applications/org.gnome.Snapshot.desktop \
-         /usr/share/applications/org.gnome.Extensions.desktop \
-         /usr/share/applications/yelp.desktop \
-         /usr/share/applications/mpv.desktop \
-         /usr/share/applications/setup-mozc.desktop; do
-    [ -e "$f" ] || continue
-    base=$(basename "$f")
-    # Rimuove eventuali NoDisplay preesistenti e ne inserisce uno subito
-    # dopo l'intestazione del gruppo, cosi' non finisce dentro una
-    # eventuale sezione [Desktop Action ...] in fondo al file.
-    sed -e '/^NoDisplay=/d' \
-        -e '/^\[Desktop Entry\]/a NoDisplay=true' \
-        "$f" > "/usr/local/share/applications/$base"
-    echo "Nascosto dal menu: $base"
-done
-
-if command -v update-desktop-database >/dev/null 2>&1; then
-    update-desktop-database /usr/local/share/applications || true
-fi
-EOF
+chmod +x .work/config/hooks/normal/9992-wallpaper-aliases.hook.chroot
 
 # ---------------------------------------------------------------------------
 # RIMUOVI GNOME-SOFTWARE (inutile: aggiornamenti e repository sono disabilitati)

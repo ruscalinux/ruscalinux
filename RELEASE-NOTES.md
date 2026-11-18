@@ -43,6 +43,14 @@
   on, and tables and formulas in every export; pictures next to an imported
   Markdown file come into the project with it, and the PDF prints
   Greek, Cyrillic and every other script the chosen font contains.
+- **A folder for the in-house tools.** All RuscaLinux OS Tools are gathered
+  in the **RuscaLinux-Tools** folder of the GNOME app grid. The folder is
+  created at the first login of each user; you can rename, empty or delete
+  it like any other folder.
+- **New applications.** Inkscape (vector graphics), darktable (raw photo
+  development), Blender (3D modelling and animation), MediaInfo (technical
+  details of audio and video files), Asunder (audio CD ripper), Gaupol
+  (subtitle editor) and GPRename (batch file renaming).
 - **26 languages everywhere.** All in-house tools follow the system language
   and are translated into the same 26 languages, now including Traditional
   Chinese and European Portuguese.
@@ -70,6 +78,13 @@
   read with the same voice. Models
   are not included: copy a GGUF model with its mmproj (for example
   Qwen3-TTS) into `~/.local/share/ruscanarrator/models/`.
+- **A talking cat.** RuscaCat is Martin, an animated Heideggerian
+  philosopher cat, grumpy and cynical but kind at heart, that you talk to
+  out loud. He listens through the microphone with the Whisper model of
+  RuscaTranscriber, answers with the language model of RuscaLLama and speaks
+  with the voice model of RuscaNarrator, starting to speak while the answer
+  is still being written. The microphone is open only while he listens, and
+  nothing leaves the computer.
 - **NVIDIA graphics, optional.** The image includes the NVIDIA driver
   @NVIDIA@, with open kernel modules, for GTX 16, RTX 20 and later cards,
   RTX 50 included. RuscaLinux still starts and installs with the free
@@ -84,7 +99,7 @@
   from source with Vulkan for NVIDIA, AMD and Intel graphics. It is built
   without HTTPS support and without its web interface, so it cannot download
   anything: nothing is sent over the internet. It now includes **llama-tts**
-  for speech synthesis, used by RuscaNarrator and from the terminal.
+  for speech synthesis, used by RuscaNarrator, RuscaCat and from the terminal.
 - **SMPlayer** replaces VLC as the video player.
 - **Foliate** reads EPUB and other e-books, with a clean reading view.
 - **Magic wallpaper** redrawn for contrast: a rose-mauve background halfway
