@@ -220,5 +220,6 @@
   "img_te_device": "文字編碼器",
   "img_te_device_sub": "放到另一張顯示卡或處理器上，讓主顯示卡專門執行模型",
   "img_te_same": "同一張顯示卡",
-  "img_te_cpu": "處理器 (CPU)"
+  "img_te_cpu": "處理器 (CPU)",
+  "img_open_models_folder": "開啟圖像模型資料夾"
 }

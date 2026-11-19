@@ -220,5 +220,6 @@
   "img_te_device": "Penyandi teks",
   "img_te_device_sub": "Letakkan di kartu lain atau di prosesor, agar kartu utama tetap bebas untuk model",
   "img_te_same": "Di kartu yang sama",
-  "img_te_cpu": "Di prosesor (CPU)"
+  "img_te_cpu": "Di prosesor (CPU)",
+  "img_open_models_folder": "Buka folder model gambar"
 }

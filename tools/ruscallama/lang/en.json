@@ -220,5 +220,6 @@
   "img_te_device": "Text Encoder",
   "img_te_device_sub": "Put it on another card or on the processor, so the main card stays free for the model",
   "img_te_same": "On the Same Card",
-  "img_te_cpu": "On the Processor (CPU)"
+  "img_te_cpu": "On the Processor (CPU)",
+  "img_open_models_folder": "Open the Image Models Folder"
 }

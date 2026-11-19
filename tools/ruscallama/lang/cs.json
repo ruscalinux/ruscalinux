@@ -220,5 +220,6 @@
   "img_te_device": "Kodér textu",
   "img_te_device_sub": "Přesuňte jej na jinou kartu nebo na procesor, aby hlavní karta zůstala volná pro model",
   "img_te_same": "Na stejné kartě",
-  "img_te_cpu": "Na procesoru (CPU)"
+  "img_te_cpu": "Na procesoru (CPU)",
+  "img_open_models_folder": "Otevřít složku modelů obrázků"
 }

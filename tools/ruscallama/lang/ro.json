@@ -220,5 +220,6 @@
   "img_te_device": "Codificator de text",
   "img_te_device_sub": "Puneți-l pe altă placă sau pe procesor, astfel placa principală rămâne liberă pentru model",
   "img_te_same": "Pe aceeași placă",
-  "img_te_cpu": "Pe procesor (CPU)"
+  "img_te_cpu": "Pe procesor (CPU)",
+  "img_open_models_folder": "Deschideți dosarul modelelor de imagini"
 }

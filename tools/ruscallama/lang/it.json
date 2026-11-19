@@ -220,5 +220,6 @@
   "img_te_device": "Codificatore di testo",
   "img_te_device_sub": "Mettilo su un’altra scheda o sul processore, così la scheda principale resta libera per il modello",
   "img_te_same": "Sulla stessa scheda",
-  "img_te_cpu": "Sul processore (CPU)"
+  "img_te_cpu": "Sul processore (CPU)",
+  "img_open_models_folder": "Apri la cartella dei modelli per immagini"
 }

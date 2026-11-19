@@ -220,5 +220,6 @@
   "img_te_device": "Textencoder",
   "img_te_device_sub": "Legen Sie ihn auf eine andere Karte oder den Prozessor, damit die Hauptkarte für das Modell frei bleibt",
   "img_te_same": "Auf derselben Karte",
-  "img_te_cpu": "Auf dem Prozessor (CPU)"
+  "img_te_cpu": "Auf dem Prozessor (CPU)",
+  "img_open_models_folder": "Ordner der Bildmodelle öffnen"
 }

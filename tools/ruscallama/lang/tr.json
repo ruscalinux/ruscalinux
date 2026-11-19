@@ -220,5 +220,6 @@
   "img_te_device": "Metin kodlayıcı",
   "img_te_device_sub": "Başka bir karta ya da işlemciye koyun; böylece ana kart modele ayrılır",
   "img_te_same": "Aynı kartta",
-  "img_te_cpu": "İşlemcide (CPU)"
+  "img_te_cpu": "İşlemcide (CPU)",
+  "img_open_models_folder": "Görsel modelleri klasörünü aç"
 }

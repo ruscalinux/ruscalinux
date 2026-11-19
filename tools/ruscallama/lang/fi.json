@@ -220,5 +220,6 @@
   "img_te_device": "Tekstikooderi",
   "img_te_device_sub": "Siirrä se toiselle näytönohjaimelle tai suorittimelle, jotta pääkortti jää vapaaksi mallille",
   "img_te_same": "Samalla näytönohjaimella",
-  "img_te_cpu": "Suorittimella (CPU)"
+  "img_te_cpu": "Suorittimella (CPU)",
+  "img_open_models_folder": "Avaa kuvamallien kansio"
 }

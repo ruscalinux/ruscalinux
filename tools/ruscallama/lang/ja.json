@@ -220,5 +220,6 @@
   "img_te_device": "テキストエンコーダー",
   "img_te_device_sub": "別のグラフィックカードか CPU に置くと、メインのカードをモデル専用にできます",
   "img_te_same": "同じカード",
-  "img_te_cpu": "プロセッサー (CPU)"
+  "img_te_cpu": "プロセッサー (CPU)",
+  "img_open_models_folder": "画像モデルのフォルダーを開く"
 }

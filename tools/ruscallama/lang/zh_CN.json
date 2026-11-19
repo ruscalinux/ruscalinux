@@ -220,5 +220,6 @@
   "img_te_device": "文本编码器",
   "img_te_device_sub": "放到另一块显卡或处理器上，让主显卡专门运行模型",
   "img_te_same": "同一块显卡",
-  "img_te_cpu": "处理器 (CPU)"
+  "img_te_cpu": "处理器 (CPU)",
+  "img_open_models_folder": "打开图像模型文件夹"
 }

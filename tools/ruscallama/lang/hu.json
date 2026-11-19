@@ -220,5 +220,6 @@
   "img_te_device": "Szövegkódoló",
   "img_te_device_sub": "Tegye egy másik kártyára vagy a processzorra, így a fő kártya szabad marad a modell számára",
   "img_te_same": "Ugyanazon a kártyán",
-  "img_te_cpu": "A processzoron (CPU)"
+  "img_te_cpu": "A processzoron (CPU)",
+  "img_open_models_folder": "A képmodellek mappájának megnyitása"
 }

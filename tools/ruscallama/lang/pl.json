@@ -220,5 +220,6 @@
   "img_te_device": "Koder tekstu",
   "img_te_device_sub": "Przenieś go na inną kartę lub na procesor, aby główna karta została wolna dla modelu",
   "img_te_same": "Na tej samej karcie",
-  "img_te_cpu": "Na procesorze (CPU)"
+  "img_te_cpu": "Na procesorze (CPU)",
+  "img_open_models_folder": "Otwórz folder modeli obrazów"
 }

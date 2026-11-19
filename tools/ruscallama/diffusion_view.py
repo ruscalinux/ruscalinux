@@ -242,8 +242,14 @@ class ImagesPage(Adw.Bin):
         add.add_suffix(Gtk.Image(icon_name="folder-new-symbolic"))
         add.connect("activated", lambda _r: self.add_folder())
         group.add(add)
-        folder = Adw.ActionRow(title=_("open_models_folder"),
-                               subtitle=_("img_models_folder_hint"), activatable=True)
+        # Il percorso si vede: la cartella dei modelli per immagini non e'
+        # quella dei modelli della chat (~/.local/share/ruscallama/models).
+        home = os.path.expanduser("~")
+        shown = rd.USER_MODEL_DIR.replace(home, "~", 1) if rd.USER_MODEL_DIR.startswith(
+            home + os.sep) else rd.USER_MODEL_DIR
+        folder = Adw.ActionRow(title=_("img_open_models_folder"), subtitle=shown,
+                               tooltip_text=_("img_models_folder_hint"), activatable=True)
+        folder.add_css_class("property")
         folder.add_suffix(Gtk.Image(icon_name="folder-open-symbolic"))
         folder.connect("activated", lambda _r: self.open_models_folder())
         group.add(folder)

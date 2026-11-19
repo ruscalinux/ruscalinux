@@ -220,5 +220,6 @@
   "img_te_device": "Bộ mã hóa văn bản",
   "img_te_device_sub": "Đặt nó trên card khác hoặc trên bộ xử lý, để card chính dành riêng cho mô hình",
   "img_te_same": "Trên cùng card",
-  "img_te_cpu": "Trên bộ xử lý (CPU)"
+  "img_te_cpu": "Trên bộ xử lý (CPU)",
+  "img_open_models_folder": "Mở thư mục mô hình hình ảnh"
 }

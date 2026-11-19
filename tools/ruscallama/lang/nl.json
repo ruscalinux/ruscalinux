@@ -220,5 +220,6 @@
   "img_te_device": "Tekstencoder",
   "img_te_device_sub": "Zet hem op een andere kaart of op de processor, zodat de hoofdkaart vrij blijft voor het model",
   "img_te_same": "Op dezelfde kaart",
-  "img_te_cpu": "Op de processor (CPU)"
+  "img_te_cpu": "Op de processor (CPU)",
+  "img_open_models_folder": "Map met afbeeldingsmodellen openen"
 }

@@ -220,5 +220,6 @@
   "img_te_device": "텍스트 인코더",
   "img_te_device_sub": "다른 그래픽 카드나 프로세서에 두면 주 카드를 모델에만 쓸 수 있습니다",
   "img_te_same": "같은 카드",
-  "img_te_cpu": "프로세서 (CPU)"
+  "img_te_cpu": "프로세서 (CPU)",
+  "img_open_models_folder": "이미지 모델 폴더 열기"
 }

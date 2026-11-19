@@ -220,5 +220,6 @@
   "img_te_device": "Codificador de texto",
   "img_te_device_sub": "Ponlo en otra tarjeta o en el procesador, así la tarjeta principal queda libre para el modelo",
   "img_te_same": "En la misma tarjeta",
-  "img_te_cpu": "En el procesador (CPU)"
+  "img_te_cpu": "En el procesador (CPU)",
+  "img_open_models_folder": "Abrir la carpeta de modelos de imágenes"
 }

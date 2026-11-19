@@ -220,5 +220,6 @@
   "img_te_device": "Textkodare",
   "img_te_device_sub": "Lägg den på ett annat kort eller på processorn, så att huvudkortet är ledigt för modellen",
   "img_te_same": "På samma kort",
-  "img_te_cpu": "På processorn (CPU)"
+  "img_te_cpu": "På processorn (CPU)",
+  "img_open_models_folder": "Öppna mappen för bildmodeller"
 }

@@ -220,5 +220,6 @@
   "img_te_device": "Encodeur de texte",
   "img_te_device_sub": "Placez-le sur une autre carte ou sur le processeur, pour laisser la carte principale libre pour le modèle",
   "img_te_same": "Sur la même carte",
-  "img_te_cpu": "Sur le processeur (CPU)"
+  "img_te_cpu": "Sur le processeur (CPU)",
+  "img_open_models_folder": "Ouvrir le dossier des modèles d’images"
 }

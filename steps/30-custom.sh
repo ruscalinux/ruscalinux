@@ -281,15 +281,16 @@ EOF
 # ---------------------------------------------------------------------------
 # GRIGLIA DELLE APPLICAZIONI SENZA BUCHI
 #
-# GNOME Shell salva la posizione di ogni icona (org.gnome.shell
-# app-picker-layout) e non la ricompatta: quando un aggiornamento della ISO
-# toglie, rinomina o sposta in una cartella delle applicazioni, al loro posto
-# restano dei buchi, e quelle nuove finiscono in fondo, spesso in una pagina
-# in piu' (pagina 2 con quattro posti vuoti, pagina 3 con quattro icone). Lo
-# script, a ogni accesso e dopo gli script delle cartelle, toglie le voci che
-# non esistono piu' o che stanno in una cartella e ricompatta le pagine nello
-# stesso ordine: la disposizione scelta dall'utente resta, senza buchi.
-# Scrive solo se cambia qualcosa.
+# GNOME Shell tiene la posizione di ogni icona e non la ricompatta: quando
+# delle applicazioni spariscono da una pagina (i RuscaLinux OS Tools che al
+# primo accesso entrano nella cartella RuscaLinux-Tools, o applicazioni tolte
+# o rinominate da un aggiornamento) restano dei posti vuoti e la pagina dopo
+# non scala (pagina 2 con quattro posti vuoti, pagina 3 con quattro icone).
+# Azzerare la disposizione salvata non basta: GNOME ha gia' le icone in
+# memoria e non le ridispone. Lo script, a ogni accesso (25 e 90 secondi
+# dopo, quando gli script delle cartelle hanno finito), scrive una
+# disposizione completa e compatta: le voci salvate nel loro ordine, poi le
+# altre in ordine alfabetico, a pagine da 24. Scrive solo se cambia qualcosa.
 # ---------------------------------------------------------------------------
 cat <<'EOF' > .work/config/includes.chroot_after_packages/usr/lib/ruscalinux/ruscalinux-app-grid
 #!/usr/bin/python3 -I
@@ -297,15 +298,25 @@ cat <<'EOF' > .work/config/includes.chroot_after_packages/usr/lib/ruscalinux/rus
 # Scritto da steps/30-custom.sh; avviato a ogni accesso da
 # /etc/xdg/autostart/ruscalinux-app-grid.desktop.
 #
-# GNOME Shell salva la posizione di ogni icona (org.gnome.shell
-# app-picker-layout). Quando un aggiornamento toglie o rinomina
-# un'applicazione, o la sposta in una cartella, al suo posto resta un buco;
-# le applicazioni nuove finiscono in fondo, spesso in una pagina nuova
-# (pagina 2 con quattro posti vuoti, pagina 3 con quattro icone). Qui si
-# tolgono dalla disposizione le voci che non ci sono piu' o che stanno in
-# una cartella e si ricompattano le pagine, nello stesso ordine: le icone
-# scalano in avanti, la disposizione scelta dall'utente resta. Si scrive
-# solo se qualcosa cambia; GNOME Shell rilegge la disposizione da solo.
+# GNOME Shell tiene la posizione di ogni icona (org.gnome.shell
+# app-picker-layout) e non la ricompatta. Quando delle applicazioni spariscono
+# da una pagina (tolte, rinominate o spostate in una cartella, come i
+# RuscaLinux OS Tools che entrano nella cartella RuscaLinux-Tools al primo
+# accesso) restano dei posti vuoti, e la pagina dopo non scala: pagina 2 con
+# quattro posti vuoti, pagina 3 con quattro icone. Succede anche quando la
+# disposizione salvata e' vuota (azzerata al primo accesso): GNOME ha gia'
+# messo le icone in memoria e non le ridispone.
+#
+# Qui si scrive una disposizione completa e compatta: le voci della
+# disposizione salvata, nel loro ordine, senza quelle che non ci sono piu' o
+# che stanno in una cartella; poi le altre in ordine alfabetico, come le
+# metterebbe GNOME. Le pagine sono da 24 icone: tutte le griglie di GNOME
+# Shell 48 (8 × 3, 6 × 4, 4 × 6, 3 × 8, js/ui/appDisplay.js) ne tengono 24.
+# Si scrive solo se cambia qualcosa; GNOME Shell rilegge la disposizione da
+# solo. Lo script gira due volte, dopo gli script delle cartelle del primo
+# accesso.
+import locale
+import os
 import sys
 import time
 
@@ -316,44 +327,65 @@ from gi.repository import Gio, GLib  # noqa: E402
 FOLDERS = "org.gnome.desktop.app-folders"
 FOLDER = "org.gnome.desktop.app-folders.folder"
 SHELL = "org.gnome.shell"
+PER_PAGE = 24
+PASSES = (25, 90)                      # secondi dall'accesso
 
 
-def folder_members(apps):
-    """Applicazioni che stanno in una cartella: elencate nella cartella o
-    con una delle sue categorie, come in js/ui/appDisplay.js di GNOME."""
-    folders = Gio.Settings.new(FOLDERS).get_strv("folder-children")
-    inside = set()
-    for fid in folders:
+def folder_name(settings):
+    """Nome della cartella come lo mostra GNOME (tradotto, se translate)."""
+    name = settings.get_string("name")
+    if settings.get_boolean("translate") and name.endswith(".directory"):
+        for d in [GLib.get_user_data_dir()] + list(GLib.get_system_data_dirs()):
+            kf = GLib.KeyFile()
+            try:
+                kf.load_from_file(os.path.join(d, "desktop-directories", name),
+                                  GLib.KeyFileFlags.NONE)
+                return kf.get_locale_string("Desktop Entry", "Name", None)
+            except GLib.Error:
+                continue
+    return name
+
+
+def grid_items():
+    """{id: nome} delle voci della griglia: le applicazioni visibili che non
+    sono nel dash e non stanno in una cartella, e le cartelle."""
+    favorites = set(Gio.Settings.new(SHELL).get_strv("favorite-apps"))
+    apps = {a.get_id(): a for a in Gio.AppInfo.get_all()
+            if isinstance(a, Gio.DesktopAppInfo) and a.should_show()}
+    items, inside = {}, set()
+    for fid in Gio.Settings.new(FOLDERS).get_strv("folder-children"):
         s = Gio.Settings.new_with_path(FOLDER, f"/org/gnome/desktop/app-folders/folders/{fid}/")
         excluded = set(s.get_strv("excluded-apps"))
         cats = set(s.get_strv("categories"))
-        members = set(s.get_strv("apps"))
-        if cats:
-            for app in apps.values():
-                app_cats = set(filter(None, (app.get_categories() or "").split(";")))
-                if cats & app_cats:
-                    members.add(app.get_id())
-        inside |= members - excluded
-    return folders, inside
+        members = {a for a in s.get_strv("apps") if a in apps}
+        for app in apps.values():
+            if cats & set(filter(None, (app.get_categories() or "").split(";"))):
+                members.add(app.get_id())
+        members -= excluded | favorites
+        if members:                    # GNOME non mostra le cartelle vuote
+            items[fid] = folder_name(s)
+        inside |= members
+    for app_id, app in apps.items():
+        if app_id not in inside and app_id not in favorites:
+            items[app_id] = app.get_name()
+    return items
 
 
-def compact(pages, keep):
-    """Pagine senza le voci che non sono in keep e senza buchi, nello stesso
-    ordine; ogni pagina tiene al massimo tante icone quante ne teneva la
-    pagina piu' piena."""
-    capacity = 0
+def compact(pages, items):
+    """Disposizione completa e senza buchi: prima le voci gia' salvate, nel
+    loro ordine, poi le nuove in ordine alfabetico, a pagine di PER_PAGE."""
     order = []
     for n, page in enumerate(pages):
         for app_id, data in page.items():
             pos = int(data.get("position", 0)) if isinstance(data, dict) else 0
-            capacity = max(capacity, pos + 1)
             order.append((n, pos, app_id))
     order.sort()
-    ids = [app_id for _n, _p, app_id in order if app_id in keep]
-    if capacity <= 0:
-        return []
-    return [{app_id: {"position": i} for i, app_id in enumerate(ids[k:k + capacity])}
-            for k in range(0, len(ids), capacity)]
+    ids = [app_id for _n, _p, app_id in order if app_id in items]
+    seen = set(ids)
+    ids += sorted((i for i in items if i not in seen),
+                  key=lambda i: (locale.strxfrm(items[i].casefold()), i))
+    return [{app_id: {"position": i} for i, app_id in enumerate(ids[k:k + PER_PAGE])}
+            for k in range(0, len(ids), PER_PAGE)]
 
 
 def to_variant(pages):
@@ -362,25 +394,28 @@ def to_variant(pages):
          for app_id, d in page.items()} for page in pages])
 
 
-def main():
-    if not Gio.SettingsSchemaSource.get_default().lookup(SHELL, True):
-        return 0
-    # Si lascia a GNOME e agli altri script dell'accesso (cartelle) il
-    # tempo di sistemare tutto.
-    time.sleep(float(sys.argv[1]) if len(sys.argv) > 1 else 20)
+def fix_once():
     shell = Gio.Settings.new(SHELL)
     pages = shell.get_value("app-picker-layout").unpack()
-    if not pages:
-        return 0                       # nessuna disposizione salvata: niente buchi
-    apps = {a.get_id(): a for a in Gio.AppInfo.get_all()
-            if isinstance(a, Gio.DesktopAppInfo) and a.should_show()}
-    folders, inside = folder_members(apps)
-    keep = (set(apps) - inside) | set(folders)
-    new = compact(pages, keep)
     old = [{k: {"position": int(v.get("position", 0))} for k, v in p.items()} for p in pages]
-    if new != old:
+    new = compact(pages, grid_items())
+    if new and new != old:
         shell.set_value("app-picker-layout", to_variant(new))
         Gio.Settings.sync()
+
+
+def main():
+    try:
+        locale.setlocale(locale.LC_ALL, "")
+    except locale.Error:
+        pass
+    if not Gio.SettingsSchemaSource.get_default().lookup(SHELL, True):
+        return 0
+    passes = [float(a) for a in sys.argv[1:]] or PASSES
+    start = time.monotonic()
+    for at in passes:
+        time.sleep(max(0.0, at - (time.monotonic() - start)))
+        fix_once()
     return 0
 
 

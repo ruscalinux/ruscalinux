@@ -220,5 +220,6 @@
   "img_te_device": "Codificador de texto",
   "img_te_device_sub": "Coloque-o noutra placa ou no processador, para que a placa principal fique livre para o modelo",
   "img_te_same": "Na mesma placa",
-  "img_te_cpu": "No processador (CPU)"
+  "img_te_cpu": "No processador (CPU)",
+  "img_open_models_folder": "Abrir a pasta dos modelos de imagens"
 }
