@@ -192,7 +192,7 @@ Menu principale → Esporta:
 
 | Formato | Note |
 |---|---|
-| PDF | Formati di pagina da libro, margini di rilegatura, testo giustificato, font incorporati. La sillabazione richiede `python3-pyphen` e `hyphen-<lingua>`. |
+| PDF | Formati di pagina da libro, margini di rilegatura, testo giustificato, font incorporati. Ogni a capo inizia un capoverso rientrato; la pagina che apre un capitolo non ha testatina. La sillabazione richiede `python3-pyphen` e `hyphen-<lingua>`. |
 | PDF tipografico (LuaLaTeX) | Il libro composto da LuaLaTeX, per la stampa: vedi sotto. Richiede `texlive-luatex` e `texlive-latex-recommended`, già presenti in RuscaLinux. |
 | EPUB | Con copertina, frontespizio, colophon e indice |
 | AZW3 | Richiede Calibre (`ebook-convert`), avviato in locale |
@@ -208,7 +208,7 @@ Menu principale → Esporta → *Esporta in PDF tipografico (LuaLaTeX)…* compo
 - **crenatura e legature** (fi, fl) del carattere, e tutte le scritture: greco, cirillico, arabo (da destra a sinistra), devanagari, cinese, giapponese e coreano (con i caratteri Noto di RuscaLinux);
 - **struttura da libro**: copertina a pagina piena, frontespizio, colophon sul retro, indice con i numeri di pagina, capitoli che iniziano su pagina dispari, testatine (titolo del libro sulle pagine pari, capitolo sulle dispari), nessuna riga vedova od orfana.
 
-Formato e margini sono quelli dell'impostazione pagina, che si apre prima della scelta del file. Giustificazione e sillabazione partono attive e il PDF tipografico le ricorda a parte, senza cambiare quelle del PDF normale. La sillabazione c'è per le lingue che hanno un dizionario `hyphen-<lingua>`: in RuscaLinux tutte quelle che si dividono in sillabe, tranne finlandese e turco, che in Debian non ce l'hanno. Il carattere è quello del libro (EB Garamond, di solito); i simboli che non ha arrivano da DejaVu Sans e Noto. Ogni a capo del testo inizia un paragrafo con il rientro della prima riga, come nei libri stampati.
+Formato e margini sono quelli dell'impostazione pagina, che si apre prima della scelta del file. Giustificazione e sillabazione partono attive e il PDF tipografico le ricorda a parte, senza cambiare quelle del PDF normale. La sillabazione c'è per le lingue che hanno un dizionario `hyphen-<lingua>`: in RuscaLinux tutte quelle che si dividono in sillabe, tranne finlandese e turco, che in Debian non ce l'hanno. Il carattere è quello del libro (EB Garamond, di solito); i simboli che non ha arrivano da DejaVu Sans e Noto. Come nel PDF normale, ogni a capo del testo inizia un capoverso con il rientro della prima riga, e una riga vuota lascia mezzo rigo di spazio.
 
 La composizione dura da qualche secondo a un minuto, secondo la lunghezza del libro, e avviene in un'altra attività: si può continuare a scrivere. La sillabazione è quella di Pyphen, la stessa del PDF normale. Tutto avviene sul computer, in una cartella temporanea che poi si cancella; il testo del libro non può mai diventare un comando di TeX.
 

@@ -15,6 +15,13 @@ One line per change.
   full-page cover, title page, colophon, table of contents, chapters on
   right-hand pages, running heads and no widows or orphans. Needs
   `texlive-luatex` and `texlive-latex-recommended`
+- **Fixed** — PDF: on a cover without an image a long title ran past the
+  frame and the rules crossed it; the title now shrinks until every word fits
+  inside the frame, and the rules follow the text
+- **Changed** — PDF: each line break starts an indented paragraph, so
+  paragraphs can be told apart without blank lines; space before headings;
+  no running head on a chapter's opening page, which always shows the
+  chapter title; web and e-mail addresses are no longer hyphenated
 
 ## [1.99.2] — RuscaLinux OS Tools
 

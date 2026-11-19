@@ -249,6 +249,7 @@ class _Writer:
     def blocks(self, blocks, nest=0):
         for b in blocks:
             kind = b[0]
+            prev, self.last = getattr(self, "last", None), kind
             if kind == "heading":
                 cmd = {1: "section", 2: "subsection"}.get(b[1], "subsubsection")
                 title = escape(_m.plain_runs(b[2]).strip())
@@ -256,6 +257,12 @@ class _Writer:
                     self.out.append(f"\\{cmd}*{{{title}}}")
                     self.noindent = True
             elif kind == "p":
+                # come nel PDF normale: ogni a capo è un capoverso con il
+                # rientro; la riga vuota fra due blocchi lascia mezzo rigo e
+                # il blocco che segue non rientra
+                if prev == "p":
+                    self.out.append(r"\vspace{.5\baselineskip}")
+                    self.noindent = True
                 for line in b[1]:
                     if _m.plain_runs(line).strip():
                         self.para(runs_tex(line, self.hy))

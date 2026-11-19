@@ -1594,6 +1594,14 @@ def parse_md_line(raw_line, base_size):
     return (_parse_inline_md(raw_line), base_size, 0.0, 0.0, None)
 
 
+# Rientro della prima riga dei capoversi, in multipli del corpo (1,5 em).
+PARA_INDENT_EM = 1.5
+
+# Indirizzi web e di posta: non si sillabano (un trattino in un indirizzo lo
+# renderebbe sbagliato); vanno a capo interi.
+_NO_HYPHEN_RE = re.compile(r"://|^\(?www\.|@|\.(?:org|com|it|net|eu|io)\b")
+
+
 def fit_cover_title(parole, max_w, misura, start=13.5, floor=2.0,
                     max_lines=4, step=0.94):
     """Sceglie il corpo del titolo di copertina e la sua andata a capo.
@@ -1655,7 +1663,11 @@ def fit_cover_title(parole, max_w, misura, start=13.5, floor=2.0,
     return (corpo, righe)
 
 
-def _cover_graphics_ops(page_w, page_h):
+COVER_FRAME_INSET = 40.0     # cornice della copertina, dal bordo (pt)
+COVER_TEXT_PAD = 18.0        # testo della copertina, dalla cornice (pt)
+
+
+def _cover_graphics_ops(page_w, page_h, y_top=None, y_bot=None):
     """Operatori grafici vettoriali per una copertina sobria e seria.
     Disegna soltanto:
       - una cornice esterna a filetto singolo, sottile, color prugna scuro;
@@ -1679,15 +1691,17 @@ def _cover_graphics_ops(page_w, page_h):
         P.append(f"{x1:.2f} {y1:.2f} m {x2:.2f} {y2:.2f} l S".encode("latin-1"))
 
     # --- cornice esterna sottile ----------------------------------------
-    m_out = 40.0
+    m_out = COVER_FRAME_INSET
     rect_stroke(m_out, m_out, page_w - 2 * m_out, page_h - 2 * m_out,
                 0.8, plum_d)
 
     # --- due brevi filetti centrati attorno al titolo -------------------
     cx = page_w / 2.0
     half = page_w * 0.16        # mezza lunghezza del filetto (corto, centrato)
-    y_top = page_h * 0.560      # appena sopra il blocco del titolo
-    y_bot = page_h * 0.400      # appena sotto (sopra autore/data)
+    # appena sopra il titolo e appena sotto l'autore (li calcola chi impagina
+    # il testo; queste sono le posizioni di ripiego)
+    y_top = page_h * 0.560 if y_top is None else y_top
+    y_bot = page_h * 0.400 if y_bot is None else y_bot
     line(cx - half, y_top, cx + half, y_top, 0.7, plum_d)
     line(cx - half, y_bot, cx + half, y_bot, 0.7, plum_d)
 
@@ -2177,6 +2191,15 @@ def write_pdf(path, chapters, title="",
     def seg_w(s, size):
         return _text_width(s, size, adv, widths_map)
 
+    # larghezze del neretto, per i titoli della copertina (più larghi del tondo)
+    bold_m = embed_fonts.get("bold")
+    bold_map = (bold_m.get("uni_widths") or bold_m.get("widths_by_code")) if bold_m else None
+
+    def seg_w_bold(s, size):
+        if not bold_map:
+            return seg_w(s, size) * 1.08
+        return _text_width(s, size, bold_m.get("advance1000"), bold_map)
+
     # --- sillabazione (opzionale) ------------------------------------------
     # EN: the hyphenator is created only if requested AND Pyphen is present;
     #     otherwise it stays None and no word is ever broken with a hyphen.
@@ -2194,7 +2217,7 @@ def write_pdf(path, chapters, title="",
         re-impaginato. Restituisce una lista di pezzi (testo, stile) dove ogni
         pezzo tranne l'ultimo finisce con un trattino "-". Se nessuna divisione
         valida entra, restituisce [(tok, style)] intatto."""
-        if hyphenator is None or len(tok) < 5:
+        if hyphenator is None or len(tok) < 5 or _NO_HYPHEN_RE.search(tok):
             return [(tok, style)]
         # Pyphen.positions() da' gli indici di sillaba validi (crescenti).
         try:
@@ -2270,9 +2293,10 @@ def write_pdf(path, chapters, title="",
         cur_lines = []
         y = content_top_y
 
-    def wrap_segments(segments, size, maxw):
+    def wrap_segments(segments, size, maxw, first_indent=0.0):
         """Manda a capo una sequenza di run (testo,stile) entro maxw.
-        Restituisce una lista di righe, ciascuna lista di run.
+        Restituisce una lista di righe, ciascuna lista di run. first_indent
+        accorcia la sola prima riga (rientro del capoverso).
 
         Se il sillabatore e' attivo, una parola che non entra nello spazio
         rimasto sulla riga corrente viene spezzata con un trattino nel punto
@@ -2281,7 +2305,7 @@ def write_pdf(path, chapters, title="",
         uniforme (meno spazi dilatati)."""
         lines = []
         cur = []
-        cur_w = 0.0
+        cur_w = first_indent
         for seg_text, style in segments:
             # spezza il run in parole conservando gli spazi
             tokens = re.split(r"(\s+)", seg_text)
@@ -2426,6 +2450,7 @@ def write_pdf(path, chapters, title="",
     # vuoti. Si emette comunque una pagina (presente nel PDF) ma senza alcuna
     # grafica vettoriale e senza testo: pagina completamente bianca, senza
     # numero. Esclude la copertina stilizzata sottostante.
+    cover_rules = []             # altezze dei due filetti, decise dal testo
     blank_cover_now = blank_cover and cover_image is None
     if blank_cover_now:
         flush_page("plain")   # pagina vuota, senza cornice e senza numero
@@ -2451,7 +2476,7 @@ def write_pdf(path, chapters, title="",
         author_lead = leading * 1.4
 
         def put_centered(text, size, cy_pos, style):
-            lw = seg_w(text, size)
+            lw = seg_w_bold(text, size) if style == "bold" else seg_w(text, size)
             cx = (page_w - lw) / 2.0
             cur_lines.append((cx, cy_pos, [(text, style)], size))
 
@@ -2488,28 +2513,54 @@ def write_pdf(path, chapters, title="",
             middle = raw_lines[1:-1] if len(raw_lines) > 2 else raw_lines[1:]
 
         if raw_lines:
+            # Tutto il testo sta DENTRO la cornice (COVER_FRAME_INSET), con
+            # un margine interno: il titolo si rimpicciolisce finché ogni
+            # parola entra intera, in al più quattro righe (fit_cover_title,
+            # lo stesso criterio del generatore di copertine); sottotitolo e
+            # autore vanno a capo nella stessa misura. I due filetti seguono
+            # il blocco: uno sopra il titolo e uno sotto l'autore, invece di
+            # stare a un'altezza fissa che un titolo lungo attraversava.
+            inner_w = page_w - 2 * (COVER_FRAME_INSET + COVER_TEXT_PAD)
+            title_size, title_rows = fit_cover_title(
+                title_line.split(), inner_w, seg_w_bold,
+                start=title_size, floor=font_size * 1.1, max_lines=4)
+            title_lead = title_size * 1.25
 
-            # TITOLO: centrato nella fascia tra i due filetti (0.585 e 0.375),
-            # quindi attorno a ~0.48 dell'altezza pagina.
-            band_mid = page_h * 0.48
-            title_rows = wrap_centered(title_line, title_size)
-            n_mid = len(middle)
-            block_h = len(title_rows) * title_lead + n_mid * author_lead
-            ty = band_mid + block_h / 2.0 - title_size * 0.30
+            def wrap_in(text, size):
+                words = text.split()
+                rows, cur = [], ""
+                for w in words:
+                    trial = (cur + " " + w).strip()
+                    if not cur or seg_w(trial, size) <= inner_w:
+                        cur = trial
+                    else:
+                        rows.append(cur)
+                        cur = w
+                if cur:
+                    rows.append(cur)
+                return rows
+            mid_rows = [r for t in middle for r in wrap_in(t, author_size)]
+            gap = font_size * 1.6                  # fra filetto e testo
+            block_h = (len(title_rows) * title_lead + (font_size * 0.8 if mid_rows else 0)
+                       + len(mid_rows) * author_lead)
+            top = page_h * 0.56 + block_h / 2.0    # bordo alto del blocco
+            ty = top - title_size
             for trow in title_rows:
                 put_centered(trow, title_size, ty, "bold")
                 ty -= title_lead
-
-            # AUTORE / sottotitolo: appena sotto il titolo
-            ay = ty - (title_lead * 0.15)
-            for line_txt in middle:
+            ay = ty + title_lead - title_size - font_size * 0.8 - author_size
+            for line_txt in mid_rows:
                 put_centered(line_txt, author_size, ay, "regular")
                 ay -= author_lead
+            bottom = (ay + author_lead - author_size * 0.3) if mid_rows else (ty + title_lead - title_size * 0.3)
+            cover_rules[:] = [top + gap * 0.6, bottom - gap * 0.6]
 
-            # DATA: ancorata appena sotto il filetto inferiore (0.400)
+            # EDITORE: in basso, dentro la cornice
             if date_line:
-                dy = page_h * 0.400 - date_size * 2.2
-                put_centered(date_line, date_size, dy, "italic")
+                dy = COVER_FRAME_INSET + COVER_TEXT_PAD + date_size
+                for row in reversed(wrap_in(date_line, date_size)):
+                    put_centered(row, date_size, dy, "italic")
+                    dy += date_size * 1.4
 
         flush_page("cover")
 
@@ -2625,22 +2676,25 @@ def write_pdf(path, chapters, title="",
                 segs.append((t, st))
             return segs or [("", "regular")]
 
-        def text_line(segments, sz, indent, extra=0.0, force=None, centered=False):
+        def text_line(segments, sz, indent, extra=0.0, force=None, centered=False,
+                      first_indent=0.0):
             """Una riga del testo, che va a capo nella gabbia. L'ULTIMA riga
             spezzata non si giustifica mai (apparirebbe dilatata), e nemmeno
-            i titoli (force == "bold")."""
+            i titoli (force == "bold"). first_indent: rientro della prima
+            riga, che segna l'inizio di un capoverso."""
             nonlocal y, pages_so_far
             line_leading = leading * (sz / font_size)
             avail = usable_w - indent
-            wrapped = wrap_segments(segments, sz, avail)
+            wrapped = wrap_segments(segments, sz, avail, first_indent)
             can_justify = justify and force != "bold" and not centered
             for li, run_line in enumerate(wrapped):
                 if y < bottom_y:
                     flush_page()
                     pages_so_far += 1
                 is_last = (li == len(wrapped) - 1)
-                jw = avail if (can_justify and not is_last) else None
-                x = left_margin + indent
+                fi = first_indent if li == 0 else 0.0
+                jw = (avail - fi) if (can_justify and not is_last) else None
+                x = left_margin + indent + fi
                 if centered:
                     x = left_margin + (usable_w - sum(seg_w(t, sz) for t, _s in run_line)) / 2.0
                 cur_lines.append((x, y, run_line, sz, jw))
@@ -2696,17 +2750,28 @@ def write_pdf(path, chapters, title="",
                 y -= leading * 0.3
 
         def blocks_out(blocks, indent=0.0, quote=False):
-            nonlocal pages_so_far
+            nonlocal pages_so_far, y
             force = "italic" if quote else None
             for b in blocks:
                 kind = b[0]
                 if kind == "heading":
                     lvl = b[1]
                     sz = font_size * _HEADING_SCALE[lvl]
+                    # spazio prima del titolo, tranne in cima alla pagina:
+                    # il titolo sta con il testo che segue, non con quello
+                    # che lo precede
+                    if y < content_top_y - 1.0:
+                        y -= leading * 0.7
                     text_line([(plain_runs(b[2]), "bold")], sz, indent, font_size * 0.4, "bold")
                 elif kind == "p":
-                    for line in b[1]:
-                        text_line(pdf_runs(line, force), font_size, indent, force=force)
+                    # In RuscaWriter ogni a capo inizia un capoverso, come in un
+                    # programma di videoscrittura: dal secondo in poi del blocco
+                    # la prima riga rientra, così i capoversi si distinguono
+                    # anche senza riga vuota. Il primo del blocco non rientra
+                    # (lo separa già lo spazio fra i blocchi).
+                    for li, line in enumerate(b[1]):
+                        text_line(pdf_runs(line, force), font_size, indent, force=force,
+                                  first_indent=PARA_INDENT_EM * font_size if li else 0.0)
                 elif kind == "list":
                     for depth, mark, line, inner in list_lines(b):
                         ind = indent + font_size * 1.2 * (depth + 1)
@@ -2734,7 +2799,14 @@ def write_pdf(path, chapters, title="",
         # Il capitolo arriva come paragrafi separati da righe vuote; il
         # motore lo legge tutto insieme (book_blocks) e dopo ogni blocco
         # resta mezza interlinea, come fra i paragrafi di prima.
-        for block in book_blocks("\n\n".join(paragraphs)):
+        blocks = book_blocks("\n\n".join(paragraphs))
+        # Un capitolo che non comincia con un titolo («# …») riceve quello
+        # dell'indice: senza, la sua prima pagina non direbbe che capitolo è
+        # (la testatina lì non c'è).
+        if ci < len(chapter_titles) and chapter_titles[ci] \
+                and not (blocks and blocks[0][0] == "heading"):
+            blocks.insert(0, ("heading", 1, [(chapter_titles[ci], "bold")]))
+        for block in blocks:
             blocks_out([block])
             y -= leading * 0.5
     flush_page()
@@ -2761,6 +2833,10 @@ def write_pdf(path, chapters, title="",
                 title_for_page = chapter_titles[ci2]
             else:
                 break
+        # la pagina che apre un capitolo non ha testatina: il titolo del
+        # capitolo c'è già, grande, sulla pagina
+        if vis in chapter_start_page:
+            title_for_page = ""
         chapter_page_header.append(title_for_page)
 
     # 1b) pagina indice (sommario), senza numero, con i NUMERI DI PAGINA reali
@@ -3025,7 +3101,7 @@ def write_pdf(path, chapters, title="",
             continue
         if kind == "cover":
             # grafica vettoriale della copertina prima del testo
-            parts.extend(_cover_graphics_ops(page_w, page_h))
+            parts.extend(_cover_graphics_ops(page_w, page_h, *cover_rules))
         # spostamento orizzontale per la rilegatura: sulle pagine di contenuto
         # numerate, il recto (pagina fisica dispari) ha il margine interno a
         # sinistra, quindi il blocco di testo si sposta a destra della
