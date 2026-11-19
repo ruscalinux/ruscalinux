@@ -465,8 +465,10 @@ GUIDE = (
          "https://huggingface.co/leejet/Z-Image-Turbo-GGUF/tree/main"),
         ("llm", "Qwen3-4B-Instruct-2507-Q4_K_M.gguf",
          "https://huggingface.co/unsloth/Qwen3-4B-Instruct-2507-GGUF/tree/main"),
+        # Lo stesso autoencoder di FLUX.1, ma senza registrazione: il
+        # repository di black-forest-labs chiede di accedere e accettare la licenza.
         ("vae", "ae.safetensors",
-         "https://huggingface.co/black-forest-labs/FLUX.1-schnell/tree/main"))},
+         "https://huggingface.co/Comfy-Org/z_image_turbo/tree/main/split_files/vae"))},
 )
 
 # Cartelle dei modelli della chat: chi copia li' un modello per immagini non
