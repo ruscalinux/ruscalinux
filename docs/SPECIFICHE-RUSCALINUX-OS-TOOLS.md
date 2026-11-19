@@ -55,11 +55,12 @@ Si trova nel repository in `docs/SPECIFICHE-RUSCALINUX-OS-TOOLS.md`. In caso di 
 | RuscaHub | Gestione AppImages | Gestore applicazioni | `org.ruscalinux.RuscaHub` | `ruscahub` | No |
 | RuscaMark | Editing Markdown | Editor di testo | `org.ruscalinux.RuscaMark` | `ruscamark` | Sì, se c’è il controllo ortografico |
 | RuscaWriter | Scrittura e impaginazione di libri | Word processor | `org.ruscalinux.RuscaWriter` | `ruscawriter` | Sì, sempre |
-| RuscaLLama | Chat con modelli linguistici locali | Assistente IA | `org.ruscalinux.RuscaLLama` | `ruscallama` | No |
+| RuscaLLama | Chat con modelli linguistici locali e creazione di immagini da una descrizione | Assistente IA | `org.ruscalinux.RuscaLLama` | `ruscallama` | No |
 | RuscaTranslator | Traduzione di documenti Markdown, con RAG ottimizzato per italiano ↔ inglese | Traduttore | `org.ruscalinux.RuscaTranslator` | `ruscatranslator` | No |
 | ruscallama-engine | Motore che esegue i modelli per RuscaLLama e RuscaTranslator: **llama.cpp, software esterno** | Componente di sistema, senza interfaccia | — | `ruscallama-engine` | — |
 | RuscaTranscriber | Trascrizione di video e audio in testo (Markdown) e sottotitoli (SRT) | Riconoscimento vocale | `org.ruscalinux.RuscaTranscriber` | `ruscatranscriber` | No |
 | ruscawhisper-engine | Motore di riconoscimento vocale di RuscaTranscriber: **whisper.cpp, software esterno** | Componente di sistema, senza interfaccia | — | `ruscawhisper-engine` | — |
+| ruscadiffusion-engine | Motore di generazione delle immagini di RuscaLLama: **stable-diffusion.cpp, software esterno** | Componente di sistema, senza interfaccia | — | `ruscadiffusion-engine` | — |
 | RuscaNarrator | Lettura ad alta voce di documenti Markdown e di sottotitoli SRT (rispettandone i tempi) | Sintesi vocale | `org.ruscalinux.RuscaNarrator` | `ruscanarrator` | No |
 | RuscaCat | Un gatto filosofo animato con cui si parla a voce: ascolta, risponde e parla con i motori locali | Assistente vocale | `org.ruscalinux.RuscaCat` | `ruscacat` | No |
 
@@ -189,6 +190,48 @@ RuscaCat è **Martino** (in inglese **Martin**), un gatto nero dagli occhiali to
 python3 -m unittest tests/test_ruscacat.py
 ```
 
+### 1.6 La generazione delle immagini
+
+RuscaLLama ha due viste, **Chat** e **Immagini** (`Adw.ViewStack` con `Adw.ViewSwitcher` nella barra del titolo; sotto i 550 sp il selettore scende in basso, `Adw.ViewSwitcherBar`). Nella vista Immagini si scrive una descrizione, si sceglie il formato (Quadrata, Orizzontale, Verticale) e si preme **Genera**. Le immagini sono create da modelli di diffusione che girano sul computer dell’utente, tramite **ruscadiffusion-engine**.
+
+- **ruscadiffusion-engine è stable-diffusion.cpp** (<https://github.com/leejet/stable-diffusion.cpp>), software esterno con licenza MIT, copyright leejet, con la sua copia di ggml (<https://github.com/leejet/ggml>, MIT, The ggml authors), che usa come sottomodulo git. RuscaLinux lo compila dal sorgente senza modificarne il codice, con il backend Vulkan, con le stesse regole di ruscawhisper-engine (sezioni 6 e 7). Il pacchetto contiene solo `sd-cli`, con ggml compilato dentro: niente `sd-server`, niente interfaccia web, niente backend RPC. La build controlla che nel binario non ci sia codice di rete.
+- **Un processo per generazione.** `sd-cli` parte, carica il modello, scrive le immagini PNG ed esce: **non resta acceso nessun server e non si apre nessuna porta**, nemmeno su 127.0.0.1. Ogni generazione ricarica il modello: è più lento di un server, ma per la privacy si è preferito così, come per RuscaNarrator.
+- **Moduli.** `rusca_diffusion.py` (riconoscimento dei modelli, valori consigliati, comando, avanzamento, `Generator`) non usa GTK e si prova senza interfaccia; `diffusion_view.py` è la vista. `ruscallama.py` li monta. Il pannello laterale (F9) mostra le impostazioni della vista in primo piano.
+- **Modelli.** Non fanno parte dei pacchetti. Si copiano in `~/.local/share/ruscadiffusion/models/` (o, per tutti, in `/usr/share/ruscadiffusion/models/`), oppure si usano da un’altra cartella con **Aggiungi una cartella…**, che la ricorda nelle impostazioni (`img_folders`) senza copiare i file; **Togli la cartella dall’elenco** la dimentica, senza toccare i file. Le regole sono le stesse per ogni cartella:
+  - una cartella che contiene **componenti** (VAE, codificatori di testo CLIP-L, CLIP-G, T5, modello linguistico) è **un modello in più file**, con il nome della cartella: il file più grande che non è un componente è il modello di diffusione (`--diffusion-model`), ogni componente ha la sua opzione (`--vae`, `--clip_l`, `--clip_g`, `--t5xxl`, `--llm`); così si usano FLUX, Stable Diffusion 3.5, Z-Image, Qwen-Image, Chroma;
+  - altrimenti ogni file `.safetensors`, `.gguf` o `.ckpt` è un **modello completo** (`-m`): Stable Diffusion 1.5 e 2.1, SDXL, i modelli Turbo;
+  - le sottocartelle si guardano allo stesso modo, una per una. LoRA, ControlNet, TAESD, upscaler e mmproj si ignorano.
+- **Riconoscimento dei file.** Dal nome (`file_role()`, la prima regola che corrisponde vince), con i nomi degli esempi della documentazione di stable-diffusion.cpp (`docs/models/`): `ae`, `vae`, `flux2_ae` sono il VAE (`--vae`); `clip_l`, `clip_g`, `t5xxl`/`umt5` i codificatori CLIP e T5; `qwen`, `gemma`, `mistral`, `ministral`, `llama`, `gpt-oss`, `ovis_2`, `ling_mini` il modello linguistico (`--llm`); `mmproj` la sua parte visiva (`--llm_vision`); `tokenizer*.json` il tokenizzatore (`--tokenizer`); `connector` i connettori (`--embeddings-connectors`); `uncond` il secondo modello di Ideogram 4 (`--uncond-diffusion-model`); `qwen-image`, `z-image`, `ovis-image`, `ming-image` sono modelli di diffusione. Estensioni: `.safetensors`, `.sft`, `.gguf`, `.ckpt`. Mmproj e tokenizzatore da soli non fanno di una cartella un modello in più file. Per i `.safetensors` contano anche i nomi dei tensori nell’intestazione (`checkpoint_info()`: si leggono gli 8 byte della lunghezza e il JSON, mai i pesi): un file con `model.diffusion_model.` e con VAE o codificatore è completo anche se il nome contiene «vae» (`sd_xl_base_1.0_0.9vae`); un VAE accanto a un modello completo si passa con `--vae`.
+- **Valori consigliati** (`recommended()`, tabella `PROFILES`). Sono quelli degli esempi di `docs/models/` di stable-diffusion.cpp, riconosciuti dal nome della cartella e del file. Un SD 1.x o SDXL completo si riconosce invece dai tensori, che valgono più del nome. Alcuni esempi:
+
+  | Modello | Passi | CFG | Campionatore e opzioni |
+  |---|---|---|---|
+  | Z-Image-Turbo | 8 (fissi) | 1 | — |
+  | Z-Image | 20 | 5 | — |
+  | FLUX.2-klein / klein-base / dev | 4 (fissi) / 20 / 20 | 1 / 4 / 1 | dev: euler |
+  | FLUX.3 / FLUX.3-base | 16 (fissi) / 20 | 1 / 3,5 | euler |
+  | FLUX.1-schnell / dev | 4 (fissi) / 20 | 1 | euler |
+  | Qwen-Image / Qwen-Image-2.1 | 20 | 2,5 / 6 | euler; Qwen-Image `--flow-shift 3` |
+  | Chroma | 20 | 4 | euler, `--model-args chroma_use_dit_mask=false` |
+  | SD 3.5 | 28 | 4,5 | euler |
+  | SDXL / SD 1.x | 25 | 6 / 7 | 1024 / 512 px |
+  | SD-Turbo, SDXL-Turbo, Lightning, LCM… | 4 (fissi) | 1 | — |
+
+  Ci sono anche LongCat, Ovis, Anima, ERNIE, Fibo, Lens, Mage-Flow, Ming, MiniMax-H3, MOSS, SeFi, PixArt, Krea, Iris. Dove la documentazione non indica la CFG (Krea 2, Ideogram 4…) non si passa e decide il motore. Un modello sconosciuto con un codificatore LLM usa 20 passi e la CFG del motore. Gli altri lati sono 1024 px. **Qualità** moltiplica i passi (Veloce 0,6, Normale 1, Dettagliata 1,6), salvo per i modelli distillati («fissi»): con meno passi si rovinano, con più non migliorano. Il formato tiene circa lo stesso numero di pixel (rapporto 3:2), a multipli di 64: 1024 → 1024 × 1024, 1280 × 832, 832 × 1280. Quando stable-diffusion.cpp aggiunge un modello, la tabella si aggiorna dagli esempi della sua documentazione, con un caso in `LAYOUTS` del test.
+- **Impostazioni** (`~/.config/ruscallama/settings.json`, chiavi `img_*`). Modello, Aggiungi una cartella…, Apri la cartella dei modelli; Qualità, Immagini per volta (1–4), Da evitare (prompt negativo), Scrivi la descrizione nel file (metadati PNG, **spento** per impostazione predefinita: chi riceve l’immagine non legge il prompt); Impostazioni avanzate: passi, CFG, lato di base, campionatore, seme (0, «Automatico» e −1 vogliono dire «consigliato» o «a caso»; il sottotitolo dice il valore consigliato per il modello scelto). Motore: scheda grafica, scheda da usare, codificatore di testo, thread, **Risparmia memoria** (`--vae-tiling --offload-to-cpu`: tutti i pesi nella RAM; di solito non serve, perché il motore li sposta già da solo quando la scheda non basta).
+- **Scheda grafica.** `sd-cli --list-devices` scrive una riga `nome<TAB>descrizione` per scheda; la scelta si salva per descrizione e si passa con `--backend VulkanN`. Con «Automatica» decide il motore: la scheda dedicata con più memoria libera; i pesi che non ci stanno restano nella RAM e passano sulla scheda a pezzi (`--auto-fit`, predefinito in stable-diffusion.cpp). Senza scheda grafica: `--backend cpu` e driver Vulkan nascosti.
+- **Codificatore di testo su un’altra scheda** (`img_te_device`, `backend_assignment()`): «Sulla stessa scheda», «Sul processore (CPU)» o una delle schede. Si passa con l’assegnazione per modulo di stable-diffusion.cpp: `--backend all=Vulkan0,te=Vulkan1` (o `te=Vulkan1` se la scheda principale è automatica, `te=cpu` per il processore). Il codificatore (Qwen3-4B, T5, Mistral…) pesa molto ma lavora una volta per immagine; il modello di diffusione lavora a ogni passo: così la scheda più veloce resta tutta per lui. Esempio tipico: un portatile con una NVIDIA da 6 GB e una Radeon integrata con 16 GB condivisi, codificatore sulla Radeon. Se la scheda scelta non c’è più, il codificatore resta sulla scheda principale.
+- **Avanzamento e anteprima.** `sd-cli` disegna una barra sullo standard output (`#` caricamento dei pesi, `=` passi): RuscaLLama mostra «Passo n di N» e la barra. Con `--preview proj --preview-interval 1` il motore riscrive un’anteprima a ogni passo; la si legge quando ha smesso di crescere e si passano i byte all’interfaccia. **Ferma** (Esc) termina il gruppo di processi.
+- **Galleria.** Le immagini restano in `~/.cache/ruscallama/images/` (permessi 0700) finché la finestra è aperta. Ogni immagine ha **Salva l’immagine…** (PNG, nella cartella Immagini per impostazione predefinita), **Copia l’immagine**, **Allega alla conversazione** (per un modello linguistico con la Visione), **Riusa il seme** (stesso seme e stessa descrizione, da ritoccare), **Togli** (con Annulla). In un gruppo il seme di ogni immagine è il seme più la posizione, come in stable-diffusion.cpp.
+- **Dalla chat.** Il menu di ogni risposta ha **Crea un’immagine da questa risposta**: il primo blocco di codice, se c’è (i modelli ci mettono spesso il prompt), altrimenti il testo senza formattazione, diventa la descrizione.
+- **Chiusura.** Alla chiusura e a ogni avvio la cartella di lavoro si cancella. Se ci sono immagini non salvate, prima si chiede (`Adw.AlertDialog`, «Chiudi senza salvare» distruttivo, «Annulla» predefinito).
+
+**Test.** `tests/test_ruscallama_diffusion.py` controlla il riconoscimento dei file e delle cartelle di modelli (con `.safetensors` senza pesi, e 21 cartelle come quelle degli esempi di stable-diffusion.cpp, da Z-Image a FLUX.2, Qwen-Image, Ideogram 4 e Lens), i valori consigliati, le dimensioni, l’elenco delle schede, la lettura dell’avanzamento e l’intero percorso di una generazione (gruppo di immagini, anteprime, errore, interruzione, scheda scelta, opzioni, pulizia dei file di lavoro, prompt mai sulla riga di comando) con un `sd-cli` finto che scrive PNG veri; controlla anche che tutti i testi della vista ci siano in tutte le lingue. Senza PyGObject si salta.
+
+```bash
+python3 -m unittest tests/test_ruscallama_diffusion.py
+```
+
 Gli identificatori di ogni tool devono coincidere tra loro (vedi sezione 5.2).
 
 Fino alla versione 1.99.1 RuscaMark usava l’App ID `org.ruscalinux.ruscamark`. Dalla 1.99.2 usa `org.ruscalinux.RuscaMark`: l’aggiornamento del pacchetto rimuove il vecchio file `.desktop`, e la metainfo dichiara il vecchio identificativo con `<replaces>` perché GNOME Software riconosca l’applicazione. Le impostazioni restano in `~/.config/ruscamark/`, che prende il nome dal comando e non dall’App ID. Il nome del tool e la parte finale dell’App ID usano la stessa grafia CamelCase: `RuscaMark` → `org.ruscalinux.RuscaMark`.
@@ -205,7 +248,7 @@ Fino alla versione 1.99.1 RuscaMark usava l’App ID `org.ruscalinux.ruscamark`.
 | Libreria GNOME | libadwaita (>= 1.7) |
 | Markdown | CommonMark 0.30 con le estensioni della sezione 1.2, tramite `python3-markdown-it` (>= 3.0), `python3-mdit-py-plugins` (>= 0.4) e `python3-linkify-it` (>= 2.0) |
 | Distro base | Debian Stable |
-| Formato pacchetti | deb, `Architecture: all` (`amd64` per ruscallama-engine e ruscawhisper-engine, che sono compilati) |
+| Formato pacchetti | deb, `Architecture: all` (`amd64` per ruscallama-engine, ruscawhisper-engine e ruscadiffusion-engine, che sono compilati) |
 | Versione tool | 1.99.3 |
 
 Regole tecniche:
@@ -703,12 +746,13 @@ Componenti esterni in uso:
 | EB Garamond e Courier Prime (caratteri tipografici) | inclusi nei sorgenti | SIL Open Font License 1.1 | `tools/ruscawriter/assets/`, installati in `/usr/share/ruscawriter/assets/` con il testo della licenza | RuscaWriter |
 | llama.cpp (con ggml e le librerie che include: nlohmann/json e cpp-httplib MIT, xxHash BSD-2-Clause, stb, miniaudio, sha1 e sha256 di pubblico dominio) | ultima release stabile al momento della build (1.99.2: 0.9.0; 1.99.3: 1.0.0), scritta nella descrizione del pacchetto e in `/usr/share/doc/ruscallama-engine/README.md.gz` | MIT | Compilato nel pacchetto `ruscallama-engine`, in `/usr/lib/ruscallama-engine/` | RuscaLLama, RuscaTranslator, RuscaNarrator (`llama-tts`), RuscaCat (`llama-server` e `llama-tts`) |
 | whisper.cpp (con ggml e le librerie compilate nei programmi impacchettati: sgemm di llamafile, MIT; miniaudio, pubblico dominio o MIT-0; stb_vorbis, pubblico dominio o MIT) | ultima release stabile al momento della build (1.99.3: 1.9.5), scritta nella descrizione del pacchetto e in `/usr/share/doc/ruscawhisper-engine/README.md.gz` | MIT | Compilato nel pacchetto `ruscawhisper-engine`, in `/usr/lib/ruscawhisper-engine/` | RuscaTranscriber, RuscaCat |
+| stable-diffusion.cpp (con la sua copia di ggml, leejet/ggml, e le librerie compilate in `sd-cli`: nlohmann/json, miniz e sgemm di llamafile, MIT; zip di kuba--, Unlicense; stb, pubblico dominio o MIT; darts-clone, BSD-3-Clause; Oniguruma, BSD-2-Clause; utf8proc, MIT e licenza dei dati Unicode) | ultima release al momento della build (tag `master-<numero>-<commit>`; 1.99.3: master-1106-532d2c1), scritta nella descrizione del pacchetto e in `/usr/share/doc/ruscadiffusion-engine/README.md.gz` | MIT | Compilato nel pacchetto `ruscadiffusion-engine`, in `/usr/lib/ruscadiffusion-engine/` | RuscaLLama (vista Immagini) |
 | Regola dell’evidenziato, porting del plugin markdown-it-mark (© Vitaly Puzrin e Alex Kocharin) con la struttura della regola del barrato di markdown-it-py (© ExecutableBookProject) | — | MIT (Expat) | `markdown_it_mark.py`, file a sé accanto a `rusca_markdown.py`; dichiarato nel file `copyright` del pacchetto, nella finestra Informazioni e nei manuali | RuscaLLama, RuscaMark, RuscaWriter, RuscaTranslator, RuscaNarrator, RuscaCat |
 | Esempi della specifica CommonMark (© John MacFarlane) | 0.30 | CC BY-SA 4.0 | `tests/data/commonmark-0.30-spec.json`, con `README.md`; solo per i test, non installati da nessun pacchetto | Test di `rusca_markdown.py` |
 
 markdown-it-py, mdit-py-plugins e linkify-it-py (licenza MIT) non sono inclusi: sono dipendenze dei pacchetti, installate da Debian.
 
-I file `copyright` di `ruscallama-engine` e di `ruscawhisper-engine` riportano tutte queste licenze; solo gli script di costruzione e i profili AppArmor sono di RuscaLinux (GPL-3.0).
+I file `copyright` di `ruscallama-engine`, `ruscawhisper-engine` e `ruscadiffusion-engine` riportano tutte queste licenze; solo gli script di costruzione e i profili AppArmor sono di RuscaLinux (GPL-3.0).
 
 FFmpeg non è incluso: RuscaTranscriber, RuscaNarrator e RuscaCat usano il comando `ffmpeg` del pacchetto Debian, che è una loro dipendenza.
 
@@ -750,6 +794,13 @@ Il suffisso `ruscalinux` nel nome del file indica che il pacchetto appartiene al
 1. si compilano solo `whisper-cli` e `whisper-bench`, con `WHISPER_BUILD_SERVER=OFF`, `WHISPER_CURL=OFF`, `WHISPER_SDL2=OFF` e `WHISPER_COMMON_FFMPEG=OFF`; la build si ferma se i binari usano OpenSSL o curl, o se tra i simboli che richiedono c’è una funzione per aprire connessioni (`socket`, `connect`, `bind`, `listen`, `accept`, `getaddrinfo`…);
 2. whisper.cpp tiene le librerie di altri autori in `examples/`, non in `vendor/`: la build si ferma se in `examples/` compare un file che non è negli elenchi di `make-deb.sh`;
 3. oltre a controllare che `whisper-cli` accetti le opzioni usate da RuscaTranscriber, la build gli fa trascrivere l’audio di prova del sorgente con il modello di prova (senza pesi) e controlla che scriva il JSON, e con il backend Vulkan controlla che ggml abbia ancora `GGML_VK_VISIBLE_DEVICES`, con cui RuscaTranscriber sceglie la scheda.
+
+**Eccezione: ruscadiffusion-engine.** È fatto come ruscawhisper-engine, con stable-diffusion.cpp al posto di whisper.cpp: file `ruscadiffusion-engine-ruscalinux_<versione>_amd64.deb`, variabile `RUSCADIFFUSION_SD_VERSION` (il tag intero o solo il numero), binario in `/usr/lib/ruscadiffusion-engine/`, cache in `~/.cache/ruscalinux/ruscadiffusion-engine/`, stesse dipendenze di costruzione. Cambiano quattro cose:
+
+1. stable-diffusion.cpp non ha versioni `X.Y.Z`: ogni release è un tag `master-<numero>-<commit>` e la più recente ha il numero più alto. Il sorgente sono **due archivi**: stable-diffusion.cpp e la sua copia di ggml (sottomodulo git, assente dagli archivi di GitHub). Il commit di ggml è quello registrato nel tag, letto con `git fetch --filter=blob:none`; il commit di ciascun archivio deve essere quello atteso, e il file di `checksums/` registra le impronte di tutti e due;
+2. si compila solo `sd-cli`, con ggml dentro (`BUILD_SHARED_LIBS=OFF`), con `SD_RPC=OFF`, `GGML_RPC=OFF`, `SD_SERVER_BUILD_FRONTEND=OFF`, `SD_WEBP=OFF` e `SD_WEBM=OFF`; stessi controlli di rete sui simboli;
+3. le librerie di altri autori stanno in `thirdparty/`: la build si ferma se compare un file che non è in `TERZI_DICHIARATI`;
+4. il sorgente non ha un modello di prova: la build controlla che `sd-cli` dica la sua versione, elenchi le schede nel formato `nome<TAB>descrizione` e accetti le opzioni usate da RuscaLLama (`OPZIONI_USATE`).
 
 Esempio di output:
 
@@ -965,6 +1016,18 @@ Regole aggiuntive per il riconoscimento vocale (RuscaTranscriber):
 | Confinamento | Profilo AppArmor per `whisper-cli`, in modalità complain: nega la rete, `.ssh`, `.gnupg`, `.config`, profili di Firefox e Thunderbird |
 | Avviso all’utente | Il manuale ricorda che la trascrizione automatica va riletta |
 
+Regole aggiuntive per la generazione delle immagini (RuscaLLama, vista Immagini):
+
+| Regola | Come è applicata |
+|---|---|
+| Nessuna rete, nemmeno locale | `sd-cli` è avviato una volta per generazione e non ha codice di rete (lo controlla la build del motore: niente server, niente RPC); `rusca_diffusion.py` e `diffusion_view.py` non usano moduli di rete |
+| Programma esterno | `/usr/lib/ruscadiffusion-engine/sd-cli`, con percorso assoluto e lista di argomenti |
+| La descrizione | Passa al motore in un file (`--prompt-file`, `--negative-prompt-file`), non sulla riga di comando, dove altri utenti la vedrebbero con `ps`; il file si cancella appena il motore esce |
+| Immagini di lavoro | In `~/.cache/ruscallama/images/` con permessi 0700; cancellate all’avvio e alla chiusura; prima di chiudere con immagini non salvate si chiede conferma |
+| Metadati | Per impostazione predefinita `--disable-image-metadata`: il PNG salvato non contiene descrizione e impostazioni, salvo scelta contraria |
+| Modelli | Solo file locali, letti dall’utente; le cartelle aggiunte non vengono copiate né modificate; dei `.safetensors` si legge solo l’intestazione |
+| Confinamento | Profilo AppArmor per `sd-cli`, in modalità complain: nega la rete, `.ssh`, `.gnupg`, `.config`, profili di Firefox e Thunderbird; scrive solo nella cartella di lavoro |
+
 Regole aggiuntive per la sintesi vocale (RuscaNarrator):
 
 | Regola | Come è applicata |
@@ -1044,10 +1107,10 @@ Un tool è pronto quando:
 11. Ha identificatori coerenti tra loro (sezioni 1 e 5.2).
 12. Ha file `.desktop` e metainfo validi, con `StartupWMClass` uguale all’App ID e la categoria `X-RuscaLinux-Tools` (sezione 5.3).
 13. Ha icona SVG e icona simbolica.
-14. Ha `make-deb.sh` che produce un solo `ruscafoo-ruscalinux_<versione>_all.deb` (o `_amd64.deb` per ruscallama-engine e ruscawhisper-engine) e `SHA256SUMS` in `build-deb/`.
+14. Ha `make-deb.sh` che produce un solo `ruscafoo-ruscalinux_<versione>_all.deb` (o `_amd64.deb` per ruscallama-engine, ruscawhisper-engine e ruscadiffusion-engine) e `SHA256SUMS` in `build-deb/`.
 15. Ha la versione uguale a `VERSION` di `release.conf`.
 16. È licenziato GPL-3.0, con componenti esterni dichiarati.
-17. Non usa rete, telemetria o comandi pericolosi (per RuscaLLama, RuscaTranslator e RuscaCat: rete solo verso 127.0.0.1, sezione 11; RuscaTranscriber e RuscaNarrator non usano la rete in nessun modo).
+17. Non usa rete, telemetria o comandi pericolosi (per RuscaLLama, RuscaTranslator e RuscaCat: rete solo verso 127.0.0.1, sezione 11, e la vista Immagini di RuscaLLama non la usa in nessun modo; RuscaTranscriber e RuscaNarrator non usano la rete in nessun modo).
 18. Se mostra, converte o divide Markdown, usa `rusca_markdown.py` (sezione 1.2), e i test di `tests/` passano.
 
 ---
@@ -1151,6 +1214,14 @@ Chat con modelli linguistici che girano su questo computer.
 3. Scrivere un messaggio e premere Invio: il motore parte da solo.
 4. Copiare o salvare le risposte dal menu di ogni risposta; salvare la conversazione con Ctrl+S.
 
+Immagini (vista **Immagini**, Alt+2):
+
+1. Copiare un modello per immagini in `~/.local/share/ruscadiffusion/models/`: un file `.safetensors` o `.gguf` (per esempio Stable Diffusion 1.5 o SDXL), oppure una cartella con il modello e i suoi file (FLUX, Z-Image…). Se il modello sta già in un’altra cartella: pannello laterale (F9) → “Aggiungi una cartella…”.
+2. Scrivere la descrizione, scegliere Quadrata, Orizzontale o Verticale e premere “Genera” (Invio).
+3. Ogni immagine si salva, si copia o si allega alla conversazione dal suo menu. Le immagini non salvate si cancellano alla chiusura.
+
+La vista Immagini usa **ruscadiffusion-engine**, cioè stable-diffusion.cpp, software esterno con licenza MIT. Non usa la rete.
+
 ## 🌐 RuscaTranslator
 
 Traduzione di documenti Markdown tra le 26 lingue della sezione 9: inglese, italiano, cinese semplificato e tradizionale, spagnolo, hindi, arabo, portoghese brasiliano ed europeo, russo, giapponese, tedesco, francese, coreano, indonesiano, turco, polacco, olandese, ucraino, ceco, vietnamita, svedese, rumeno, ungherese, greco e finlandese.
@@ -1238,11 +1309,12 @@ Tutti i dati elaborati dai RuscaLinux OS Tools rimangono in locale. Nessun dato 
 | RuscaHub | AppImage management |
 | RuscaMark | Markdown editing |
 | RuscaWriter | Writing and typesetting books |
-| RuscaLLama | Chat with local language models |
+| RuscaLLama | Chat with local language models and images from a description |
 | RuscaTranslator | Translation of Markdown documents, with a RAG optimized for Italian ↔ English |
 | ruscallama-engine | Engine that runs the models: llama.cpp, an external component (MIT) |
 | RuscaTranscriber | Transcription of video and audio into text (Markdown) and subtitles (SRT) |
 | ruscawhisper-engine | Speech recognition engine: whisper.cpp, an external component (MIT) |
+| ruscadiffusion-engine | Image generation engine of RuscaLLama: stable-diffusion.cpp, an external component (MIT) |
 | RuscaNarrator | Reading Markdown documents and SRT subtitles (following their timing) aloud |
 | RuscaCat | An animated philosopher cat you talk to out loud: it listens, answers and speaks with the local engines |
 
@@ -1342,6 +1414,14 @@ Chat with language models that run on this computer.
 2. Open RuscaLLama and choose the model in the side panel (F9).
 3. Write a message and press Enter: the engine starts on its own.
 4. Copy or save answers from each answer's menu; save the conversation with Ctrl+S.
+
+Images (**Images** view, Alt+2):
+
+1. Copy an image model into `~/.local/share/ruscadiffusion/models/`: a `.safetensors` or `.gguf` file (for example Stable Diffusion 1.5 or SDXL), or a folder with the model and its files (FLUX, Z-Image…). If the model is already in another folder: side panel (F9) → "Add a Folder…".
+2. Write the description, choose Square, Landscape or Portrait and press "Generate" (Enter).
+3. Save, copy or attach each image to the conversation from its menu. Images you have not saved are deleted when the program closes.
+
+The Images view uses **ruscadiffusion-engine**, that is stable-diffusion.cpp, an external component under the MIT license. It does not use the network.
 
 ## 🌐 RuscaTranslator
 

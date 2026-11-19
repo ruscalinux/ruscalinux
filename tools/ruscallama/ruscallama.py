@@ -7,11 +7,16 @@ Usa ruscallama-engine (llama.cpp, software esterno con licenza MIT) per
 eseguire modelli GGUF sul computer dell'utente. Nessun dato lascia la
 macchina: il motore ascolta solo su 127.0.0.1 con una chiave temporanea.
 
+La vista «Immagini» crea immagini con ruscadiffusion-engine
+(stable-diffusion.cpp, software esterno con licenza MIT): un processo per
+generazione, senza server e senza porte (rusca_diffusion.py,
+diffusion_view.py).
+
 Copyright (C) 2026 Nunzio Curcuruto — https://www.ruscalinux.org
 Licenza: GNU GPL 3.0 o successiva.
 
 Requisiti: Python 3.10+, PyGObject, GTK 4.18+, libadwaita 1.7+,
-GtkSourceView 5, ruscallama-engine.
+GtkSourceView 5, ruscallama-engine; per le immagini ruscadiffusion-engine.
 """
 import base64
 import html
@@ -36,6 +41,8 @@ BASE_DIR = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, BASE_DIR)
 import rusca_engine as engine  # noqa: E402
 import rusca_markdown as md  # noqa: E402
+import rusca_diffusion  # noqa: E402
+import diffusion_view  # noqa: E402
 
 _RE_LINK_TAG = re.compile(r"</?a\b[^>]*>")
 
@@ -50,6 +57,8 @@ CONFIG_FILE = os.path.join(CONFIG_DIR, "settings.json")
 USER_MODELS = os.path.join(GLib.get_user_data_dir(), "ruscallama", "models")
 COMPONENTS = (
     ("llama.cpp", "MIT — The ggml authors", "https://github.com/ggml-org/llama.cpp"),
+    ("stable-diffusion.cpp", "MIT — leejet; ggml: The ggml authors",
+     "https://github.com/leejet/stable-diffusion.cpp"),
     # Regola dell'evidenziato ==testo==, nel file a sé markdown_it_mark.py
     ("markdown-it-mark", "MIT — Vitaly Puzrin, Alex Kocharin; ExecutableBookProject",
      "https://github.com/markdown-it/markdown-it-mark"),
@@ -92,8 +101,16 @@ DEFAULTS = {
     "speculative": False, "reasoning": False, "effort": "low",
     "preset": "balanced", "sampling": dict(PRESETS["balanced"]), "seed": -1,
     "system": "", "font_size": 0, "width": 1100, "height": 780, "maximized": False,
-    "sidebar": True, "theme": "system",
+    "sidebar": True, "theme": "system", "view": "chat",
+    # Immagini (diffusion_view.py): 0 e "" = valore consigliato per il modello
+    "img_model": "", "img_folders": [], "img_quality": "normal", "img_aspect": "square",
+    "img_count": 1, "img_negative": "", "img_steps": 0, "img_cfg": 0.0, "img_side": 0,
+    "img_sampler": "", "img_seed": -1, "img_gpu": True, "img_device": "",
+    "img_te_device": "",
+    "img_threads": rusca_diffusion.physical_cores(), "img_low_memory": False,
+    "img_metadata": False,
 }
+VIEWS = ("chat", "images")
 THEMES = ("system", "light", "dark")         # ordine delle voci nel menu
 
 
@@ -173,12 +190,18 @@ def load_settings():
             data = json.load(f)
         if isinstance(data, dict):
             for k, v in data.items():
+                if isinstance(cfg.get(k), float) and isinstance(v, int) \
+                        and not isinstance(v, bool):
+                    v = float(v)
                 if k in cfg and isinstance(v, type(cfg[k])):
                     cfg[k] = v
     except (OSError, ValueError):
         pass
     if cfg["preset"] not in PRESETS:
         cfg["preset"] = "balanced"
+    cfg["img_folders"] = [f for f in cfg["img_folders"] if isinstance(f, str)]
+    if cfg["view"] not in VIEWS:
+        cfg["view"] = "chat"
     return cfg
 
 
@@ -397,6 +420,9 @@ class Message(Gtk.Box):
             menu = Gio.Menu()
             menu.append(_("save_answer_md"), "win.save-answer")
             menu.append(_("save_code_blocks"), "win.save-code")
+            images = Gio.Menu()
+            images.append(_("img_from_answer"), "win.image-from-answer")
+            menu.append_section(None, images)
             more.set_menu_model(menu)
             more.connect("notify::active", self._on_menu)
             for b in (copy, more):
@@ -667,7 +693,11 @@ class RuscaLLamaWindow(FontSizeMixin, Adw.ApplicationWindow):
                          ("engine-stop", self.stop_engine),
                          ("engine-restart", self.restart_engine),
                          ("show-log", self.show_log),
-                         ("stop", self.stop_generation),
+                         ("show-image-log", self.show_image_log),
+                         ("image-from-answer", self.image_from_answer),
+                         ("view-chat", lambda: self.show_view("chat")),
+                         ("view-images", lambda: self.show_view("images")),
+                         ("stop", self.stop_current),
                          ("toggle-sidebar", self.toggle_sidebar),
                          ("shortcuts", self.show_shortcuts),
                          ("about", self.show_about)):
@@ -678,11 +708,16 @@ class RuscaLLamaWindow(FontSizeMixin, Adw.ApplicationWindow):
     # ── interfaccia ───────────────────────────────────────────────────────
     def _build_ui(self):
         header = Adw.HeaderBar()
-        self.title = Adw.WindowTitle(title=APP_NAME)
-        header.set_title_widget(self.title)
-        new = Gtk.Button(icon_name="list-add-symbolic", action_name="win.new-chat",
-                         tooltip_text=_("new_chat"))
-        header.pack_start(new)
+        # Due viste, Chat e Immagini (specifiche, sezione 3.2): il selettore
+        # sta nella barra del titolo; nelle finestre strette scende in basso.
+        self.views = Adw.ViewStack(vexpand=True)
+        self.switcher = Adw.ViewSwitcher(stack=self.views,
+                                         policy=Adw.ViewSwitcherPolicy.WIDE)
+        header.set_title_widget(self.switcher)
+        self.new_btn = Gtk.Button(icon_name="list-add-symbolic", action_name="win.new-chat",
+                                  tooltip_text=_("new_chat"))
+        self.new_btn.update_property([Gtk.AccessibleProperty.LABEL], [_("new_chat")])
+        header.pack_start(self.new_btn)
         menu = Gio.Menu()
         save = Gio.Menu()
         save.append(_("save_md"), "win.save-md")
@@ -692,6 +727,7 @@ class RuscaLLamaWindow(FontSizeMixin, Adw.ApplicationWindow):
         eng.append(_("engine_restart"), "win.engine-restart")
         eng.append(_("engine_stop"), "win.engine-stop")
         eng.append(_("engine_log"), "win.show-log")
+        eng.append(_("img_log"), "win.show-image-log")
         menu.append_section(None, eng)
         app_menu = Gio.Menu()
         app_menu.append(_("shortcuts"), "win.shortcuts")
@@ -723,16 +759,31 @@ class RuscaLLamaWindow(FontSizeMixin, Adw.ApplicationWindow):
         self.stack = Gtk.Stack(transition_type=Gtk.StackTransitionType.CROSSFADE)
         self.stack.add_named(self.empty, "empty")
         self.stack.add_named(self.chat_scroll, "chat")
-        self.toasts = Adw.ToastOverlay(child=self.stack)
+        chat = Adw.ToolbarView(content=self.stack)
+        chat.add_top_bar(self.banner)
+        chat.add_bottom_bar(self._build_input())
+        chat_icon = f"{APP_ID}-symbolic" if theme_has_icon(f"{APP_ID}-symbolic") \
+            else "chat-message-new-symbolic"
+        self.views.add_titled_with_icon(chat, "chat", _("view_chat"), chat_icon)
 
+        # Immagini
+        self.images = diffusion_view.ImagesPage(self, _)
+        self.views.add_titled_with_icon(self.images, "images", _("view_images"),
+                                        "image-x-generic-symbolic")
+
+        self.toasts = Adw.ToastOverlay(child=self.views)
+        self.switcher_bar = Adw.ViewSwitcherBar(stack=self.views)
         view = Adw.ToolbarView(content=self.toasts)
         view.add_top_bar(header)
-        view.add_top_bar(self.banner)
-        view.add_bottom_bar(self._build_input())
+        view.add_bottom_bar(self.switcher_bar)
 
         # Il pannello ha la sua barra del titolo: con il pannello aperto a
         # destra, sono i suoi i pulsanti della finestra (chiudi, riduci...).
-        sidebar = Adw.ToolbarView(content=self._build_sidebar())
+        # Mostra le impostazioni della vista in primo piano.
+        self.sidebar_stack = Gtk.Stack(transition_type=Gtk.StackTransitionType.CROSSFADE)
+        self.sidebar_stack.add_named(self._build_sidebar(), "chat")
+        self.sidebar_stack.add_named(self.images.settings_page, "images")
+        sidebar = Adw.ToolbarView(content=self.sidebar_stack)
         sidebar.add_top_bar(Adw.HeaderBar(show_title=False))
         self.split = Adw.OverlaySplitView(content=view, sidebar=sidebar,
                                           sidebar_position=Gtk.PackType.END,
@@ -744,7 +795,15 @@ class RuscaLLamaWindow(FontSizeMixin, Adw.ApplicationWindow):
         breakpoint_ = Adw.Breakpoint.new(Adw.BreakpointCondition.parse("max-width: 760sp"))
         breakpoint_.add_setter(self.split, "collapsed", True)
         self.add_breakpoint(breakpoint_)
+        narrow = Adw.Breakpoint.new(Adw.BreakpointCondition.parse("max-width: 550sp"))
+        narrow.add_setter(self.split, "collapsed", True)
+        narrow.add_setter(self.switcher, "visible", False)
+        narrow.add_setter(self.switcher_bar, "reveal", True)
+        self.add_breakpoint(narrow)
         self.set_content(self.split)
+        self.views.connect("notify::visible-child-name", lambda *_a: self._on_view())
+        self.views.set_visible_child_name(self.cfg["view"])
+        self._on_view()
 
     def _build_input(self):
         outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6,
@@ -793,11 +852,17 @@ class RuscaLLamaWindow(FontSizeMixin, Adw.ApplicationWindow):
         for w in (attach, overlay, self.send_btn, self.stop_btn):
             row.append(w)
         outer.append(row)
+        # Stato del motore (modello caricato, spento...) e velocità.
+        status = Gtk.Box(spacing=12)
+        self.engine_label = Gtk.Label(xalign=0, hexpand=True,
+                                      ellipsize=Pango.EllipsizeMode.MIDDLE)
         self.stats = Gtk.Label(xalign=1, visible=False)
-        self.stats.add_css_class("caption")
-        self.stats.add_css_class("dim-label")
-        self.stats.add_css_class("numeric")
-        outer.append(self.stats)
+        for label in (self.engine_label, self.stats):
+            label.add_css_class("caption")
+            label.add_css_class("dim-label")
+            label.add_css_class("numeric")
+            status.append(label)
+        outer.append(status)
         clamp = Adw.Clamp(child=outer, maximum_size=820)
         return clamp
 
@@ -1126,8 +1191,8 @@ class RuscaLLamaWindow(FontSizeMixin, Adw.ApplicationWindow):
         if not self.engine.running and state in ("ready", "starting"):
             state = "stopped"
         model = os.path.basename(self.cfg["model"]) if self.cfg["model"] else _("no_model")
-        self.title.set_subtitle({"ready": model, "starting": _("state_starting")}
-                                .get(state, _("state_stopped")))
+        self.engine_label.set_label({"ready": model, "starting": _("state_starting")}
+                                    .get(state, _("state_stopped")))
         b = self.banner
         if not engine.find_binary():
             b.set_title(_("banner_no_engine"))
@@ -1454,23 +1519,68 @@ class RuscaLLamaWindow(FontSizeMixin, Adw.ApplicationWindow):
         self.get_clipboard().set(text)
         self.toasts.add_toast(Adw.Toast(title=_("copied"), timeout=2))
 
+    # ── viste ─────────────────────────────────────────────────────────────
+    def _on_view(self):
+        name = self.views.get_visible_child_name() or "chat"
+        self.sidebar_stack.set_visible_child_name(name)
+        self.new_btn.set_visible(name == "chat")
+        if name != self.cfg["view"]:
+            self._set("view", name)
+        (self.images.focus if name == "images" else self.input.grab_focus)()
+
+    def show_view(self, name):
+        self.views.set_visible_child_name(name)
+
+    def stop_current(self):
+        """Esc: ferma cio' che si sta facendo nella vista in primo piano."""
+        if self.views.get_visible_child_name() == "images":
+            self.images.stop()
+        else:
+            self.stop_generation()
+
+    def attach_image(self, path):
+        """Un'immagine creata nella vista Immagini, allegata al prossimo
+        messaggio della chat (serve un modello con la Visione)."""
+        self._add_attachment(path)
+        self.show_view("chat")
+
+    def image_from_answer(self):
+        """Usa una risposta come descrizione di un'immagine: il primo blocco
+        di codice se c'e' (i modelli ci mettono spesso il prompt), altrimenti
+        il testo della risposta senza formattazione."""
+        msg = self._target_message()
+        if msg is None or not msg.text:
+            self.toasts.add_toast(Adw.Toast(title=_("nothing_to_save")))
+            return
+        blocks = md.code_blocks(msg.text)
+        text = blocks[0][1] if blocks else md.plain_text(
+            "\n\n".join(b[1] for b in md.parse_blocks(msg.text) if b[0] == "text"))
+        self.images.set_prompt(text or msg.text)
+        self.show_view("images")
+
     # ── finestre secondarie ───────────────────────────────────────────────
     def toggle_sidebar(self):
         self.split.set_show_sidebar(not self.split.get_show_sidebar())
 
-    def show_log(self):
+    def show_log(self, lines=None, title=None):
         view = Gtk.TextView(editable=False, cursor_visible=False, monospace=True,
                             wrap_mode=Gtk.WrapMode.WORD_CHAR, top_margin=12,
                             bottom_margin=12, left_margin=12, right_margin=12)
-        view.get_buffer().set_text("\n".join(self.log_lines) or _("log_empty"))
+        lines = self.log_lines if lines is None else lines
+        view.get_buffer().set_text("\n".join(lines) or _("log_empty"))
         toolbar = Adw.ToolbarView(content=Gtk.ScrolledWindow(child=view, vexpand=True))
         toolbar.add_top_bar(Adw.HeaderBar())
-        Adw.Dialog(title=_("engine_log"), content_width=720, content_height=480,
+        Adw.Dialog(title=title or _("engine_log"), content_width=720, content_height=480,
                    child=toolbar).present(self)
+
+    def show_image_log(self):
+        self.show_log(self.images.log_lines, _("img_log"))
 
     def show_shortcuts(self):
         group = Adw.PreferencesGroup()
-        for title, accel in ((_("send"), "Return"), (_("newline"), "<Shift>Return"),
+        for title, accel in ((_("view_chat"), "<Alt>1"), (_("view_images"), "<Alt>2"),
+                             (_("send") + " / " + _("img_generate"), "Return"),
+                             (_("newline"), "<Shift>Return"),
                              (_("stop"), "Escape"), (_("new_chat"), "<Control>n"),
                              (_("attach"), "<Control>o"), (_("save_md"), "<Control>s"),
                              (_("settings_toggle"), "F9"),
@@ -1500,6 +1610,24 @@ class RuscaLLamaWindow(FontSizeMixin, Adw.ApplicationWindow):
         dialog.present(self)
 
     def _on_close(self, *_a):
+        # Le immagini non salvate stanno nella cache e si cancellano alla
+        # chiusura: prima si chiede (specifiche, sezione 3.8).
+        if self.images.unsaved() and not getattr(self, "_closing", False):
+            dialog = Adw.AlertDialog(heading=_("img_close_title"), body=_("img_close_body"))
+            dialog.add_response("cancel", _("cancel"))
+            dialog.add_response("close", _("img_close_confirm"))
+            dialog.set_response_appearance("close", Adw.ResponseAppearance.DESTRUCTIVE)
+            dialog.set_default_response("cancel")
+            dialog.set_close_response("cancel")
+
+            def answered(_d, response):
+                if response == "close":
+                    self._closing = True
+                    self.close()
+            dialog.connect("response", answered)
+            dialog.present(self)
+            return True
+        self.images.shutdown()
         self.stop_generation()
         self.engine.stop(wait=True)
         w, h = self.get_default_size()
@@ -1536,6 +1664,7 @@ class RuscaLLamaApp(Adw.Application):
         for action, accels in (("app.quit", ["<Control>q"]), ("window.close", ["<Control>w"]),
                                ("win.new-chat", ["<Control>n"]), ("win.attach", ["<Control>o"]),
                                ("win.save-md", ["<Control>s"]), ("win.stop", ["Escape"]),
+                               ("win.view-chat", ["<Alt>1"]), ("win.view-images", ["<Alt>2"]),
                                ("win.toggle-sidebar", ["F9"]),
                                ("win.zoom-in", ["<Control>plus", "<Control>equal", "<Control>KP_Add"]),
                                ("win.zoom-out", ["<Control>minus", "<Control>KP_Subtract"]),

@@ -5,7 +5,8 @@ set -e
 # adwaita-prugna, ruscalinux-backgrounds-it, ruscalinux-fonts, ruscalinux-theme,
 # ruscalinux-shell-theme e le utility di
 # tools/ (ruscacleaner, ruscahub, ruscamark, ruscawriter, ruscallama-engine, ruscallama,
-# ruscatranslator, ruscawhisper-engine, ruscatranscriber, ruscanarrator, ruscacat)
+# ruscatranslator, ruscawhisper-engine, ruscatranscriber, ruscanarrator, ruscacat,
+# ruscadiffusion-engine)
 cp local/extra_debs/*.deb .work/config/packages.chroot/
 
 # IMPOSTAZIONE splash.png BINARY

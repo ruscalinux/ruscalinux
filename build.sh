@@ -125,13 +125,14 @@ elif [ -n "$(find branding tools -name build-deb -prune -o \
     ./make-debs.sh
 fi
 
-# Motori: il make-deb.sh di ruscallama-engine e di ruscawhisper-engine
-# costruisce l'ultima release stabile di llama.cpp e di whisper.cpp. Se ne e'
-# uscita una piu' nuova di quella gia' impacchettata, si ricostruisce anche
-# se in tools/ non e' cambiato nulla (una volta sola: make-debs.sh rifa'
-# tutti e due i motori). Senza rete il controllo si salta e restano i
-# pacchetti che ci sono.
-for coppia in ruscallama-engine:llama.cpp ruscawhisper-engine:whisper.cpp; do
+# Motori: il make-deb.sh di ruscallama-engine, ruscawhisper-engine e
+# ruscadiffusion-engine costruisce l'ultima release di llama.cpp, whisper.cpp
+# e stable-diffusion.cpp. Se ne e' uscita una piu' nuova di quella gia'
+# impacchettata, si ricostruisce anche se in tools/ non e' cambiato nulla
+# (una volta sola: make-debs.sh rifa' tutti i motori). Senza rete il
+# controllo si salta e restano i pacchetti che ci sono.
+for coppia in ruscallama-engine:llama.cpp ruscawhisper-engine:whisper.cpp \
+              ruscadiffusion-engine:stable-diffusion.cpp; do
     motore=${coppia%%:*}
     progetto=${coppia#*:}
     DEB=$(ls local/extra_debs/"$motore"-*.deb 2> /dev/null | head -n 1)

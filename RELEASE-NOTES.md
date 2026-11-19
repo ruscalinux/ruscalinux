@@ -63,6 +63,17 @@
   (Ukrainian and Russian, Simplified and Traditional Chinese, European and
   Brazilian Portuguese). Models are not included: copy a GGUF file into
   `~/.local/share/ruscallama/models/`.
+- **Images from a description.** RuscaLLama has a second view, Images:
+  describe what you want to see, choose square, landscape or portrait and
+  press Generate; a preview shows the image taking shape. Its engine,
+  **ruscadiffusion-engine**, is stable-diffusion.cpp built from source with
+  Vulkan and without any network code, started once per image: no server,
+  no port. It runs single-file models (Stable Diffusion 1.5, SDXL, Turbo
+  models) and models made of several files (FLUX, SD 3.5, Z-Image,
+  Qwen-Image), recognised on their own. Models are not included: copy them
+  into `~/.local/share/ruscadiffusion/models/`, or add the folder where they
+  already are. An image can be attached to the conversation, and an answer
+  can become the description of a new image.
 - **Speech to text.** RuscaTranscriber transcribes a video or audio file with a
   Whisper model that runs on your own computer and saves the text as
   Markdown and the subtitles as SRT. Its engine, **ruscawhisper-engine**, is

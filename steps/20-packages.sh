@@ -110,19 +110,29 @@ python3-venv
 python3-tk
 
 # Costruire RuscaLinux da RuscaLinux (build.sh, make-debs.sh, test.sh).
-# live-build, squashfs-tools, sudo, git e build-essential (con dpkg-dev)
-# sono gia' sopra.
+# live-build, squashfs-tools, sudo, git e build-essential (con dpkg-dev,
+# per dpkg-deb, dpkg-shlibdeps e dpkg-buildflags, e binutils, per strip, nm
+# e readelf) sono gia' sopra.
 unzip
 python3-fonttools
 lintian
 qemu-utils
 ovmf
+# Controlli di make-deb.sh di ogni tool: desktop-file-validate per i file
+# .desktop, appstreamcli per la metainfo, apparmor_parser per i profili
+# AppArmor dei motori. curl lo usano ultima-versione.sh dei motori (con
+# wget come ripiego) per sapere qual e' l'ultima release.
+desktop-file-utils
+appstream
+apparmor
+curl
 # Test dei tool: rilettura dei PDF prodotti da RuscaWriter
 python3-pypdf
 
-# Compilare ruscallama-engine (llama.cpp) e ruscawhisper-engine
-# (whisper.cpp) con il backend Vulkan: vedi tools/ruscallama-engine/README.md
-# e tools/ruscawhisper-engine/README.md
+# Compilare ruscallama-engine (llama.cpp), ruscawhisper-engine (whisper.cpp)
+# e ruscadiffusion-engine (stable-diffusion.cpp) con il backend Vulkan: vedi
+# tools/ruscallama-engine/README.md, tools/ruscawhisper-engine/README.md e
+# tools/ruscadiffusion-engine/README.md
 cmake
 wget
 libvulkan-dev
