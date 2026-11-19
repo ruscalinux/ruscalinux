@@ -26,15 +26,20 @@ gimp
 imagemagick
 gcolor3
 eog
-# Grafica vettoriale, sviluppo dei RAW delle fotocamere, modellazione 3D
-inkscape
+# Sviluppo dei RAW delle fotocamere
 darktable
-blender
+# Riconoscimento del testo (OCR) da immagini e PDF scansionati, con Tesseract
+# in tutte le lingue e scritture che conosce (tesseract-ocr-all: un
+# pacchetto per lingua, piu' di cento)
+gimagereader
+tesseract-ocr-all
 
 # Ebooks
 gnome-epub-thumbnailer
 calibre
 foliate
+# Editor di libri EPUB
+sigil
 
 # Scrittura
 goldendict-ng

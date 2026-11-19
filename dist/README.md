@@ -21,8 +21,8 @@ moment it boots.
 - **Base** — Debian 13 stable, Linux 6.12 long-term kernel
 - **Desktop** — GNOME 48.7 on Wayland with custom Adwaita-Prugna icons and Plymouth boot splash
 - **Office** — LibreOffice 25.2 (Writer, Calc, Impress, Draw, Math, Base), Evince
-- **Multimedia** — SMPlayer, Audacity, OBS Studio, GIMP 3.0, Inkscape, darktable, Blender, Audacious, Asunder, Brasero, EasyTAG, Gaupol, MediaInfo, FFmpeg 7.1
-- **E-books and files** — Calibre, Foliate, GPRename
+- **Multimedia** — SMPlayer, Audacity, OBS Studio, GIMP 3.0, darktable, Audacious, Asunder, Brasero, EasyTAG, Gaupol, MediaInfo, FFmpeg 7.1
+- **E-books and files** — Calibre, Foliate, Sigil, gImageReader (OCR with Tesseract in all languages), GPRename
 - **Internet** — Firefox ESR 153, Thunderbird 140, qBittorrent
 - **Languages** — 40+ localizations bundled in the base image
 - **In-house tools** (in the RuscaLinux-Tools folder of the app grid) — RuscaMark (Markdown editor), RuscaWriter (book writing), RuscaHub (AppImage manager), RuscaCleaner (privacy cleanup), RuscaLLama and RuscaTranslator (local AI chat and translation)

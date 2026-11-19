@@ -47,10 +47,11 @@
   in the **RuscaLinux-Tools** folder of the GNOME app grid. The folder is
   created at the first login of each user; you can rename, empty or delete
   it like any other folder.
-- **New applications.** Inkscape (vector graphics), darktable (raw photo
-  development), Blender (3D modelling and animation), MediaInfo (technical
-  details of audio and video files), Asunder (audio CD ripper), Gaupol
-  (subtitle editor) and GPRename (batch file renaming).
+- **New applications.** darktable (raw photo development), gImageReader
+  (text recognition from images and scanned PDFs, with Tesseract in all its
+  languages), Sigil (EPUB book editor), MediaInfo (technical details of audio
+  and video files), Asunder (audio CD ripper), Gaupol (subtitle editor) and
+  GPRename (batch file renaming).
 - **26 languages everywhere.** All in-house tools follow the system language
   and are translated into the same 26 languages, now including Traditional
   Chinese and European Portuguese.
