@@ -53,8 +53,29 @@ def lualatex_path():
     return None
 
 
+# File di TeX Live che il PDF tipografico usa, con il pacchetto Debian che li
+# porta: senza, lualatex parte ma si ferma alla prima riga del documento.
+REQUIRED_TEX_FILES = ("scrbook.cls", "fontspec.sty", "microtype.sty", "ragged2e.sty")
+KPSEWHICH = "/usr/bin/kpsewhich"
+
+
+def missing_tex_files():
+    """I file di REQUIRED_TEX_FILES che TeX Live non trova (vuoto se ci sono
+    tutti). Li cerca kpsewhich, lo strumento di TeX Live per questo."""
+    if not (os.path.isfile(KPSEWHICH) and os.access(KPSEWHICH, os.X_OK)):
+        return list(REQUIRED_TEX_FILES)
+    try:
+        r = subprocess.run([KPSEWHICH, *REQUIRED_TEX_FILES], stdin=subprocess.DEVNULL,
+                           capture_output=True, text=True, timeout=30, check=False)
+    except (OSError, subprocess.SubprocessError):
+        return list(REQUIRED_TEX_FILES)
+    found = {os.path.basename(x.strip()) for x in r.stdout.splitlines() if x.strip()}
+    return [f for f in REQUIRED_TEX_FILES if f not in found]
+
+
 def available():
-    return lualatex_path() is not None
+    """lualatex e i pacchetti LaTeX che servono sono installati."""
+    return lualatex_path() is not None and not missing_tex_files()
 
 
 class TypesetError(Exception):
@@ -685,8 +706,8 @@ def run(workdir, passes=2):
     """lualatex su book.tex, senza shell né rete, confinato in workdir.
     Restituisce il percorso del PDF o solleva TypesetError."""
     exe = lualatex_path()
-    if exe is None:
-        raise TypesetError(f"lualatex non installato ({DEPENDENCIES})")
+    if exe is None or missing_tex_files():
+        raise TypesetError(f"TeX Live incompleto: sudo apt install {DEPENDENCIES}")
     env = {k: v for k, v in os.environ.items()
            if k in ("PATH", "HOME", "LANG", "LC_ALL", "LANGUAGE", "XDG_CACHE_HOME", "USER")}
     cache = os.path.join(os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache"),

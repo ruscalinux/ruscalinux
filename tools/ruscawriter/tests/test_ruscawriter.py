@@ -1933,6 +1933,11 @@ def test_pdf_tipografico():
     check("tabella e caselle delle attività", "\\begin{longtable}" in corpo and "\\item[☑]" in corpo)
     check("caratteri copiati nella cartella di lavoro",
           os.path.exists(os.path.join(d, "fonts", "book-regular.ttf")))
+    salvati = typeset.REQUIRED_TEX_FILES
+    typeset.REQUIRED_TEX_FILES = salvati + ("pacchetto-che-non-esiste.sty",)
+    check("un pacchetto LaTeX mancante rende l'export non disponibile",
+          not typeset.available() and "pacchetto-che-non-esiste.sty" in typeset.missing_tex_files())
+    typeset.REQUIRED_TEX_FILES = salvati
     if typeset.available():
         out_pdf = os.path.join(d, "libro.pdf")
         try:
