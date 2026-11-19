@@ -1933,6 +1933,11 @@ def test_pdf_tipografico():
     check("tabella e caselle delle attività", "\\begin{longtable}" in corpo and "\\item[☑]" in corpo)
     check("caratteri copiati nella cartella di lavoro",
           os.path.exists(os.path.join(d, "fonts", "book-regular.ttf")))
+    check("errore di TeX leggibile anche dentro un pacchetto",
+          typeset._tex_error("/usr/x/y.sty:3: LaTeX Error: boom\nl.3 z").startswith("LaTeX Error: boom"))
+    check("errore fatale di luaotfload riconosciuto",
+          "no writeable cache path" in typeset._tex_error(
+              "luaotfload | load : FATAL ERROR\nluaotfload | load : × \"no writeable cache path\""))
     salvati = typeset.REQUIRED_TEX_FILES
     typeset.REQUIRED_TEX_FILES = salvati + ("pacchetto-che-non-esiste.sty",)
     check("un pacchetto LaTeX mancante rende l'export non disponibile",

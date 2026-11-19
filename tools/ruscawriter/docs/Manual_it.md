@@ -237,7 +237,7 @@ I margini si salvano **nel documento**, un insieme per ogni formato: un libro ri
 | `~/.config/ruscawriter/settings.json` | Impostazioni |
 | `~/.local/share/ruscawriter/dictionaries/` | Dizionari aggiunti |
 | `~/.cache/ruscawriter/mdict/` | Indici dei dizionari, eliminabili |
-| `~/.cache/ruscawriter/texmf-var/` | Cache dei caratteri del PDF tipografico, eliminabile |
+| `~/.cache/ruscawriter/pdf-tipografico/` | Sorgente e registro dell'ultimo PDF tipografico non riuscito, da allegare a una segnalazione; eliminabile |
 | `<progetto>.rwr.autosave` | Copia automatica, accanto al progetto |
 | `/usr/share/ruscawriter/` | Programma installato |
 | `/usr/share/doc/ruscawriter/` | Questo manuale e la versione inglese |
@@ -252,7 +252,7 @@ I margini si salvano **nel documento**, un insieme per ogni formato: un libro ri
 | Niente controllo ortografico | Installa `gir1.2-spelling-1` e il dizionario `hunspell-<lingua>` |
 | PDF senza sillabazione | Installa `python3-pyphen` e `hyphen-<lingua>` |
 | Manca il PDF tipografico | `sudo apt install texlive-luatex texlive-latex-recommended` |
-| «Composizione non riuscita» | Il messaggio riporta l'errore di TeX; esporta il PDF normale e segnala il problema |
+| «Composizione non riuscita» | Il messaggio riporta l'errore di TeX e la cartella con sorgente e registro; esporta il PDF normale e segnala il problema allegando quei file |
 | Esportazione AZW3 impossibile | Installa Calibre, oppure esporta in EPUB |
 | Dizionario con «⚠» | Leggi il motivo nell'elenco; verifica di aver scelto il `.mdx` e non il `.mdd` |
 | Impostazioni strane | Chiudi il programma e rinomina `~/.config/ruscawriter/settings.json` |

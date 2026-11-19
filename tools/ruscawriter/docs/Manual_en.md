@@ -237,7 +237,7 @@ Margins are saved **in the document**, one set per format, so a book reopened la
 | `~/.config/ruscawriter/settings.json` | Settings |
 | `~/.local/share/ruscawriter/dictionaries/` | Added dictionaries |
 | `~/.cache/ruscawriter/mdict/` | Dictionary indexes (safe to delete) |
-| `~/.cache/ruscawriter/texmf-var/` | Font cache of the typeset PDF (safe to delete) |
+| `~/.cache/ruscawriter/pdf-tipografico/` | Source and log of the last typeset PDF that failed, to attach to a bug report (safe to delete) |
 | `<project>.rwr.autosave` | Automatic copy, next to the project |
 | `/usr/share/ruscawriter/` | Installed program |
 | `/usr/share/doc/ruscawriter/` | This manual and the Italian edition |
@@ -252,7 +252,7 @@ Margins are saved **in the document**, one set per format, so a book reopened la
 | No spell checking | Install `gir1.2-spelling-1` and `hunspell-<lang>` |
 | PDF without hyphenation | Install `python3-pyphen` and `hyphen-<lang>` |
 | No typeset PDF | `sudo apt install texlive-luatex texlive-latex-recommended` |
-| "Typesetting failed" | The message quotes TeX's error; export the ordinary PDF and report the problem |
+| "Typesetting failed" | The message quotes TeX's error and the folder with source and log; export the ordinary PDF and report the problem, attaching those files |
 | AZW3 export not possible | Install Calibre, or export to EPUB instead |
 | Dictionary marked "⚠" | Read the reason in the list; make sure you chose the `.mdx`, not the `.mdd` |
 | Odd settings | Close the program and rename `~/.config/ruscawriter/settings.json` |

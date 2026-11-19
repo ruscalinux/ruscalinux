@@ -21,9 +21,10 @@ Sicurezza. Il testo del libro non diventa mai codice TeX: ogni carattere
 speciale (\\ { } $ & % # _ ^ ~) è sostituito dal comando che lo stampa, quindi
 dal documento non può nascere nessun comando (né \\input, né \\directlua). Il
 preambolo è scritto solo da questo modulo. lualatex gira senza shell
-(-no-shell-escape), senza poter scrivere né leggere fuori dalla cartella
-temporanea (openout_any/openin_any = p), con un tempo massimo; i caratteri e
-le immagini vengono copiati o collegati lì dentro con nomi scelti qui.
+(-no-shell-escape), con le regole di Debian sui file (scrive solo nella
+cartella temporanea e nella cache di TeX Live) e un tempo massimo; i
+caratteri e le immagini vengono copiati o collegati lì dentro con nomi
+scelti qui.
 Nessun accesso alla rete: TeX Live non ne fa.
 """
 
@@ -691,52 +692,106 @@ def _front_tex(front, colophon):
 # ---------------------------------------------------------------------------
 # Composizione
 # ---------------------------------------------------------------------------
+_ERR_LINE = re.compile(r"^(?:!\s*(.*)|\S+\.(?:tex|sty|cls|def|lua):\d+:\s*(.*))$")
+
+
 def _tex_error(log):
-    """Il primo errore del registro di TeX, in una riga leggibile."""
+    """Il primo errore del registro di TeX, in una riga leggibile: un «!»,
+    un «file:riga: messaggio» (anche dentro un pacchetto) o un errore fatale
+    di luaotfload (per esempio la cache dei caratteri non scrivibile)."""
     lines = log.splitlines()
     for i, ln in enumerate(lines):
-        if ln.startswith("!") or re.match(r"^\./book\.tex:\d+:", ln):
-            msg = re.sub(r"^\./book\.tex:\d+:\s*|^!\s*", "", ln).strip()
+        m = _ERR_LINE.match(ln)
+        if m:
+            msg = (m.group(1) or m.group(2) or "").strip()
             ctx = " ".join(x.strip() for x in lines[i + 1:i + 3] if x.strip().startswith("l."))
             return (msg + (" — " + ctx if ctx else "")).strip()[:400]
+        if "luaotfload" in ln and "FATAL" in ln:
+            more = [x.split("×", 1)[-1].strip() for x in lines[i + 1:i + 6] if "×" in x]
+            return ("luaotfload: " + " ".join(more)).strip()[:400]
     return ""
 
 
+def _texmfvar(env):
+    """La cartella della cache di TeX Live dell'utente (TEXMFVAR, in Debian
+    ~/.texliveAAAA/texmf-var). Si crea se manca: luaotfload vi scrive la
+    cache dei caratteri e da TeX Live 2024 non la crea più da solo."""
+    try:
+        r = subprocess.run([KPSEWHICH, "-var-value=TEXMFVAR"], env=env,
+                           stdin=subprocess.DEVNULL, capture_output=True, text=True,
+                           timeout=30, check=False)
+        path = r.stdout.strip()
+        if path and os.path.isabs(path):
+            os.makedirs(path, exist_ok=True)
+            return path
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return None
+
+
+def _save_failed(workdir):
+    """Copia sorgente e registro di una composizione fallita in
+    ~/.cache/ruscawriter/pdf-tipografico/, per poterli guardare o inviare."""
+    dest = os.path.join(os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache"),
+                        "ruscawriter", "pdf-tipografico")
+    try:
+        os.makedirs(dest, exist_ok=True)
+        for name in ("book.tex", "book.log", "lualatex-output.txt"):
+            src = os.path.join(workdir, name)
+            if os.path.isfile(src):
+                shutil.copyfile(src, os.path.join(dest, name))
+        return dest
+    except OSError:
+        return None
+
+
 def run(workdir, passes=2):
-    """lualatex su book.tex, senza shell né rete, confinato in workdir.
-    Restituisce il percorso del PDF o solleva TypesetError."""
+    """lualatex su book.tex, senza shell né rete. Restituisce il percorso
+    del PDF o solleva TypesetError (con l'errore di TeX e la cartella dove
+    sono rimasti sorgente e registro).
+
+    Le regole di TeX Live sui file restano quelle di Debian (openout_any =
+    p: si scrive solo nella cartella di lavoro e nella cache di TeX Live).
+    Non si restringono oltre: da TeX Live 2024 valgono anche per il Lua di
+    luaotfload, che con regole più strette non riesce a scrivere la cache
+    dei caratteri e ferma la composizione. Il testo del libro, comunque,
+    non può contenere comandi (escape())."""
     exe = lualatex_path()
     if exe is None or missing_tex_files():
         raise TypesetError(f"TeX Live incompleto: sudo apt install {DEPENDENCIES}")
     env = {k: v for k, v in os.environ.items()
            if k in ("PATH", "HOME", "LANG", "LC_ALL", "LANGUAGE", "XDG_CACHE_HOME", "USER")}
-    cache = os.path.join(os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache"),
-                         "ruscawriter", "texmf-var")
-    os.makedirs(cache, exist_ok=True)
-    env.update({
-        "openout_any": "p", "openin_any": "p", "shell_escape": "f",
-        "TEXMFVAR": cache,                    # cache dei caratteri di luaotfload
-        "max_print_line": "1000",
-    })
+    env.update({"shell_escape": "f", "max_print_line": "1000"})
+    _texmfvar(env)
     args = [exe, "-interaction=nonstopmode", "-halt-on-error", "-no-shell-escape",
             "-file-line-error", "book.tex"]
     log_path = os.path.join(workdir, "book.log")
+    pdf = os.path.join(workdir, "book.pdf")
     for n in range(passes + 1):
         try:
-            subprocess.run(args, cwd=workdir, env=env, stdin=subprocess.DEVNULL,
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                           timeout=TIMEOUT_S, check=False)
+            r = subprocess.run(args, cwd=workdir, env=env, stdin=subprocess.DEVNULL,
+                               capture_output=True, timeout=TIMEOUT_S, check=False)
         except subprocess.TimeoutExpired:
             raise TypesetError("tempo scaduto")
+        out = (r.stdout or b"").decode("utf-8", "replace") + (r.stderr or b"").decode("utf-8", "replace")
+        try:
+            with open(os.path.join(workdir, "lualatex-output.txt"), "w", encoding="utf-8") as f:
+                f.write(out)
+        except OSError:
+            pass
         try:
             with open(log_path, encoding="utf-8", errors="replace") as f:
                 log = f.read()
         except OSError:
             log = ""
-        pdf = os.path.join(workdir, "book.pdf")
-        if "Fatal error" in log or not os.path.isfile(pdf):
-            raise TypesetError(_tex_error(log) or "lualatex non ha prodotto il PDF")
-        rerun = re.search(r"Rerun to get|Label\(s\) may have changed|rerunfilecheck", log)
+        if r.returncode != 0 or not os.path.isfile(pdf):
+            msg = _tex_error(log) or _tex_error(out)
+            if not msg:
+                tail = [x for x in out.strip().splitlines() if x.strip()][-3:]
+                msg = " / ".join(tail)[:400] or "lualatex non ha prodotto il PDF"
+            saved = _save_failed(workdir)
+            raise TypesetError(msg + (f"\n\n(sorgente e registro in {saved})" if saved else ""))
+        rerun = re.search(r"Rerun to get|Label\(s\) may have changed|rerunfilecheck Warning", log)
         if n + 1 >= passes and not rerun:
             break
     return pdf
