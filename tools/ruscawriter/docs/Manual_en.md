@@ -193,10 +193,24 @@ Main menu → Export:
 | Format | Notes |
 |---|---|
 | PDF | Book page sizes, binding margins, justified text, embedded fonts. Hyphenation needs `python3-pyphen` and `hyphen-<lang>`. |
+| Typeset PDF (LuaLaTeX) | The book typeset by LuaLaTeX, for print: see below. Needs `texlive-luatex` and `texlive-latex-recommended`, already in RuscaLinux. |
 | EPUB | With cover, frontispiece, colophon and table of contents |
 | AZW3 | Needs Calibre (`ebook-convert`), run locally |
 | ODT, DOCX | For LibreOffice or Word |
 | HTML, Markdown, TXT | Simple, open formats |
+
+### Typeset PDF
+
+Main menu → Export → *Export to typeset PDF (LuaLaTeX)…* typesets the book with LuaLaTeX, the TeX engine, the way books for the printer are made. Compared with the ordinary PDF:
+
+- **whole-paragraph line breaking**: TeX picks the line breaks looking at the whole paragraph, so justified text has no lines that are too loose or too tight;
+- **microtypography**: punctuation hangs slightly into the margin and letters widen or narrow imperceptibly, for more even columns;
+- the typeface's **kerning and ligatures** (fi, fl), and every script: Greek, Cyrillic, Arabic (right to left), Devanagari, Chinese, Japanese and Korean (with the Noto fonts of RuscaLinux);
+- **book structure**: full-page cover, title page, colophon on its back, table of contents with page numbers, chapters opening on a right-hand page, running heads (book title on left-hand pages, chapter on right-hand ones), no widows or orphans.
+
+Page size, margins, justification and hyphenation come from the page setup, which opens before the file chooser. The typeface is the book's (usually EB Garamond); symbols it lacks come from DejaVu Sans and Noto. Each line break in the text starts a paragraph with a first-line indent, as in printed books.
+
+Typesetting takes from a few seconds to a minute, depending on the length of the book, and runs in the background: you can keep writing. Hyphenation is Pyphen's, the same as the ordinary PDF. Everything happens on the computer, in a temporary folder that is deleted afterwards; the text of the book can never become a TeX command.
 
 ### Page setup
 
@@ -223,6 +237,7 @@ Margins are saved **in the document**, one set per format, so a book reopened la
 | `~/.config/ruscawriter/settings.json` | Settings |
 | `~/.local/share/ruscawriter/dictionaries/` | Added dictionaries |
 | `~/.cache/ruscawriter/mdict/` | Dictionary indexes (safe to delete) |
+| `~/.cache/ruscawriter/texmf-var/` | Font cache of the typeset PDF (safe to delete) |
 | `<project>.rwr.autosave` | Automatic copy, next to the project |
 | `/usr/share/ruscawriter/` | Installed program |
 | `/usr/share/doc/ruscawriter/` | This manual and the Italian edition |
@@ -236,6 +251,8 @@ Margins are saved **in the document**, one set per format, so a book reopened la
 | The program does not start | Check that `python3`, `python3-gi` and `gir1.2-gtk-4.0` are installed; run `ruscawriter` from a terminal to read the error |
 | No spell checking | Install `gir1.2-spelling-1` and `hunspell-<lang>` |
 | PDF without hyphenation | Install `python3-pyphen` and `hyphen-<lang>` |
+| No typeset PDF | `sudo apt install texlive-luatex texlive-latex-recommended` |
+| "Typesetting failed" | The message quotes TeX's error; export the ordinary PDF and report the problem |
 | AZW3 export not possible | Install Calibre, or export to EPUB instead |
 | Dictionary marked "⚠" | Read the reason in the list; make sure you chose the `.mdx`, not the `.mdd` |
 | Odd settings | Close the program and rename `~/.config/ruscawriter/settings.json` |

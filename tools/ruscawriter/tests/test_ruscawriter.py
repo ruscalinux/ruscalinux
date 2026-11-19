@@ -1885,6 +1885,82 @@ def test_formule_tabelle_immagini():
     check("file mancante lasciato com'è", "(manca.jpg)" in text)
 
 
+def test_pdf_tipografico():
+    print("PDF tipografico (LuaLaTeX): testo sicuro, struttura, composizione")
+    import re
+    from ruscawriter import typeset
+    nasty = "\\directlua{os.exit()} \\input{/etc/passwd} ^^5c $x$ # % & _ ~ {a} \\\\ \x00\ue000"
+    out = typeset.escape(nasty)
+    comandi = set(re.findall(r"\\([A-Za-z]+)", out))
+    check("il testo non produce comandi TeX",
+          comandi <= {"textbackslash", "textasciicircum", "textasciitilde"})
+    check("nessuna graffa aperta dal testo",
+          out.replace("\\{", "").replace("\\}", "").replace("{}", "").count("{") == 0)
+    check("niente caratteri di controllo né area privata", "\x00" not in out and "\ue000" not in out)
+    check("codice: spazi conservati, niente comandi",
+          typeset.code_line_tex("  a \\end{x}") == "~~a\\ \\textbackslash{}end\\{x\\}")
+    check("lingua del libro -> babel",
+          [typeset.BABEL_NAMES[typeset.lang_key(c)] for c in ("it_IT", "pt_BR", "zh-TW", "xx")]
+          == ["italian", "brazilian", "chinese-traditional", "english"])
+    check("le 26 lingue hanno un nome babel",
+          all(typeset.lang_key(c) != "en" or c.startswith("en") for c in pw_i18n.LANGUAGES))
+    hy = typeset.Hyphenator("it", True)
+    if hy.dic is not None:
+        t = typeset.text_tex("precipitevolissimevolmente https://www.esempio.it/percorso", hy)
+        check("sillabazione di Pyphen come \\-", "\\-" in t.split("http")[0])
+        check("gli indirizzi non si sillabano", "\\-" not in t.split("www", 1)[1])
+    else:
+        print("     (Pyphen o hyphen-it assenti: salto la sillabazione)")
+
+    p = sample_project()
+    p.frontispiece_fields.update(title="Romanzo di prova", author="Mario Bianchi")
+    p.colophon_fields.update(copyright="© 2026 Mario Bianchi")
+    p.chapters.append(Chapter(3, "# Terzo\n\nPericolo: " + nasty + "\n\n- [x] fatto\n- [ ] da fare\n\n"
+                                 "| a | b |\n|---|--:|\n| uno | due |\n\n```\n\\end{document}\n```", ""))
+    book = p.typeset_data(lang="it_IT", page_size="A5")
+    check("i dati del libro: capitoli senza la copertina", len(book["chapters"]) == 3)
+    check("margini in punti PDF", book["margins"]["inner"] > 30 and isinstance(book["margins"]["mirror"], bool))
+    d = tempfile.mkdtemp()
+    src = open(typeset.build_document(book, d), encoding="utf-8").read()
+    corpo = src.split("\\begin{document}", 1)[1]
+    check("un \\chapter per capitolo", corpo.count("\\chapter{") == 3)
+    check("il titolo «# Capitolo primo» non si ripete",
+          corpo.count("Capitolo primo") == 1)
+    check("indice e frontespizio", "\\tableofcontents" in corpo and "Mario Bianchi" in corpo)
+    check("il testo pericoloso resta testo",
+          "\\directlua{os" not in corpo and "\\input{/etc" not in corpo
+          and "\\end{document}" not in corpo.rsplit("\\end{document}", 1)[0])
+    check("tabella e caselle delle attività", "\\begin{longtable}" in corpo and "\\item[☑]" in corpo)
+    check("caratteri copiati nella cartella di lavoro",
+          os.path.exists(os.path.join(d, "fonts", "book-regular.ttf")))
+    if typeset.available():
+        out_pdf = os.path.join(d, "libro.pdf")
+        try:
+            typeset.typeset(book, out_pdf)
+            ok = True
+        except typeset.TypesetError as e:
+            print("     ", e)
+            ok = False
+        check("lualatex compone il libro", ok and open(out_pdf, "rb").read(5) == b"%PDF-")
+        try:
+            from pypdf import PdfReader
+        except ImportError:
+            PdfReader = None
+        if ok and PdfReader is not None:
+            r = PdfReader(out_pdf)
+            testo = "".join(pg.extract_text() or "" for pg in r.pages)
+            check("copertina, frontespizio, indice e capitoli (almeno 8 pagine)", len(r.pages) >= 8)
+            check("il testo pericoloso si legge nel PDF", "directlua{os.exit()}" in testo)
+            check("titolo e autore nei metadati",
+                  r.metadata.title == "Romanzo di prova" and r.metadata.author == "Mario Bianchi")
+    else:
+        print("     (lualatex assente: salto la composizione)")
+    # le dipendenze sono dichiarate dove servono
+    deb = open(os.path.join(ROOT, "make-deb.sh"), encoding="utf-8").read()
+    check("dipendenze nel pacchetto",
+          all(x in deb for x in typeset.DEPENDENCIES.split()))
+
+
 def main():
     for fn in (test_save_load_roundtrip, test_autosave_non_mutating,
                test_chapter_title_priority, test_export_txt,
@@ -1913,7 +1989,8 @@ def main():
                test_i18n, test_export_markdown_odt_docx,
                test_export_html, test_azw3_logic,
                test_epub_cover_png, test_simple_png, test_import_text,
-               test_attached_images, test_formule_tabelle_immagini):
+               test_attached_images, test_formule_tabelle_immagini,
+               test_pdf_tipografico):
         fn()
     print("\n" + "=" * 50)
     print(f"RISULTATO: {PASSED} superati, {FAILED} falliti")

@@ -5620,6 +5620,50 @@ class Project:
                   blank_cover=blank_cover,
                   justify=justify, hyphenate=hyphenate, hyphen_lang=hyphen_lang)
 
+    def typeset_data(self, fonts=None, font_size=11, page_size="A5",
+                     justify=True, hyphenate=True, lang="it", margins=None):
+        """I dati del libro per il PDF tipografico (typeset.build_document):
+        gli stessi capitoli, copertina, frontespizio, colophon, immagini,
+        formato e margini del PDF veloce, ma il testo resta Markdown: lo
+        legge book_blocks() dentro typeset. fonts: {stile: file} del
+        carattere scelto (None = EB Garamond incluso)."""
+        if page_size not in PDF_PAGE_SIZES:
+            page_size = PDF_DEFAULT_PAGE_SIZE
+        spec = PDF_PAGE_SIZES[page_size]
+        margins = (self.page_margins(page_size) if margins is None
+                   else normalize_page_margins(margins, page_size))
+        chapters = []
+        for title, text in self._ordered_chapters():
+            text = render_math(text).rstrip("\n")
+            # le bandiere non si stampano (come nel PDF veloce)
+            text = re.sub("[\U0001F1E6-\U0001F1FF]{2}[ \t]?", "", text)
+            chapters.append((title, text))
+        f = getattr(self, "frontispiece_fields", {}) or {}
+        return {
+            "title": (f.get("title") or "").strip() or self.title,
+            "author": (f.get("author") or "").strip(),
+            "lang": lang, "font_size": font_size,
+            "page_w": spec["w"], "page_h": spec["h"],
+            "margins": {k: (bool(margins[k]) if k == "mirror" else margins[k] * PT_PER_MM)
+                        for k in ("top", "bottom", "inner", "outer", "gutter", "mirror")},
+            "justify": justify, "hyphenate": hyphenate,
+            "fonts": fonts or {},
+            "cover_image": self.cover_image or None,
+            "cover_lines": self.cover_lines_with_roles(),
+            "blank_cover": self.cover_is_blank(),
+            "front_lines": self._front_lines(),
+            "colophon_lines": self._colophon_lines(),
+            "chapters": chapters,
+            "images": {n: self.images[n] for n in self.used_images() if n in self.images},
+        }
+
+    def export_pdf_typeset(self, path, **kw):
+        """PDF tipografico con LuaLaTeX (vedi typeset.py). Stessi argomenti
+        di typeset_data(); solleva typeset.TypesetError se la composizione
+        non riesce."""
+        from . import typeset
+        return typeset.typeset(self.typeset_data(**kw), path)
+
     def _make_cover_png(self, cover_lines, width=600, height=900):
         """Genera i byte di un'immagine PNG di copertina (raster), necessaria
         perché i generatori di miniature come gnome-epub-thumbnailer mostrino

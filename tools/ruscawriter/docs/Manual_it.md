@@ -193,10 +193,24 @@ Menu principale → Esporta:
 | Formato | Note |
 |---|---|
 | PDF | Formati di pagina da libro, margini di rilegatura, testo giustificato, font incorporati. La sillabazione richiede `python3-pyphen` e `hyphen-<lingua>`. |
+| PDF tipografico (LuaLaTeX) | Il libro composto da LuaLaTeX, per la stampa: vedi sotto. Richiede `texlive-luatex` e `texlive-latex-recommended`, già presenti in RuscaLinux. |
 | EPUB | Con copertina, frontespizio, colophon e indice |
 | AZW3 | Richiede Calibre (`ebook-convert`), avviato in locale |
 | ODT, DOCX | Per LibreOffice o Word |
 | HTML, Markdown, TXT | Formati aperti e semplici |
+
+### PDF tipografico
+
+Menu principale → Esporta → *Esporta in PDF tipografico (LuaLaTeX)…* compone il libro con LuaLaTeX, il motore di TeX, come si fa per i libri da mandare in tipografia. Rispetto al PDF normale:
+
+- **a capo sull'intero paragrafo**: TeX sceglie i punti a capo guardando tutto il paragrafo, così nel testo giustificato non ci sono righe troppo larghe o troppo strette;
+- **microtipografia**: la punteggiatura sporge appena oltre il margine e le lettere si allargano o si stringono in modo impercettibile, per colonne più regolari;
+- **crenatura e legature** (fi, fl) del carattere, e tutte le scritture: greco, cirillico, arabo (da destra a sinistra), devanagari, cinese, giapponese e coreano (con i caratteri Noto di RuscaLinux);
+- **struttura da libro**: copertina a pagina piena, frontespizio, colophon sul retro, indice con i numeri di pagina, capitoli che iniziano su pagina dispari, testatine (titolo del libro sulle pagine pari, capitolo sulle dispari), nessuna riga vedova od orfana.
+
+Formato, margini, giustificazione e sillabazione sono quelli dell'impostazione pagina, che si apre prima della scelta del file. Il carattere è quello del libro (EB Garamond, di solito); i simboli che non ha arrivano da DejaVu Sans e Noto. Ogni a capo del testo inizia un paragrafo con il rientro della prima riga, come nei libri stampati.
+
+La composizione dura da qualche secondo a un minuto, secondo la lunghezza del libro, e avviene in un'altra attività: si può continuare a scrivere. La sillabazione è quella di Pyphen, la stessa del PDF normale. Tutto avviene sul computer, in una cartella temporanea che poi si cancella; il testo del libro non può mai diventare un comando di TeX.
 
 ### Impostazione pagina
 
@@ -223,6 +237,7 @@ I margini si salvano **nel documento**, un insieme per ogni formato: un libro ri
 | `~/.config/ruscawriter/settings.json` | Impostazioni |
 | `~/.local/share/ruscawriter/dictionaries/` | Dizionari aggiunti |
 | `~/.cache/ruscawriter/mdict/` | Indici dei dizionari, eliminabili |
+| `~/.cache/ruscawriter/texmf-var/` | Cache dei caratteri del PDF tipografico, eliminabile |
 | `<progetto>.rwr.autosave` | Copia automatica, accanto al progetto |
 | `/usr/share/ruscawriter/` | Programma installato |
 | `/usr/share/doc/ruscawriter/` | Questo manuale e la versione inglese |
@@ -236,6 +251,8 @@ I margini si salvano **nel documento**, un insieme per ogni formato: un libro ri
 | Il programma non parte | Verifica che siano presenti `python3`, `python3-gi` e `gir1.2-gtk-4.0`; avvia `ruscawriter` da terminale per leggere l'errore |
 | Niente controllo ortografico | Installa `gir1.2-spelling-1` e il dizionario `hunspell-<lingua>` |
 | PDF senza sillabazione | Installa `python3-pyphen` e `hyphen-<lingua>` |
+| Manca il PDF tipografico | `sudo apt install texlive-luatex texlive-latex-recommended` |
+| «Composizione non riuscita» | Il messaggio riporta l'errore di TeX; esporta il PDF normale e segnala il problema |
 | Esportazione AZW3 impossibile | Installa Calibre, oppure esporta in EPUB |
 | Dizionario con «⚠» | Leggi il motivo nell'elenco; verifica di aver scelto il `.mdx` e non il `.mdd` |
 | Impostazioni strane | Chiudi il programma e rinomina `~/.config/ruscawriter/settings.json` |

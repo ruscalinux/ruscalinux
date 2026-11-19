@@ -7,6 +7,15 @@ One line per change.
 
 ---
 
+## [Unreleased]
+
+- **Added** — Export → *Typeset PDF (LuaLaTeX)*: the book typeset by LuaLaTeX
+  with whole-paragraph line breaking, microtypography, kerning and ligatures,
+  every script (Arabic right to left, Devanagari, Chinese, Japanese, Korean),
+  full-page cover, title page, colophon, table of contents, chapters on
+  right-hand pages, running heads and no widows or orphans. Needs
+  `texlive-luatex` and `texlive-latex-recommended`
+
 ## [1.99.2] — RuscaLinux OS Tools
 
 RuscaWriter is now one of the RuscaLinux OS Tools: it lives in the RuscaLinux

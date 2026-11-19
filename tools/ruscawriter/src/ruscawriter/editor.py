@@ -1901,6 +1901,7 @@ class RuscaWriterWindow(Adw.ApplicationWindow):
             ("export_txt",   self.on_export,         []),
             ("export_md",    self.on_export_markdown, []),
             ("export_pdf",   self.on_export_pdf,     []),
+            ("export_pdf_typeset", self.on_export_pdf_typeset, []),
             ("page_setup",   self.on_page_setup,     ["<Control><Shift>p"]),
             ("export_epub",  self.on_export_epub,    []),
             ("export_azw3",  self.on_export_azw3,    []),
@@ -2029,7 +2030,9 @@ class RuscaWriterWindow(Adw.ApplicationWindow):
         files.append(self.t("mi_open"), "win.open")
         files.append(self.t("mi_import_chapters"), "win.import_chapters")
         m_export = Gio.Menu()
-        for key, action in (("mi_export_pdf", "export_pdf"), ("mi_export_epub", "export_epub"),
+        for key, action in (("mi_export_pdf", "export_pdf"),
+                            ("mi_export_pdf_typeset", "export_pdf_typeset"),
+                            ("mi_export_epub", "export_epub"),
                             ("mi_export_azw3", "export_azw3"), ("mi_export_odt", "export_odt"),
                             ("mi_export_docx", "export_docx"), ("mi_export_html", "export_html"),
                             ("mi_export_md", "export_md"), ("mi_export_txt", "export_txt")):
@@ -5499,6 +5502,77 @@ class RuscaWriterWindow(Adw.ApplicationWindow):
         self._commit_current()
         self._page_setup_dialog(for_export=True)
 
+    def on_export_pdf_typeset(self, *_):
+        """Esporta il PDF tipografico (LuaLaTeX, vedi typeset.py): la stessa
+        impostazione della pagina del PDF, poi la scelta del file; la
+        composizione gira in un thread e avvisa alla fine."""
+        from . import typeset
+        self._commit_current()
+        if not typeset.available():
+            self._error(self.t("typeset_missing", pkgs=typeset.DEPENDENCIES))
+            return
+        if getattr(self, "_typesetting", False):
+            self.toast(self.t("typeset_running"))
+            return
+        self._page_setup_dialog(for_export=True, export=self._do_export_pdf_typeset)
+
+    def _doc_font_files(self):
+        """I file (stile -> percorso) del carattere del libro, come li sceglie
+        il PDF: quello scelto da chi scrive, o EB Garamond incluso."""
+        scelto = getattr(self, "doc_font", "")
+        incorporati = {SERIF_FAMILY: SERIF_FILES, _TW_FAMILY: TYPEWRITER_FILES}
+        if scelto in incorporati:
+            files = {k: os.path.join(ASSETS_DIR, v) for k, v in incorporati[scelto].items()}
+        elif scelto:
+            files = dict(font_files_for_family(scelto))
+        else:
+            files = {}
+        files = {k: v for k, v in files.items() if os.path.isfile(v)}
+        if "regular" not in files:
+            files = {k: os.path.join(ASSETS_DIR, v) for k, v in SERIF_FILES.items()}
+        return files
+
+    def _do_export_pdf_typeset(self, path):
+        from . import typeset
+        if not path.endswith(".pdf"):
+            path += ".pdf"
+        size = getattr(self, "_pdf_page_size", PDF_DEFAULT_PAGE_SIZE)
+        try:
+            # i dati si leggono qui, nel thread dell'interfaccia; nel thread
+            # di lavoro restano solo file e lualatex
+            book = self.project.typeset_data(
+                fonts=self._doc_font_files(), font_size=self.font_size,
+                page_size=size, justify=getattr(self, "_pdf_justify", True),
+                hyphenate=getattr(self, "_pdf_hyphenate", True),
+                lang=getattr(self, "lang", "it"),
+                margins=self.project.page_margins(size))
+        except Exception as exc:
+            self._error(self.t("err_export", e=exc))
+            return
+        self._typesetting = True
+        running = Adw.Toast(title=GLib.markup_escape_text(self.t("typeset_running")), timeout=0)
+        self.toasts.add_toast(running)
+
+        def work():
+            try:
+                typeset.typeset(book, path)
+                err = None
+            except typeset.TypesetError as exc:
+                err = self.t("err_typeset", e=exc)
+            except Exception as exc:
+                err = self.t("err_export", e=exc)
+            GLib.idle_add(done, err)
+
+        def done(err):
+            self._typesetting = False
+            running.dismiss()
+            if err:
+                self._error(err)
+            else:
+                self._info(self.t("exported", p=path))
+            return False
+        threading.Thread(target=work, daemon=True).start()
+
     def on_page_setup(self, *_):
         """File -> Impostazione pagina: formato e margini del libro, senza
         esportare. Valgono per PDF, ODT e DOCX."""
@@ -5509,7 +5583,7 @@ class RuscaWriterWindow(Adw.ApplicationWindow):
     PAGE_UNITS = (("mm", 1.0, 1, 0.5), ("cm", 10.0, 2, 0.05),
                   ("in", 25.4, 3, 0.01))
 
-    def _page_setup_dialog(self, for_export=False):
+    def _page_setup_dialog(self, for_export=False, export=None):
         """EN: the page set-up dialog. Format, a margin preset, mirrored
         pages, the five margins (top, bottom, inner, outer, gutter) in mm, cm
         or inches, and a live preview of the spread with the text block, the
@@ -5959,7 +6033,7 @@ class RuscaWriterWindow(Adw.ApplicationWindow):
                 GLib.idle_add(lambda: (self._save_file_dialog(
                     self.t("dlg_export_pdf_title"),
                     f"{self.project.title}.pdf", ["*.pdf"],
-                    self.t("filter_pdf"), self._do_export_pdf), False)[1])
+                    self.t("filter_pdf"), export or self._do_export_pdf), False)[1])
 
         def on_close_req(*_):
             finish(False)

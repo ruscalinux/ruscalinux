@@ -163,6 +163,13 @@ gstreamer1.0-plugins-good
 # RuscaWriter: sillabazione del PDF (Pyphen) e generatore di copertine (Pillow)
 python3-pyphen
 python3-pil
+# RuscaWriter: PDF tipografico (Esporta -> PDF tipografico), composto da
+# LuaLaTeX. Bastano questi due, circa 200 MB: la sillabazione la fa Pyphen
+# con i dizionari hyphen-*, quindi niente texlive-lang-*, e i caratteri
+# delle scritture non latine sono i Noto qui sotto (fonts-noto-core,
+# fonts-noto-cjk)
+texlive-luatex
+texlive-latex-recommended
 
 # Google Chrome - https://www.google.com/
 # Nessuna libreria in più: il pacchetto .deb ha già tutto
