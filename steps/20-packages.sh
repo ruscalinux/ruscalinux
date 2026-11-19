@@ -83,7 +83,6 @@ live-build
 squashfs-tools
 fastfetch
 pdftk
-weasyprint
 tree
 file-roller
 # Rinomina di molti file insieme
