@@ -60,6 +60,8 @@ class ImagesPage(Adw.Bin):
         self._job = None
         self._t_start = None
         self._pulsing = True
+        self._monitors = []
+        self._models_timer = 0
         self.generator = rd.Generator(self._on_progress, self._on_preview,
                                       self._on_log, self._on_done)
         rd.clean_work_dir()                    # resti di una sessione interrotta
@@ -378,8 +380,58 @@ class ImagesPage(Adw.Bin):
     def _folders(self):
         return [f for f in self.cfg.get("img_folders", []) if isinstance(f, str)]
 
+    # Le cartelle dei modelli si guardano con Gio.FileMonitor, come in
+    # RuscaTranscriber e RuscaNarrator: un modello copiato mentre RuscaLLama
+    # e' aperto compare da solo. Un modello in piu' file e' una
+    # sottocartella, quindi si guardano anche le sottocartelle (un livello:
+    # i monitor si rifanno a ogni nuova lettura).
+    def _watch_models(self):
+        for m in self._monitors:
+            m.cancel()
+        self._monitors = []
+        try:
+            rd.ensure_user_model_dir()
+        except OSError:
+            pass
+        dirs = []
+        for d in tuple(rd.MODEL_DIRS) + tuple(self._folders()):
+            if not os.path.isdir(d):
+                continue
+            dirs.append(d)
+            try:
+                dirs += [e.path for e in os.scandir(d)
+                         if e.is_dir() and not e.name.startswith(".")]
+            except OSError:
+                pass
+        for d in dirs:
+            try:
+                monitor = Gio.File.new_for_path(d).monitor_directory(
+                    Gio.FileMonitorFlags.WATCH_MOVES, None)
+            except GLib.Error:
+                continue
+            monitor.connect("changed", self._on_models_changed)
+            self._monitors.append(monitor)
+
+    def _on_models_changed(self, _monitor, _file, _other, event):
+        # Durante una copia arrivano molti eventi: si rilegge una volta sola,
+        # quando la cartella si e' calmata.
+        if event in (Gio.FileMonitorEvent.ATTRIBUTE_CHANGED,):
+            return
+        if self._models_timer:
+            GLib.source_remove(self._models_timer)
+        self._models_timer = GLib.timeout_add(1500, self._models_timeout)
+
+    def _models_timeout(self):
+        self._models_timer = 0
+        if not self.generator.running:
+            self.scan_models()
+        else:                          # a generazione finita
+            self._models_timer = GLib.timeout_add(1500, self._models_timeout)
+        return False
+
     def scan_models(self, select=None):
         self.models = rd.find_models(self._folders())
+        self._watch_models()
         keys = [m.key for m in self.models]
         wanted = select or self.cfg["img_model"]
         self._updating = True
@@ -770,6 +822,9 @@ class ImagesPage(Adw.Bin):
 
     def shutdown(self):
         """Ferma il motore e cancella prompt e immagini dalla cache."""
+        for m in self._monitors:
+            m.cancel()
+        self._monitors = []
         self.generator.cancel()
         self.generator.wait(10)
         rd.clean_work_dir()

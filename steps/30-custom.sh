@@ -279,6 +279,128 @@ X-GNOME-Autostart-enabled=true
 EOF
 
 # ---------------------------------------------------------------------------
+# GRIGLIA DELLE APPLICAZIONI SENZA BUCHI
+#
+# GNOME Shell salva la posizione di ogni icona (org.gnome.shell
+# app-picker-layout) e non la ricompatta: quando un aggiornamento della ISO
+# toglie, rinomina o sposta in una cartella delle applicazioni, al loro posto
+# restano dei buchi, e quelle nuove finiscono in fondo, spesso in una pagina
+# in piu' (pagina 2 con quattro posti vuoti, pagina 3 con quattro icone). Lo
+# script, a ogni accesso e dopo gli script delle cartelle, toglie le voci che
+# non esistono piu' o che stanno in una cartella e ricompatta le pagine nello
+# stesso ordine: la disposizione scelta dall'utente resta, senza buchi.
+# Scrive solo se cambia qualcosa.
+# ---------------------------------------------------------------------------
+cat <<'EOF' > .work/config/includes.chroot_after_packages/usr/lib/ruscalinux/ruscalinux-app-grid
+#!/usr/bin/python3 -I
+# RuscaLinux — toglie i buchi dalla griglia delle applicazioni di GNOME.
+# Scritto da steps/30-custom.sh; avviato a ogni accesso da
+# /etc/xdg/autostart/ruscalinux-app-grid.desktop.
+#
+# GNOME Shell salva la posizione di ogni icona (org.gnome.shell
+# app-picker-layout). Quando un aggiornamento toglie o rinomina
+# un'applicazione, o la sposta in una cartella, al suo posto resta un buco;
+# le applicazioni nuove finiscono in fondo, spesso in una pagina nuova
+# (pagina 2 con quattro posti vuoti, pagina 3 con quattro icone). Qui si
+# tolgono dalla disposizione le voci che non ci sono piu' o che stanno in
+# una cartella e si ricompattano le pagine, nello stesso ordine: le icone
+# scalano in avanti, la disposizione scelta dall'utente resta. Si scrive
+# solo se qualcosa cambia; GNOME Shell rilegge la disposizione da solo.
+import sys
+import time
+
+import gi
+gi.require_version("Gio", "2.0")
+from gi.repository import Gio, GLib  # noqa: E402
+
+FOLDERS = "org.gnome.desktop.app-folders"
+FOLDER = "org.gnome.desktop.app-folders.folder"
+SHELL = "org.gnome.shell"
+
+
+def folder_members(apps):
+    """Applicazioni che stanno in una cartella: elencate nella cartella o
+    con una delle sue categorie, come in js/ui/appDisplay.js di GNOME."""
+    folders = Gio.Settings.new(FOLDERS).get_strv("folder-children")
+    inside = set()
+    for fid in folders:
+        s = Gio.Settings.new_with_path(FOLDER, f"/org/gnome/desktop/app-folders/folders/{fid}/")
+        excluded = set(s.get_strv("excluded-apps"))
+        cats = set(s.get_strv("categories"))
+        members = set(s.get_strv("apps"))
+        if cats:
+            for app in apps.values():
+                app_cats = set(filter(None, (app.get_categories() or "").split(";")))
+                if cats & app_cats:
+                    members.add(app.get_id())
+        inside |= members - excluded
+    return folders, inside
+
+
+def compact(pages, keep):
+    """Pagine senza le voci che non sono in keep e senza buchi, nello stesso
+    ordine; ogni pagina tiene al massimo tante icone quante ne teneva la
+    pagina piu' piena."""
+    capacity = 0
+    order = []
+    for n, page in enumerate(pages):
+        for app_id, data in page.items():
+            pos = int(data.get("position", 0)) if isinstance(data, dict) else 0
+            capacity = max(capacity, pos + 1)
+            order.append((n, pos, app_id))
+    order.sort()
+    ids = [app_id for _n, _p, app_id in order if app_id in keep]
+    if capacity <= 0:
+        return []
+    return [{app_id: {"position": i} for i, app_id in enumerate(ids[k:k + capacity])}
+            for k in range(0, len(ids), capacity)]
+
+
+def to_variant(pages):
+    return GLib.Variant("aa{sv}", [
+        {app_id: GLib.Variant("a{sv}", {"position": GLib.Variant("i", d["position"])})
+         for app_id, d in page.items()} for page in pages])
+
+
+def main():
+    if not Gio.SettingsSchemaSource.get_default().lookup(SHELL, True):
+        return 0
+    # Si lascia a GNOME e agli altri script dell'accesso (cartelle) il
+    # tempo di sistemare tutto.
+    time.sleep(float(sys.argv[1]) if len(sys.argv) > 1 else 20)
+    shell = Gio.Settings.new(SHELL)
+    pages = shell.get_value("app-picker-layout").unpack()
+    if not pages:
+        return 0                       # nessuna disposizione salvata: niente buchi
+    apps = {a.get_id(): a for a in Gio.AppInfo.get_all()
+            if isinstance(a, Gio.DesktopAppInfo) and a.should_show()}
+    folders, inside = folder_members(apps)
+    keep = (set(apps) - inside) | set(folders)
+    new = compact(pages, keep)
+    old = [{k: {"position": int(v.get("position", 0))} for k, v in p.items()} for p in pages]
+    if new != old:
+        shell.set_value("app-picker-layout", to_variant(new))
+        Gio.Settings.sync()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+EOF
+chmod +x .work/config/includes.chroot_after_packages/usr/lib/ruscalinux/ruscalinux-app-grid
+
+cat <<'EOF' > .work/config/includes.chroot_after_packages/etc/xdg/autostart/ruscalinux-app-grid.desktop
+[Desktop Entry]
+Type=Application
+Name=RuscaLinux app grid
+Comment=Removes the empty places left in the app grid by updates
+Exec=/usr/lib/ruscalinux/ruscalinux-app-grid
+OnlyShowIn=GNOME;
+NoDisplay=true
+X-GNOME-Autostart-enabled=true
+EOF
+
+# ---------------------------------------------------------------------------
 # APPLICAZIONI PREDEFINITE
 #
 # Va in /etc/xdg/gnome-mimeapps.list (e, uguale, in /etc/xdg/mimeapps.list
