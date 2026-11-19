@@ -254,7 +254,13 @@ class TestModels(unittest.TestCase):
                             "qwen_image_2.1_vae_bf16.safetensors",
                             "Qwen3VL-8B-Instruct-Q4_K_M.gguf"],
                            {"--vae": "qwen_image_2.1_vae_bf16.safetensors"},
-                           (20, 6.0, "euler", [])),
+                           (40, 6.0, "euler", [])),
+        "Qwen-Image-2.1-Turbo": (["qwen_image_2.1_turbo-Q8_0.gguf",
+                                  "qwen_image_2.1_vae_bf16.safetensors",
+                                  "Qwen3VL-8B-Instruct-Q4_K_M.gguf"], {},
+                                 (8, 1.0, "euler", ["--sigmas", "qwen-image-2.1-turbo"])),
+        "ERNIE-Image": (["ernie-image-UD-Q4_K_M.gguf", "flux2_ae.safetensors",
+                         "ministral-3-3b.safetensors"], {}, (50, 5.0, "", [])),
         "Chroma": (["chroma-unlocked-v40-q8_0.gguf", "ae.sft", "t5xxl_fp16.safetensors"],
                    {"--t5xxl": "t5xxl_fp16.safetensors"},
                    (20, 4.0, "euler", ["--model-args", "chroma_use_dit_mask=false"])),
@@ -311,6 +317,7 @@ class TestModels(unittest.TestCase):
                         ("z", "flux", "qwen-image", "qwen_image_2", "chroma", "sd3", "fibo2_",
                          "ideogram4-", "lens_", "ming_image_0.1_design", "ernie", "ovis_image",
                          "minimax_h3_image_pruned", "LongCat", "Krea")) else 10)
+                # (i nomi "qwen_image_2.1..." di modello e VAE: conta il ruolo)
                 (m,) = rd.scan_folder(os.path.join(self.dir, folder))
                 args = m.args()
                 flags = dict(zip(args[::2], (os.path.basename(a) for a in args[1::2])))

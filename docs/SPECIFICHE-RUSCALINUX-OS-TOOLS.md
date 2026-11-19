@@ -202,7 +202,7 @@ RuscaLLama ha due viste, **Chat** e **Immagini** (`Adw.ViewStack` con `Adw.ViewS
   - altrimenti ogni file `.safetensors`, `.gguf` o `.ckpt` è un **modello completo** (`-m`): Stable Diffusion 1.5 e 2.1, SDXL, i modelli Turbo;
   - le sottocartelle si guardano allo stesso modo, una per una. LoRA, ControlNet, TAESD, upscaler e mmproj si ignorano.
 - **Riconoscimento dei file.** Dal nome (`file_role()`, la prima regola che corrisponde vince), con i nomi degli esempi della documentazione di stable-diffusion.cpp (`docs/models/`): `ae`, `vae`, `flux2_ae` sono il VAE (`--vae`); `clip_l`, `clip_g`, `t5xxl`/`umt5` i codificatori CLIP e T5; `qwen`, `gemma`, `mistral`, `ministral`, `llama`, `gpt-oss`, `ovis_2`, `ling_mini` il modello linguistico (`--llm`); `mmproj` la sua parte visiva (`--llm_vision`); `tokenizer*.json` il tokenizzatore (`--tokenizer`); `connector` i connettori (`--embeddings-connectors`); `uncond` il secondo modello di Ideogram 4 (`--uncond-diffusion-model`); `qwen-image`, `z-image`, `ovis-image`, `ming-image` sono modelli di diffusione. Estensioni: `.safetensors`, `.sft`, `.gguf`, `.ckpt`. Mmproj e tokenizzatore da soli non fanno di una cartella un modello in più file. Per i `.safetensors` contano anche i nomi dei tensori nell’intestazione (`checkpoint_info()`: si leggono gli 8 byte della lunghezza e il JSON, mai i pesi): un file con `model.diffusion_model.` e con VAE o codificatore è completo anche se il nome contiene «vae» (`sd_xl_base_1.0_0.9vae`); un VAE accanto a un modello completo si passa con `--vae`.
-- **Valori consigliati** (`recommended()`, tabella `PROFILES`). Sono quelli degli esempi di `docs/models/` di stable-diffusion.cpp, riconosciuti dal nome della cartella e del file. Un SD 1.x o SDXL completo si riconosce invece dai tensori, che valgono più del nome. Alcuni esempi:
+- **Valori consigliati** (`recommended()`, tabella `PROFILES`). Sono quelli degli esempi di `docs/models/` di stable-diffusion.cpp, riconosciuti dal nome della cartella e del file; quando quegli esempi non indicano i passi, quelli della scheda del modello (ERNIE-Image 50, Qwen-Image-2.1 40). Un SD 1.x o SDXL completo si riconosce invece dai tensori, che valgono più del nome. Alcuni esempi:
 
   | Modello | Passi | CFG | Campionatore e opzioni |
   |---|---|---|---|
@@ -211,7 +211,8 @@ RuscaLLama ha due viste, **Chat** e **Immagini** (`Adw.ViewStack` con `Adw.ViewS
   | FLUX.2-klein / klein-base / dev | 4 (fissi) / 20 / 20 | 1 / 4 / 1 | dev: euler |
   | FLUX.3 / FLUX.3-base | 16 (fissi) / 20 | 1 / 3,5 | euler |
   | FLUX.1-schnell / dev | 4 (fissi) / 20 | 1 | euler |
-  | Qwen-Image / Qwen-Image-2.1 | 20 | 2,5 / 6 | euler; Qwen-Image `--flow-shift 3` |
+  | Qwen-Image / Qwen-Image-2.1 / 2.1-Turbo | 20 / 40 / 8 (fissi) | 2,5 / 6 / 1 | euler; Qwen-Image `--flow-shift 3`; Turbo `--sigmas qwen-image-2.1-turbo` |
+  | ERNIE-Image / ERNIE-Image-Turbo | 50 / 8 (fissi) | 5 / 1 | — |
   | Chroma | 20 | 4 | euler, `--model-args chroma_use_dit_mask=false` |
   | SD 3.5 | 28 | 4,5 | euler |
   | SDXL / SD 1.x | 25 | 6 / 7 | 1024 / 512 px |

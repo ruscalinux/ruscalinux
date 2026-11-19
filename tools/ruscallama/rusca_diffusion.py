@@ -326,7 +326,9 @@ def find_models(extra_folders=()):
 
 # ── valori consigliati ──────────────────────────────────────────────────────
 # Dagli esempi di docs/models/ di stable-diffusion.cpp (master-1106), che
-# sono i valori con cui gli autori provano ogni modello. Si riconoscono dal
+# sono i valori con cui gli autori provano ogni modello; i passi, quando
+# quegli esempi non li indicano, dalla scheda del modello (ERNIE-Image 50,
+# Qwen-Image-2.1 40). Si riconoscono dal
 # nome della cartella e del file; la prima regola che corrisponde vince.
 #   steps   passi (20 e' il valore predefinito di sd-cli quando la
 #           documentazione non ne indica)
@@ -351,13 +353,18 @@ PROFILES = (
     (r"chroma", _p("chroma", 20, 4.0, "euler", ["--model-args", "chroma_use_dit_mask=false"])),
     (r"z[-_ ]?image.*turbo", _p("zimage", 8, 1.0, fixed=True)),
     (r"z[-_ ]?image", _p("zimage", 20, 5.0)),
-    (r"qwen[-_ ]?image[-_ ]?2[._]?1", _p("qwen", 20, 6.0, "euler")),
+    (r"qwen[-_ ]?image[-_ ]?2[._]?1.*turbo", _p("qwen", 8, 1.0, "euler",
+                                                ["--sigmas", "qwen-image-2.1-turbo"],
+                                                fixed=True)),
+    # 40 passi: il valore predefinito della scheda del modello (Qwen).
+    (r"qwen[-_ ]?image[-_ ]?2[._]?1", _p("qwen", 40, 6.0, "euler")),
     (r"qwen[-_ ]?image", _p("qwen", 20, 2.5, "euler", ["--flow-shift", "3"])),
     (r"longcat", _p("longcat", 20, 5.0, "euler", ["--flow-shift", "3"])),
     (r"ovis", _p("ovis", 20, 5.0)),
     (r"(^|[^a-z])anima([^a-z]|$)", _p("anima", 20, 6.0, "euler")),
     (r"ernie.*turbo", _p("ernie", 8, 1.0, fixed=True)),
-    (r"ernie", _p("ernie", 20, 5.0)),
+    # 50 passi: il valore indicato da Baidu per ERNIE-Image (non Turbo).
+    (r"ernie", _p("ernie", 50, 5.0)),
     (r"fibo", _p("fibo", 20, 5.0, "euler")),
     (r"(^|[^a-z])lens.*turbo", _p("lens", 4, 1.0, fixed=True)),
     (r"(^|[^a-z])lens([^a-z]|$)", _p("lens", 20, 5.0)),
