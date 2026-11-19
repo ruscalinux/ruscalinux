@@ -62,6 +62,8 @@ class ImagesPage(Adw.Bin):
         self._pulsing = True
         self._monitors = []
         self._models_timer = 0
+        self.misplaced = []
+        self._banner_action = None
         self.generator = rd.Generator(self._on_progress, self._on_preview,
                                       self._on_log, self._on_done)
         rd.clean_work_dir()                    # resti di una sessione interrotta
@@ -112,6 +114,33 @@ class ImagesPage(Adw.Bin):
                                     title=_("img_empty_title"),
                                     description=_("img_empty_desc"))
 
+        # Senza un modello: che cosa serve e dove va, con i pulsanti per
+        # farlo (specifiche, sezione 3.8: gli stati vuoti hanno un'azione).
+        guide = Gtk.Button(label=_("img_guide_button"), halign=Gtk.Align.CENTER)
+        guide.add_css_class("suggested-action")
+        guide.add_css_class("pill")
+        guide.connect("clicked", lambda _b: self.show_guide())
+        open_dir = Gtk.Button(label=_("img_open_models_folder"), halign=Gtk.Align.CENTER)
+        open_dir.add_css_class("pill")
+        open_dir.connect("clicked", lambda _b: self.open_models_folder())
+        add_dir = Gtk.Button(label=_("img_add_folder"), halign=Gtk.Align.CENTER)
+        add_dir.add_css_class("pill")
+        add_dir.connect("clicked", lambda _b: self.add_folder())
+        buttons = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12,
+                          halign=Gtk.Align.CENTER)
+        for w in (guide, open_dir, add_dir):
+            buttons.append(w)
+        path = Gtk.Label(label=self._shown_path(rd.USER_MODEL_DIR), selectable=True, wrap=True,
+                         justify=Gtk.Justification.CENTER)
+        path.add_css_class("monospace")
+        path.add_css_class("dim-label")
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18)
+        box.append(path)
+        box.append(buttons)
+        self.setup = Adw.StatusPage(icon_name="folder-download-symbolic",
+                                    title=_("img_setup_title"),
+                                    description=_("img_setup_desc"), child=box)
+
         # Generazione in corso: anteprima, passo, barra, Ferma.
         self.preview = Gtk.Picture(can_shrink=True, content_fit=Gtk.ContentFit.CONTAIN,
                                    width_request=160, height_request=160)
@@ -152,6 +181,7 @@ class ImagesPage(Adw.Bin):
                                           hscrollbar_policy=Gtk.PolicyType.NEVER)
         self.stack = Gtk.Stack(transition_type=Gtk.StackTransitionType.CROSSFADE)
         self.stack.add_named(self.empty, "empty")
+        self.stack.add_named(self.setup, "setup")
         self.stack.add_named(self.gallery, "gallery")
 
         view = Adw.ToolbarView(content=self.stack)
@@ -242,12 +272,14 @@ class ImagesPage(Adw.Bin):
         add.add_suffix(Gtk.Image(icon_name="folder-new-symbolic"))
         add.connect("activated", lambda _r: self.add_folder())
         group.add(add)
+        guide = Adw.ActionRow(title=_("img_guide_button"), activatable=True)
+        guide.add_suffix(Gtk.Image(icon_name="help-about-symbolic"))
+        guide.connect("activated", lambda _r: self.show_guide())
+        group.add(guide)
         # Il percorso si vede: la cartella dei modelli per immagini non e'
         # quella dei modelli della chat (~/.local/share/ruscallama/models).
-        home = os.path.expanduser("~")
-        shown = rd.USER_MODEL_DIR.replace(home, "~", 1) if rd.USER_MODEL_DIR.startswith(
-            home + os.sep) else rd.USER_MODEL_DIR
-        folder = Adw.ActionRow(title=_("img_open_models_folder"), subtitle=shown,
+        folder = Adw.ActionRow(title=_("img_open_models_folder"),
+                               subtitle=self._shown_path(rd.USER_MODEL_DIR),
                                tooltip_text=_("img_models_folder_hint"), activatable=True)
         folder.add_css_class("property")
         folder.add_suffix(Gtk.Image(icon_name="folder-open-symbolic"))
@@ -400,10 +432,12 @@ class ImagesPage(Adw.Bin):
         except OSError:
             pass
         dirs = []
-        for d in tuple(rd.MODEL_DIRS) + tuple(self._folders()):
+        for d in tuple(rd.MODEL_DIRS) + tuple(self._folders()) + rd.CHAT_MODEL_DIRS:
             if not os.path.isdir(d):
                 continue
             dirs.append(d)
+            if d in rd.CHAT_MODEL_DIRS:
+                continue
             try:
                 dirs += [e.path for e in os.scandir(d)
                          if e.is_dir() and not e.name.startswith(".")]
@@ -436,6 +470,7 @@ class ImagesPage(Adw.Bin):
         return False
 
     def scan_models(self, select=None):
+        self.misplaced = rd.misplaced_files()
         self.models = rd.find_models(self._folders())
         self._watch_models()
         keys = [m.key for m in self.models]
@@ -459,6 +494,8 @@ class ImagesPage(Adw.Bin):
             self.window._set("img_model", key)
         if self.model is None:
             row.set_subtitle(self._("img_no_model_sub"))
+        elif self.model.missing():
+            row.set_subtitle(self._("img_incomplete", parts=self._parts(self.model.missing())))
         elif self.model.parts:
             row.set_subtitle(self._("img_kind_parts", n=len(self.model.parts) + 1))
         else:
@@ -566,24 +603,86 @@ class ImagesPage(Adw.Bin):
         self.placeholder.set_visible(self.input_buf.get_char_count() == 0)
         self.generate_btn.set_visible(not running)
         self.stop_btn.set_visible(running)
+        missing = self.model.missing() if self.model else []
         self.generate_btn.set_sensitive(bool(self._prompt()) and self.model is not None
-                                        and rd.find_binary() is not None)
+                                        and not missing and rd.find_binary() is not None)
         b = self.banner
+        self._banner_action = None
         if not rd.find_binary():
             b.set_title(self._("img_banner_no_engine"))
             b.set_button_label(None)
             b.set_revealed(True)
-        elif self.model is None:
-            b.set_title(self._("img_banner_no_model"))
-            b.set_button_label(self._("img_add_folder"))
+        elif self.misplaced:
+            b.set_title(self._("img_misplaced", name=os.path.basename(self.misplaced[0])))
+            b.set_button_label(self._("img_open_models_folder"))
+            self._banner_action = self.open_models_folder
+            b.set_revealed(True)
+        elif missing:
+            b.set_title(self._("img_banner_incomplete", name=self.model.name,
+                               parts=self._parts(missing)))
+            b.set_button_label(self._("img_guide_button"))
+            self._banner_action = self.show_guide
             b.set_revealed(True)
         else:
             b.set_revealed(False)
-        self.stack.set_visible_child_name("gallery" if self.items or running else "empty")
+        if self.items or running:
+            self.stack.set_visible_child_name("gallery")
+        else:
+            self.stack.set_visible_child_name("setup" if self.model is None else "empty")
 
     def _on_banner(self, _banner):
-        if self.model is None:
-            self.add_folder()
+        if self._banner_action:
+            self._banner_action()
+
+    @staticmethod
+    def _shown_path(path):
+        home = os.path.expanduser("~")
+        return "~" + path[len(home):] if path.startswith(home + os.sep) else path
+
+    def _parts(self, roles):
+        names = {"vae": "VAE", "llm": self._("img_part_te"), "t5xxl": "T5-XXL",
+                 "clip_l": "CLIP-L", "clip_g": "CLIP-G"}
+        return ", ".join(names.get(r, r) for r in roles)
+
+    # ── guida: quali file scaricare e dove ────────────────────────────────
+    def show_guide(self):
+        _ = self._
+        page = Adw.PreferencesPage(description=_("img_guide_intro"))
+        intro = Adw.PreferencesGroup(description=_("img_guide_versions"))
+        page.add(intro)
+        labels = {"model": _("img_part_model"), "llm": _("img_part_te"), "vae": "VAE"}
+        for entry in rd.GUIDE:
+            group = Adw.PreferencesGroup(title=entry["name"], description=_(entry["desc"]))
+            for role, hint, url in entry["files"]:
+                row = Adw.ActionRow(title=labels[role], subtitle=hint, activatable=True,
+                                    tooltip_text=url)
+                row.add_css_class("property")
+                row.add_suffix(Gtk.Image(icon_name="web-browser-symbolic",
+                                         tooltip_text=_("img_open_link")))
+                row.connect("activated", lambda _r, u=url: Gtk.UriLauncher.new(u).launch(
+                    self.window, None, None))
+                group.add(row)
+            target = os.path.join(rd.USER_MODEL_DIR, entry["name"])
+            row = Adw.ActionRow(title=_("img_create_folder"), subtitle=self._shown_path(target),
+                                activatable=True)
+            row.add_suffix(Gtk.Image(icon_name="folder-new-symbolic"))
+            row.connect("activated", lambda _r, t=target: self._create_model_folder(t))
+            group.add(row)
+            page.add(group)
+        view = Adw.ToolbarView(content=page)
+        view.add_top_bar(Adw.HeaderBar())
+        Adw.Dialog(title=_("img_guide_title"), content_width=620, content_height=720,
+                   child=view).present(self.window)
+
+    def _create_model_folder(self, path):
+        """Crea la cartella del modello con il nome giusto e la apre: li'
+        dentro vanno i tre file."""
+        try:
+            os.makedirs(path, exist_ok=True)
+        except OSError as e:
+            self.window._show_error(self._("save_error"), str(e))
+            return
+        Gtk.FileLauncher.new(Gio.File.new_for_path(path)).launch(self.window, None, None)
 
     def _on_key(self, _ctrl, keyval, _code, state):
         if keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter) and \

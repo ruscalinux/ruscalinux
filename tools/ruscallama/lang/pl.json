@@ -221,5 +221,20 @@
   "img_te_device_sub": "Przenieś go na inną kartę lub na procesor, aby główna karta została wolna dla modelu",
   "img_te_same": "Na tej samej karcie",
   "img_te_cpu": "Na procesorze (CPU)",
-  "img_open_models_folder": "Otwórz folder modeli obrazów"
+  "img_open_models_folder": "Otwórz folder modeli obrazów",
+  "img_setup_title": "Potrzebny jest model obrazów",
+  "img_setup_desc": "Model składa się z trzech plików: samego modelu, kodera tekstu i VAE. Pobierz je i umieść razem w jednym folderze w folderze modeli obrazów:",
+  "img_guide_button": "Jakie pliki pobrać?",
+  "img_guide_title": "Jakie pliki pobrać",
+  "img_guide_intro": "Wybierz model. Kliknij trzy wiersze, aby otworzyć strony plików i je pobrać, potem „Utwórz folder i go otwórz” i skopiuj tam trzy pliki. Model pojawi się sam w widoku Obrazy.",
+  "img_guide_versions": "Model ma kilka wersji: przy 6 GB pamięci karty graficznej lub mniej wybierz Q4_K_M (lub Q4_0), przy 8 GB lub więcej Q8_0, o najwyższej jakości.",
+  "img_guide_ernie": "Polecany: najlepsza jakość, działa nawet z 6 GB pamięci karty graficznej. Licencja Apache 2.0.",
+  "img_guide_zimage": "Lżejszy i szybszy, działa nawet z 4 GB pamięci karty graficznej. Licencja Apache 2.0.",
+  "img_part_model": "Model",
+  "img_part_te": "Koder tekstu",
+  "img_create_folder": "Utwórz folder i go otwórz",
+  "img_open_link": "Otwórz stronę, aby pobrać plik",
+  "img_incomplete": "Brakuje plików: {parts}",
+  "img_banner_incomplete": "Modelowi „{name}” brakuje plików: {parts}. Skopiuj je do jego folderu.",
+  "img_misplaced": "„{name}” jest w folderze modeli czatu: modele obrazów należy umieścić w folderze modeli obrazów."
 }

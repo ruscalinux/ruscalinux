@@ -221,5 +221,20 @@
   "img_te_device_sub": "放到另一块显卡或处理器上，让主显卡专门运行模型",
   "img_te_same": "同一块显卡",
   "img_te_cpu": "处理器 (CPU)",
-  "img_open_models_folder": "打开图像模型文件夹"
+  "img_open_models_folder": "打开图像模型文件夹",
+  "img_setup_title": "需要一个图像模型",
+  "img_setup_desc": "一个模型由三个文件组成：模型本身、文本编码器和 VAE。下载它们，并一起放进图像模型文件夹里的同一个文件夹：",
+  "img_guide_button": "要下载哪些文件？",
+  "img_guide_title": "要下载的文件",
+  "img_guide_intro": "选择一个模型。点击三行打开文件页面并下载，然后点击“创建文件夹并打开”，把三个文件复制进去。模型会自动出现在“图像”视图中。",
+  "img_guide_versions": "模型有多个版本：显存 6 GB 及以下选 Q4_K_M（或 Q4_0），8 GB 及以上选质量最高的 Q8_0。",
+  "img_guide_ernie": "推荐：质量最好，6 GB 显存也能运行。Apache 2.0 许可证。",
+  "img_guide_zimage": "更轻更快，4 GB 显存也能运行。Apache 2.0 许可证。",
+  "img_part_model": "模型",
+  "img_part_te": "文本编码器",
+  "img_create_folder": "创建文件夹并打开",
+  "img_open_link": "打开下载该文件的页面",
+  "img_incomplete": "缺少文件：{parts}",
+  "img_banner_incomplete": "模型“{name}”缺少文件：{parts}。请复制到它的文件夹中。",
+  "img_misplaced": "“{name}”在聊天的模型文件夹中：图像模型应放在图像模型文件夹中。"
 }

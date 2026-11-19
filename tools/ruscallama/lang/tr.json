@@ -221,5 +221,20 @@
   "img_te_device_sub": "Başka bir karta ya da işlemciye koyun; böylece ana kart modele ayrılır",
   "img_te_same": "Aynı kartta",
   "img_te_cpu": "İşlemcide (CPU)",
-  "img_open_models_folder": "Görsel modelleri klasörünü aç"
+  "img_open_models_folder": "Görsel modelleri klasörünü aç",
+  "img_setup_title": "Bir görsel modeli gerekli",
+  "img_setup_desc": "Bir model üç dosyadan oluşur: model, metin kodlayıcı ve VAE. Bunları indirin ve görsel modelleri klasörünün içinde tek bir klasöre birlikte koyun:",
+  "img_guide_button": "Hangi dosyalar indirilmeli?",
+  "img_guide_title": "Hangi dosyalar indirilmeli",
+  "img_guide_intro": "Bir model seçin. Dosyaların sayfalarını açıp indirmek için üç satıra tıklayın, ardından \"Klasörü oluştur ve aç\"a tıklayıp üç dosyayı oraya kopyalayın. Model, Görseller görünümünde kendiliğinden belirir.",
+  "img_guide_versions": "Modelin birkaç sürümü var: 6 GB veya daha az ekran kartı belleğiyle Q4_K_M'yi (ya da Q4_0'ı), 8 GB veya daha fazlasıyla en yüksek kaliteli Q8_0'ı seçin.",
+  "img_guide_ernie": "Önerilen: en iyi kalite, 6 GB ekran kartı belleğiyle bile çalışır. Apache 2.0 lisansı.",
+  "img_guide_zimage": "Daha hafif ve hızlı, 4 GB ekran kartı belleğiyle bile çalışır. Apache 2.0 lisansı.",
+  "img_part_model": "Model",
+  "img_part_te": "Metin kodlayıcı",
+  "img_create_folder": "Klasörü oluştur ve aç",
+  "img_open_link": "Dosyayı indirmek için sayfayı aç",
+  "img_incomplete": "Eksik dosyalar: {parts}",
+  "img_banner_incomplete": "\"{name}\" modelinde eksik dosyalar var: {parts}. Bunları modelin klasörüne kopyalayın.",
+  "img_misplaced": "\"{name}\" sohbet modelleri klasöründe: görsel modelleri, görsel modelleri klasörüne konur."
 }

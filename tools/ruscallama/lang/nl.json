@@ -221,5 +221,20 @@
   "img_te_device_sub": "Zet hem op een andere kaart of op de processor, zodat de hoofdkaart vrij blijft voor het model",
   "img_te_same": "Op dezelfde kaart",
   "img_te_cpu": "Op de processor (CPU)",
-  "img_open_models_folder": "Map met afbeeldingsmodellen openen"
+  "img_open_models_folder": "Map met afbeeldingsmodellen openen",
+  "img_setup_title": "Er is een afbeeldingsmodel nodig",
+  "img_setup_desc": "Een model bestaat uit drie bestanden: het model, de tekstencoder en de VAE. Download ze en zet ze samen in een map binnen de map met afbeeldingsmodellen:",
+  "img_guide_button": "Welke bestanden downloaden?",
+  "img_guide_title": "Welke bestanden downloaden",
+  "img_guide_intro": "Kies een model. Klik op de drie rijen om de pagina’s van de bestanden te openen en ze te downloaden, daarna op ‘Map maken en openen’, en kopieer de drie bestanden daarheen. Het model verschijnt vanzelf in de weergave Afbeeldingen.",
+  "img_guide_versions": "Het model bestaat in meerdere versies: met 6 GB videogeheugen of minder kiest u Q4_K_M (of Q4_0), met 8 GB of meer Q8_0, met de hoogste kwaliteit.",
+  "img_guide_ernie": "Aanbevolen: de beste kwaliteit, werkt zelfs met 6 GB videogeheugen. Licentie Apache 2.0.",
+  "img_guide_zimage": "Lichter en sneller, werkt zelfs met 4 GB videogeheugen. Licentie Apache 2.0.",
+  "img_part_model": "Model",
+  "img_part_te": "Tekstencoder",
+  "img_create_folder": "Map maken en openen",
+  "img_open_link": "De pagina openen om het bestand te downloaden",
+  "img_incomplete": "Er ontbreken bestanden: {parts}",
+  "img_banner_incomplete": "Bij het model ‘{name}’ ontbreken bestanden: {parts}. Kopieer ze naar de map van het model.",
+  "img_misplaced": "‘{name}’ staat in de modellenmap van de chat: afbeeldingsmodellen horen in de map met afbeeldingsmodellen."
 }

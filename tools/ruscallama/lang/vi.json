@@ -221,5 +221,20 @@
   "img_te_device_sub": "Đặt nó trên card khác hoặc trên bộ xử lý, để card chính dành riêng cho mô hình",
   "img_te_same": "Trên cùng card",
   "img_te_cpu": "Trên bộ xử lý (CPU)",
-  "img_open_models_folder": "Mở thư mục mô hình hình ảnh"
+  "img_open_models_folder": "Mở thư mục mô hình hình ảnh",
+  "img_setup_title": "Cần một mô hình hình ảnh",
+  "img_setup_desc": "Một mô hình gồm ba tệp: mô hình, bộ mã hóa văn bản và VAE. Hãy tải về và đặt chúng chung trong một thư mục bên trong thư mục mô hình hình ảnh:",
+  "img_guide_button": "Cần tải những tệp nào?",
+  "img_guide_title": "Những tệp cần tải",
+  "img_guide_intro": "Chọn một mô hình. Nhấn ba dòng để mở trang của các tệp và tải về, rồi nhấn \"Tạo thư mục và mở\" và sao chép ba tệp vào đó. Mô hình sẽ tự xuất hiện trong mục Hình ảnh.",
+  "img_guide_versions": "Mô hình có nhiều phiên bản: với bộ nhớ đồ họa 6 GB trở xuống hãy chọn Q4_K_M (hoặc Q4_0), từ 8 GB trở lên chọn Q8_0, chất lượng cao nhất.",
+  "img_guide_ernie": "Khuyên dùng: chất lượng tốt nhất, chạy được cả với bộ nhớ đồ họa 6 GB. Giấy phép Apache 2.0.",
+  "img_guide_zimage": "Nhẹ và nhanh hơn, chạy được cả với bộ nhớ đồ họa 4 GB. Giấy phép Apache 2.0.",
+  "img_part_model": "Mô hình",
+  "img_part_te": "Bộ mã hóa văn bản",
+  "img_create_folder": "Tạo thư mục và mở",
+  "img_open_link": "Mở trang để tải tệp",
+  "img_incomplete": "Thiếu tệp: {parts}",
+  "img_banner_incomplete": "Mô hình \"{name}\" thiếu tệp: {parts}. Hãy sao chép chúng vào thư mục của nó.",
+  "img_misplaced": "\"{name}\" nằm trong thư mục mô hình của trò chuyện: mô hình hình ảnh phải đặt trong thư mục mô hình hình ảnh."
 }

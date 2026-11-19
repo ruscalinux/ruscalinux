@@ -221,5 +221,20 @@
   "img_te_device_sub": "Puneți-l pe altă placă sau pe procesor, astfel placa principală rămâne liberă pentru model",
   "img_te_same": "Pe aceeași placă",
   "img_te_cpu": "Pe procesor (CPU)",
-  "img_open_models_folder": "Deschideți dosarul modelelor de imagini"
+  "img_open_models_folder": "Deschideți dosarul modelelor de imagini",
+  "img_setup_title": "Este nevoie de un model de imagini",
+  "img_setup_desc": "Un model are trei fișiere: modelul, codificatorul de text și VAE. Descărcați-le și puneți-le împreună într-un dosar din dosarul modelelor de imagini:",
+  "img_guide_button": "Ce fișiere trebuie descărcate?",
+  "img_guide_title": "Ce fișiere trebuie descărcate",
+  "img_guide_intro": "Alegeți un model. Apăsați pe cele trei rânduri pentru a deschide paginile fișierelor și a le descărca, apoi pe „Creați dosarul și deschideți-l” și copiați acolo cele trei fișiere. Modelul apare singur în vizualizarea Imagini.",
+  "img_guide_versions": "Modelul are mai multe versiuni: cu 6 GB de memorie video sau mai puțin alegeți Q4_K_M (sau Q4_0), cu 8 GB sau mai mult Q8_0, cu cea mai bună calitate.",
+  "img_guide_ernie": "Recomandat: cea mai bună calitate, funcționează chiar și cu 6 GB de memorie video. Licență Apache 2.0.",
+  "img_guide_zimage": "Mai ușor și mai rapid, funcționează chiar și cu 4 GB de memorie video. Licență Apache 2.0.",
+  "img_part_model": "Model",
+  "img_part_te": "Codificator de text",
+  "img_create_folder": "Creați dosarul și deschideți-l",
+  "img_open_link": "Deschideți pagina pentru a descărca fișierul",
+  "img_incomplete": "Lipsesc fișiere: {parts}",
+  "img_banner_incomplete": "Modelului „{name}” îi lipsesc fișiere: {parts}. Copiați-le în dosarul lui.",
+  "img_misplaced": "„{name}” este în dosarul modelelor conversației: modelele de imagini se pun în dosarul modelelor de imagini."
 }

@@ -221,5 +221,20 @@
   "img_te_device_sub": "Placez-le sur une autre carte ou sur le processeur, pour laisser la carte principale libre pour le modèle",
   "img_te_same": "Sur la même carte",
   "img_te_cpu": "Sur le processeur (CPU)",
-  "img_open_models_folder": "Ouvrir le dossier des modèles d’images"
+  "img_open_models_folder": "Ouvrir le dossier des modèles d’images",
+  "img_setup_title": "Un modèle d’images est nécessaire",
+  "img_setup_desc": "Un modèle se compose de trois fichiers : le modèle, l’encodeur de texte et le VAE. Téléchargez-les et placez-les ensemble dans un dossier, à l’intérieur du dossier des modèles d’images :",
+  "img_guide_button": "Quels fichiers télécharger ?",
+  "img_guide_title": "Quels fichiers télécharger",
+  "img_guide_intro": "Choisissez un modèle. Cliquez sur les trois lignes pour ouvrir les pages des fichiers et les télécharger, puis sur « Créer le dossier et l’ouvrir » et copiez-y les trois fichiers. Le modèle apparaît tout seul dans la vue Images.",
+  "img_guide_versions": "Le modèle existe en plusieurs versions : avec 6 Go de mémoire graphique ou moins, choisissez Q4_K_M (ou Q4_0) ; avec 8 Go ou plus, Q8_0, de la meilleure qualité.",
+  "img_guide_ernie": "Recommandé : la meilleure qualité, fonctionne même avec 6 Go de mémoire graphique. Licence Apache 2.0.",
+  "img_guide_zimage": "Plus léger et plus rapide, fonctionne même avec 4 Go de mémoire graphique. Licence Apache 2.0.",
+  "img_part_model": "Modèle",
+  "img_part_te": "Encodeur de texte",
+  "img_create_folder": "Créer le dossier et l’ouvrir",
+  "img_open_link": "Ouvrir la page pour télécharger le fichier",
+  "img_incomplete": "Il manque des fichiers : {parts}",
+  "img_banner_incomplete": "Il manque des fichiers au modèle « {name} » : {parts}. Copiez-les dans son dossier.",
+  "img_misplaced": "« {name} » est dans le dossier des modèles de la discussion : les modèles d’images vont dans le dossier des modèles d’images."
 }

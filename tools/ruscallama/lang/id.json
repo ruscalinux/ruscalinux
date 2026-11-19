@@ -221,5 +221,20 @@
   "img_te_device_sub": "Letakkan di kartu lain atau di prosesor, agar kartu utama tetap bebas untuk model",
   "img_te_same": "Di kartu yang sama",
   "img_te_cpu": "Di prosesor (CPU)",
-  "img_open_models_folder": "Buka folder model gambar"
+  "img_open_models_folder": "Buka folder model gambar",
+  "img_setup_title": "Diperlukan model gambar",
+  "img_setup_desc": "Sebuah model terdiri dari tiga berkas: model, penyandi teks, dan VAE. Unduh ketiganya dan letakkan bersama dalam satu folder di dalam folder model gambar:",
+  "img_guide_button": "Berkas mana yang diunduh?",
+  "img_guide_title": "Berkas yang perlu diunduh",
+  "img_guide_intro": "Pilih sebuah model. Klik tiga baris untuk membuka halaman berkas dan mengunduhnya, lalu \"Buat folder dan buka\" dan salin ketiga berkas ke sana. Model akan muncul sendiri di tampilan Gambar.",
+  "img_guide_versions": "Model tersedia dalam beberapa versi: dengan memori grafis 6 GB atau kurang pilih Q4_K_M (atau Q4_0), dengan 8 GB atau lebih pilih Q8_0, yang kualitasnya paling tinggi.",
+  "img_guide_ernie": "Disarankan: kualitas terbaik, berjalan bahkan dengan memori grafis 6 GB. Lisensi Apache 2.0.",
+  "img_guide_zimage": "Lebih ringan dan cepat, berjalan bahkan dengan memori grafis 4 GB. Lisensi Apache 2.0.",
+  "img_part_model": "Model",
+  "img_part_te": "Penyandi teks",
+  "img_create_folder": "Buat folder dan buka",
+  "img_open_link": "Buka halaman untuk mengunduh berkas",
+  "img_incomplete": "Ada berkas yang hilang: {parts}",
+  "img_banner_incomplete": "Model \"{name}\" kekurangan berkas: {parts}. Salin ke foldernya.",
+  "img_misplaced": "\"{name}\" ada di folder model obrolan: model gambar harus diletakkan di folder model gambar."
 }

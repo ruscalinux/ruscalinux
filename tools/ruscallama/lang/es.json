@@ -221,5 +221,20 @@
   "img_te_device_sub": "Ponlo en otra tarjeta o en el procesador, así la tarjeta principal queda libre para el modelo",
   "img_te_same": "En la misma tarjeta",
   "img_te_cpu": "En el procesador (CPU)",
-  "img_open_models_folder": "Abrir la carpeta de modelos de imágenes"
+  "img_open_models_folder": "Abrir la carpeta de modelos de imágenes",
+  "img_setup_title": "Hace falta un modelo de imágenes",
+  "img_setup_desc": "Un modelo consta de tres archivos: el modelo, el codificador de texto y el VAE. Descárgalos y ponlos juntos en una carpeta dentro de la carpeta de modelos de imágenes:",
+  "img_guide_button": "¿Qué archivos descargar?",
+  "img_guide_title": "Qué archivos descargar",
+  "img_guide_intro": "Elige un modelo. Pulsa las tres filas para abrir las páginas de los archivos y descargarlos; luego «Crear la carpeta y abrirla» y copia allí los tres archivos. El modelo aparece solo en la vista Imágenes.",
+  "img_guide_versions": "El modelo tiene varias versiones: con 6 GB de memoria gráfica o menos elige Q4_K_M (o Q4_0); con 8 GB o más, Q8_0, que tiene la mejor calidad.",
+  "img_guide_ernie": "Recomendado: la mejor calidad, funciona incluso con 6 GB de memoria gráfica. Licencia Apache 2.0.",
+  "img_guide_zimage": "Más ligero y rápido, funciona incluso con 4 GB de memoria gráfica. Licencia Apache 2.0.",
+  "img_part_model": "Modelo",
+  "img_part_te": "Codificador de texto",
+  "img_create_folder": "Crear la carpeta y abrirla",
+  "img_open_link": "Abrir la página para descargar el archivo",
+  "img_incomplete": "Faltan archivos: {parts}",
+  "img_banner_incomplete": "Al modelo «{name}» le faltan archivos: {parts}. Cópialos en su carpeta.",
+  "img_misplaced": "«{name}» está en la carpeta de modelos del chat: los modelos de imágenes van en la carpeta de modelos de imágenes."
 }

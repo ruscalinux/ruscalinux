@@ -221,5 +221,20 @@
   "img_te_device_sub": "Put it on another card or on the processor, so the main card stays free for the model",
   "img_te_same": "On the Same Card",
   "img_te_cpu": "On the Processor (CPU)",
-  "img_open_models_folder": "Open the Image Models Folder"
+  "img_open_models_folder": "Open the Image Models Folder",
+  "img_setup_title": "An Image Model Is Needed",
+  "img_setup_desc": "A model is made of three files: the model, the text encoder and the VAE. Download them and put them together in a folder inside the image models folder:",
+  "img_guide_button": "Which Files to Download?",
+  "img_guide_title": "Which Files to Download",
+  "img_guide_intro": "Choose a model. Click the three rows to open the pages of the files and download them, then “Create the Folder and Open It” and copy the three files there. The model appears on its own in the Images view.",
+  "img_guide_versions": "The model comes in several versions: with 6 GB of graphics memory or less choose Q4_K_M (or Q4_0), with 8 GB or more Q8_0, which has the highest quality.",
+  "img_guide_ernie": "Recommended: the best quality, works even with 6 GB of graphics memory. Apache 2.0 license.",
+  "img_guide_zimage": "Lighter and faster, works even with 4 GB of graphics memory. Apache 2.0 license.",
+  "img_part_model": "Model",
+  "img_part_te": "Text encoder",
+  "img_create_folder": "Create the Folder and Open It",
+  "img_open_link": "Open the page to download the file",
+  "img_incomplete": "Some files are missing: {parts}",
+  "img_banner_incomplete": "The model “{name}” is missing some files: {parts}. Copy them into its folder.",
+  "img_misplaced": "“{name}” is in the chat models folder: image models go in the image models folder."
 }

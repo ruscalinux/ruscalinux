@@ -221,5 +221,20 @@
   "img_te_device_sub": "Tegye egy másik kártyára vagy a processzorra, így a fő kártya szabad marad a modell számára",
   "img_te_same": "Ugyanazon a kártyán",
   "img_te_cpu": "A processzoron (CPU)",
-  "img_open_models_folder": "A képmodellek mappájának megnyitása"
+  "img_open_models_folder": "A képmodellek mappájának megnyitása",
+  "img_setup_title": "Képmodellre van szükség",
+  "img_setup_desc": "Egy modell három fájlból áll: magából a modellből, a szövegkódolóból és a VAE-ből. Töltse le őket, és tegye egy mappába a képmodellek mappáján belül:",
+  "img_guide_button": "Milyen fájlokat töltsek le?",
+  "img_guide_title": "Milyen fájlokat töltsön le",
+  "img_guide_intro": "Válasszon egy modellt. Kattintson a három sorra a fájlok oldalainak megnyitásához és letöltéséhez, majd a „Mappa létrehozása és megnyitása” gombra, és másolja oda a három fájlt. A modell magától megjelenik a Képek nézetben.",
+  "img_guide_versions": "A modellnek több változata van: 6 GB vagy kevesebb videomemóriával a Q4_K_M-et (vagy a Q4_0-t), 8 GB vagy több esetén a legjobb minőségű Q8_0-t válassza.",
+  "img_guide_ernie": "Ajánlott: a legjobb minőség, 6 GB videomemóriával is működik. Apache 2.0 licenc.",
+  "img_guide_zimage": "Könnyebb és gyorsabb, 4 GB videomemóriával is működik. Apache 2.0 licenc.",
+  "img_part_model": "Modell",
+  "img_part_te": "Szövegkódoló",
+  "img_create_folder": "Mappa létrehozása és megnyitása",
+  "img_open_link": "A fájl letöltőoldalának megnyitása",
+  "img_incomplete": "Hiányzó fájlok: {parts}",
+  "img_banner_incomplete": "A(z) „{name}” modellből hiányoznak fájlok: {parts}. Másolja őket a mappájába.",
+  "img_misplaced": "A(z) „{name}” a csevegés modelljeinek mappájában van: a képmodellek a képmodellek mappájába kerülnek."
 }

@@ -221,5 +221,20 @@
   "img_te_device_sub": "Coloque-o em outra placa ou no processador, assim a placa principal fica livre para o modelo",
   "img_te_same": "Na mesma placa",
   "img_te_cpu": "No processador (CPU)",
-  "img_open_models_folder": "Abrir a pasta de modelos de imagens"
+  "img_open_models_folder": "Abrir a pasta de modelos de imagens",
+  "img_setup_title": "É preciso um modelo de imagens",
+  "img_setup_desc": "Um modelo é formado por três arquivos: o modelo, o codificador de texto e o VAE. Baixe-os e coloque-os juntos em uma pasta dentro da pasta de modelos de imagens:",
+  "img_guide_button": "Quais arquivos baixar?",
+  "img_guide_title": "Quais arquivos baixar",
+  "img_guide_intro": "Escolha um modelo. Clique nas três linhas para abrir as páginas dos arquivos e baixá-los, depois em “Criar a pasta e abri-la” e copie os três arquivos para lá. O modelo aparece sozinho na visualização Imagens.",
+  "img_guide_versions": "O modelo tem várias versões: com 6 GB de memória de vídeo ou menos escolha Q4_K_M (ou Q4_0); com 8 GB ou mais, Q8_0, a de maior qualidade.",
+  "img_guide_ernie": "Recomendado: a melhor qualidade, funciona até com 6 GB de memória de vídeo. Licença Apache 2.0.",
+  "img_guide_zimage": "Mais leve e rápido, funciona até com 4 GB de memória de vídeo. Licença Apache 2.0.",
+  "img_part_model": "Modelo",
+  "img_part_te": "Codificador de texto",
+  "img_create_folder": "Criar a pasta e abri-la",
+  "img_open_link": "Abrir a página para baixar o arquivo",
+  "img_incomplete": "Faltam arquivos: {parts}",
+  "img_banner_incomplete": "Faltam arquivos no modelo “{name}”: {parts}. Copie-os para a pasta dele.",
+  "img_misplaced": "“{name}” está na pasta de modelos do chat: modelos de imagens vão na pasta de modelos de imagens."
 }

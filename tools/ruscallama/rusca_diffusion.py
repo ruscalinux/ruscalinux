@@ -235,6 +235,7 @@ class Model:
     family: str = ""                   # dall'intestazione del file, se si sa
     folder: str = ""                   # cartella del modello in piu' file
     parts: dict = field(default_factory=dict)      # ruolo -> percorso
+    header_full: object = None         # True: completo secondo i tensori del file
 
     @property
     def key(self):
@@ -255,6 +256,15 @@ class Model:
 
     def guess_family(self):
         return recommended(self)["family"]
+
+    def missing(self):
+        """Componenti che mancano a un modello in piu' file (VAE,
+        codificatore...), per i modelli di cui si sa che cosa serve. Un file
+        completo secondo i suoi tensori non ha bisogno di niente."""
+        if self.header_full:
+            return []
+        need = REQUIRED_PARTS.get(recommended(self)["family"], ())
+        return [role for role in need if not self.parts.get(role)]
 
 
 def scan_folder(folder, recursive=True):
@@ -295,14 +305,19 @@ def scan_folder(folder, recursive=True):
     if mains and any(r not in _ACCESSORY_ROLES for r in parts):
         main = max(mains, key=lambda p: (_size(p), p))
         full, family = checkpoint_info(main)
-        models.append(Model(name=os.path.basename(os.path.normpath(folder)), main=main,
-                            full=bool(full), family=family, folder=folder, parts=parts))
+        # I file messi direttamente nella cartella dei modelli: il nome e'
+        # quello del file, non "models".
+        name = os.path.basename(os.path.normpath(folder))
+        if os.path.normpath(folder) in map(os.path.normpath, MODEL_DIRS):
+            name = os.path.splitext(os.path.basename(main))[0]
+        models.append(Model(name=name, main=main, full=bool(full), family=family,
+                            folder=folder, parts=parts, header_full=full))
     else:
         for p in mains:
             full, family = checkpoint_info(p)
             # .gguf e .ckpt da soli: un file che si usa da solo e' completo.
             models.append(Model(name=os.path.splitext(os.path.basename(p))[0], main=p,
-                                full=full is not False, family=family))
+                                full=full is not False, family=family, header_full=full))
     if recursive:
         for d in subdirs:
             models += scan_folder(d, recursive=True)
@@ -425,6 +440,62 @@ def recommended(model):
     if family in ("sd1", "sdxl") and _FAST_RE.search(low):
         profile.update(steps=4, cfg=1.0, fixed=True)
     return profile
+
+
+# Che cosa serve, oltre al modello di diffusione, ai modelli che si
+# distribuiscono in piu' file (docs/models/ di stable-diffusion.cpp).
+REQUIRED_PARTS = {
+    "zimage": ("vae", "llm"), "ernie": ("vae", "llm"), "flux2": ("vae", "llm"),
+    "flux3": ("vae", "llm"), "qwen": ("vae", "llm"), "chroma": ("vae", "t5xxl"),
+    "flux": ("vae", "clip_l", "t5xxl"),
+}
+
+# Modelli consigliati, con i file da scaricare (pagine della documentazione di
+# stable-diffusion.cpp): li mostra la guida «Quali file scaricare?».
+GUIDE = (
+    {"name": "ERNIE-Image-Turbo", "desc": "img_guide_ernie", "files": (
+        ("model", "ERNIE-Image-Turbo-Q4_K_M.gguf",
+         "https://huggingface.co/unsloth/ERNIE-Image-Turbo-GGUF/tree/main"),
+        ("llm", "Ministral-3-3B-Instruct-2512-Q8_0.gguf",
+         "https://huggingface.co/unsloth/Ministral-3-3B-Instruct-2512-GGUF/tree/main"),
+        ("vae", "vae/*.safetensors",
+         "https://huggingface.co/Comfy-Org/ERNIE-Image/tree/main/vae"))},
+    {"name": "Z-Image-Turbo", "desc": "img_guide_zimage", "files": (
+        ("model", "z_image_turbo-Q4_0.gguf",
+         "https://huggingface.co/leejet/Z-Image-Turbo-GGUF/tree/main"),
+        ("llm", "Qwen3-4B-Instruct-2507-Q4_K_M.gguf",
+         "https://huggingface.co/unsloth/Qwen3-4B-Instruct-2507-GGUF/tree/main"),
+        ("vae", "ae.safetensors",
+         "https://huggingface.co/black-forest-labs/FLUX.1-schnell/tree/main"))},
+)
+
+# Cartelle dei modelli della chat: chi copia li' un modello per immagini non
+# lo trova nella vista Immagini.
+CHAT_MODEL_DIRS = ("/usr/share/ruscallama/models",
+                   os.path.join(GLib.get_user_data_dir(), "ruscallama", "models"))
+_DIFFUSION_HINT = re.compile(r"(z|qwen|ernie|ovis|ming)[-_ ]?image|flux|chroma|sd[-_]?xl|"
+                             r"stable[-_ ]?diffusion|(^|[^a-z])sd[-_ ]?(1[._]?5|3)")
+
+
+def misplaced_files(dirs=CHAT_MODEL_DIRS):
+    """File che sembrano di un modello per immagini nelle cartelle dei
+    modelli della chat (la chat usa solo .gguf linguistici)."""
+    found = []
+    for d in dirs:
+        try:
+            names = sorted(os.listdir(d))
+        except OSError:
+            continue
+        for n in names:
+            low = n.lower()
+            if not is_model_file(n):
+                continue
+            stem = os.path.splitext(low)[0]
+            if (low.endswith((".safetensors", ".sft", ".ckpt"))
+                    or file_role(n) in ("vae", "clip_l", "clip_g", "t5xxl")
+                    or _DIFFUSION_HINT.search(stem)):
+                found.append(os.path.join(d, n))
+    return found
 
 
 def image_size(side, aspect):

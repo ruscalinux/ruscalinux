@@ -221,5 +221,20 @@
   "img_te_device_sub": "Lägg den på ett annat kort eller på processorn, så att huvudkortet är ledigt för modellen",
   "img_te_same": "På samma kort",
   "img_te_cpu": "På processorn (CPU)",
-  "img_open_models_folder": "Öppna mappen för bildmodeller"
+  "img_open_models_folder": "Öppna mappen för bildmodeller",
+  "img_setup_title": "En bildmodell behövs",
+  "img_setup_desc": "En modell består av tre filer: själva modellen, textkodaren och VAE. Ladda ner dem och lägg dem tillsammans i en mapp i mappen för bildmodeller:",
+  "img_guide_button": "Vilka filer ska laddas ner?",
+  "img_guide_title": "Vilka filer ska laddas ner",
+  "img_guide_intro": "Välj en modell. Klicka på de tre raderna för att öppna filernas sidor och ladda ner dem, sedan på ”Skapa mappen och öppna den” och kopiera dit de tre filerna. Modellen dyker upp av sig själv i vyn Bilder.",
+  "img_guide_versions": "Modellen finns i flera versioner: med 6 GB grafikminne eller mindre välj Q4_K_M (eller Q4_0), med 8 GB eller mer Q8_0, som har högst kvalitet.",
+  "img_guide_ernie": "Rekommenderas: bäst kvalitet, fungerar även med 6 GB grafikminne. Licens Apache 2.0.",
+  "img_guide_zimage": "Lättare och snabbare, fungerar även med 4 GB grafikminne. Licens Apache 2.0.",
+  "img_part_model": "Modell",
+  "img_part_te": "Textkodare",
+  "img_create_folder": "Skapa mappen och öppna den",
+  "img_open_link": "Öppna sidan för att ladda ner filen",
+  "img_incomplete": "Filer saknas: {parts}",
+  "img_banner_incomplete": "Modellen ”{name}” saknar filer: {parts}. Kopiera dem till dess mapp.",
+  "img_misplaced": "”{name}” ligger i chattens modellmapp: bildmodeller ska ligga i mappen för bildmodeller."
 }

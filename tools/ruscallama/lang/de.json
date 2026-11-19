@@ -221,5 +221,20 @@
   "img_te_device_sub": "Legen Sie ihn auf eine andere Karte oder den Prozessor, damit die Hauptkarte für das Modell frei bleibt",
   "img_te_same": "Auf derselben Karte",
   "img_te_cpu": "Auf dem Prozessor (CPU)",
-  "img_open_models_folder": "Ordner der Bildmodelle öffnen"
+  "img_open_models_folder": "Ordner der Bildmodelle öffnen",
+  "img_setup_title": "Ein Bildmodell wird benötigt",
+  "img_setup_desc": "Ein Modell besteht aus drei Dateien: dem Modell, dem Textencoder und dem VAE. Laden Sie sie herunter und legen Sie sie zusammen in einen Ordner im Ordner der Bildmodelle:",
+  "img_guide_button": "Welche Dateien herunterladen?",
+  "img_guide_title": "Welche Dateien herunterladen",
+  "img_guide_intro": "Wählen Sie ein Modell. Klicken Sie auf die drei Zeilen, um die Seiten der Dateien zu öffnen und sie herunterzuladen, dann auf „Ordner erstellen und öffnen“, und kopieren Sie die drei Dateien dorthin. Das Modell erscheint von selbst in der Bilder-Ansicht.",
+  "img_guide_versions": "Das Modell gibt es in mehreren Versionen: Mit 6 GB Grafikspeicher oder weniger wählen Sie Q4_K_M (oder Q4_0), mit 8 GB oder mehr Q8_0, die beste Qualität.",
+  "img_guide_ernie": "Empfohlen: die beste Qualität, läuft auch mit 6 GB Grafikspeicher. Lizenz Apache 2.0.",
+  "img_guide_zimage": "Leichter und schneller, läuft auch mit 4 GB Grafikspeicher. Lizenz Apache 2.0.",
+  "img_part_model": "Modell",
+  "img_part_te": "Textencoder",
+  "img_create_folder": "Ordner erstellen und öffnen",
+  "img_open_link": "Seite zum Herunterladen der Datei öffnen",
+  "img_incomplete": "Es fehlen Dateien: {parts}",
+  "img_banner_incomplete": "Dem Modell „{name}“ fehlen Dateien: {parts}. Kopieren Sie sie in seinen Ordner.",
+  "img_misplaced": "„{name}“ liegt im Modellordner des Chats: Bildmodelle gehören in den Ordner der Bildmodelle."
 }

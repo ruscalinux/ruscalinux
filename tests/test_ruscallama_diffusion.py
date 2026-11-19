@@ -184,6 +184,66 @@ class TestModels(unittest.TestCase):
         (m,) = rd.scan_folder(self.dir)
         self.assertEqual(m.args(), ["-m", main, "--vae", vae])
 
+    def test_missing_parts(self):
+        # ERNIE senza VAE e senza codificatore, da solo nella cartella.
+        lone = self.touch("ERNIE-Image-Turbo-Q4_K_M.gguf", size=100)
+        (m,) = rd.scan_folder(self.dir, recursive=False)
+        self.assertEqual(m.missing(), ["vae", "llm"])
+        # Con il VAE ma senza codificatore.
+        os.remove(lone)
+        self.touch("Z-Image-Turbo/z_image_turbo-Q4_0.gguf", size=100)
+        self.touch("Z-Image-Turbo/ae.safetensors", VAE_KEYS)
+        (m,) = rd.scan_folder(os.path.join(self.dir, "Z-Image-Turbo"))
+        self.assertEqual(m.missing(), ["llm"])
+        self.touch("Z-Image-Turbo/Qwen3-4B-Instruct-2507-Q4_K_M.gguf", size=10)
+        (m,) = rd.scan_folder(os.path.join(self.dir, "Z-Image-Turbo"))
+        self.assertEqual(m.missing(), [])
+        # Un SD 1.5 completo non ha bisogno di niente.
+        sd = rd.Model("v1-5", self.touch("v1-5.safetensors", SD15_KEYS), True, "sd1",
+                      header_full=True)
+        self.assertEqual(sd.missing(), [])
+
+    def test_files_in_models_root(self):
+        """I tre file messi direttamente nella cartella dei modelli: il
+        modello prende il nome del file, non "models"."""
+        saved = rd.MODEL_DIRS
+        rd.MODEL_DIRS = (self.dir,)
+        try:
+            self.touch("ERNIE-Image-Turbo-Q4_K_M.gguf", size=100)
+            self.touch("flux2-vae.safetensors", VAE_KEYS)
+            self.touch("Ministral-3-3B-Instruct-2512-Q8_0.gguf", size=10)
+            (m,) = rd.find_models()
+            self.assertEqual(m.name, "ERNIE-Image-Turbo-Q4_K_M")
+            self.assertEqual(m.missing(), [])
+        finally:
+            rd.MODEL_DIRS = saved
+
+    def test_misplaced_files(self):
+        chat = os.path.join(self.dir, "chat")
+        os.makedirs(chat)
+        for n in ("Qwen3-8B-Q4_K_M.gguf", "ERNIE-4.5-21B-Q4_K_M.gguf",
+                  "Ministral-3-3B-Instruct-2512-Q8_0.gguf", "mmproj-F16.gguf"):
+            self.touch(os.path.join("chat", n), size=10)
+        self.assertEqual(rd.misplaced_files((chat,)), [])
+        for n in ("ERNIE-Image-Turbo-Q4_K_M.gguf", "ae.safetensors", "z_image_turbo-Q4_0.gguf"):
+            self.touch(os.path.join("chat", n), size=10)
+        self.assertEqual([os.path.basename(p) for p in rd.misplaced_files((chat,))],
+                         ["ERNIE-Image-Turbo-Q4_K_M.gguf", "ae.safetensors",
+                          "z_image_turbo-Q4_0.gguf"])
+
+    def test_guide_files_are_recognised(self):
+        """I nomi dei file della guida «Quali file scaricare?» danno un
+        modello completo."""
+        for entry in rd.GUIDE:
+            with self.subTest(entry["name"]):
+                for role, hint, _url in entry["files"]:
+                    name = "vae.safetensors" if hint.startswith("vae/") else hint
+                    self.touch(os.path.join(entry["name"], name),
+                               size=100 if role == "model" else 10)
+                (m,) = rd.scan_folder(os.path.join(self.dir, entry["name"]))
+                self.assertEqual(m.missing(), [])
+                self.assertEqual(rd.recommended(m)["steps"], 8)
+
     def test_find_models_no_duplicates(self):
         self.touch("a.safetensors", SD15_KEYS)
         found = rd.find_models([self.dir, self.dir, "/non/esiste"])

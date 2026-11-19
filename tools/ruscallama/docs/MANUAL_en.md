@@ -76,6 +76,8 @@ The **Images** view (at the top, next to **Chat**; Alt+2) creates pictures from 
 
 ### The model
 
+The first time, the Images view shows what is needed: a model is made of **three files** (the model, the text encoder and the VAE) to put together in a folder. **Which Files to Download?** lists the files of the recommended models with the pages to download them from, and **Create the Folder and Open It** prepares the folder with the right name: copy the three files there and the model appears on its own. If a file is missing, or you copied a file into the chat models folder, a notice at the top says so.
+
 Copy it into `~/.local/share/ruscadiffusion/models/` (side panel → **Open the Models Folder**), or leave it where it is and choose **Add a Folder…**: RuscaLLama remembers the folder without copying the files. A model can be:
 
 - **a single** `.safetensors`, `.gguf` or `.ckpt` **file** with everything inside: Stable Diffusion 1.5, SDXL, SD-Turbo, SDXL-Turbo;

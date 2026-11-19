@@ -76,6 +76,8 @@ La vista **Immagini** (in alto, accanto a **Chat**; Alt+2) crea immagini da una 
 
 ### Il modello
 
+La prima volta la vista Immagini mostra che cosa serve: un modello è fatto di **tre file** (il modello, il codificatore di testo e il VAE) da mettere insieme in una cartella. **Quali file scaricare?** elenca i file dei modelli consigliati con le pagine da cui scaricarli, e **Crea la cartella e aprila** prepara la cartella con il nome giusto: copia lì i tre file e il modello compare da solo. Se manca un file, o se hai copiato un file nella cartella dei modelli della chat, un avviso in alto lo dice.
+
 Copialo in `~/.local/share/ruscadiffusion/models/` (pannello laterale → **Apri la cartella dei modelli**), oppure lascialo dov’è e scegli **Aggiungi una cartella…**: RuscaLLama ricorda la cartella senza copiare i file. Un modello può essere:
 
 - **un file solo** `.safetensors`, `.gguf` o `.ckpt`, con tutto dentro: Stable Diffusion 1.5, SDXL, SD-Turbo, SDXL-Turbo;

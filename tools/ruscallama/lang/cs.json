@@ -221,5 +221,20 @@
   "img_te_device_sub": "Přesuňte jej na jinou kartu nebo na procesor, aby hlavní karta zůstala volná pro model",
   "img_te_same": "Na stejné kartě",
   "img_te_cpu": "Na procesoru (CPU)",
-  "img_open_models_folder": "Otevřít složku modelů obrázků"
+  "img_open_models_folder": "Otevřít složku modelů obrázků",
+  "img_setup_title": "Je potřeba model pro obrázky",
+  "img_setup_desc": "Model se skládá ze tří souborů: modelu, kodéru textu a VAE. Stáhněte je a dejte je společně do jedné složky uvnitř složky modelů obrázků:",
+  "img_guide_button": "Jaké soubory stáhnout?",
+  "img_guide_title": "Jaké soubory stáhnout",
+  "img_guide_intro": "Vyberte model. Klepněte na tři řádky, otevřete stránky souborů a stáhněte je, pak klepněte na „Vytvořit složku a otevřít ji“ a zkopírujte tam tři soubory. Model se sám objeví v zobrazení Obrázky.",
+  "img_guide_versions": "Model má více verzí: s 6 GB grafické paměti nebo méně zvolte Q4_K_M (nebo Q4_0), s 8 GB a více Q8_0, s nejvyšší kvalitou.",
+  "img_guide_ernie": "Doporučeno: nejlepší kvalita, funguje i s 6 GB grafické paměti. Licence Apache 2.0.",
+  "img_guide_zimage": "Lehčí a rychlejší, funguje i se 4 GB grafické paměti. Licence Apache 2.0.",
+  "img_part_model": "Model",
+  "img_part_te": "Kodér textu",
+  "img_create_folder": "Vytvořit složku a otevřít ji",
+  "img_open_link": "Otevřít stránku ke stažení souboru",
+  "img_incomplete": "Chybí soubory: {parts}",
+  "img_banner_incomplete": "Modelu „{name}“ chybí soubory: {parts}. Zkopírujte je do jeho složky.",
+  "img_misplaced": "„{name}“ je ve složce modelů chatu: modely obrázků patří do složky modelů obrázků."
 }

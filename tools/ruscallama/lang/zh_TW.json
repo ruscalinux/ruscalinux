@@ -221,5 +221,20 @@
   "img_te_device_sub": "放到另一張顯示卡或處理器上，讓主顯示卡專門執行模型",
   "img_te_same": "同一張顯示卡",
   "img_te_cpu": "處理器 (CPU)",
-  "img_open_models_folder": "開啟圖像模型資料夾"
+  "img_open_models_folder": "開啟圖像模型資料夾",
+  "img_setup_title": "需要一個圖像模型",
+  "img_setup_desc": "一個模型由三個檔案組成：模型本身、文字編碼器和 VAE。請下載它們，並一起放進圖像模型資料夾裡的同一個資料夾：",
+  "img_guide_button": "要下載哪些檔案？",
+  "img_guide_title": "要下載的檔案",
+  "img_guide_intro": "請選擇一個模型。按三列開啟檔案頁面並下載，然後按「建立資料夾並開啟」，把三個檔案複製進去。模型會自動出現在「圖像」檢視中。",
+  "img_guide_versions": "模型有多個版本：顯示記憶體 6 GB 以下請選 Q4_K_M（或 Q4_0），8 GB 以上請選品質最高的 Q8_0。",
+  "img_guide_ernie": "推薦：品質最好，6 GB 顯示記憶體也能執行。Apache 2.0 授權。",
+  "img_guide_zimage": "更輕更快，4 GB 顯示記憶體也能執行。Apache 2.0 授權。",
+  "img_part_model": "模型",
+  "img_part_te": "文字編碼器",
+  "img_create_folder": "建立資料夾並開啟",
+  "img_open_link": "開啟下載該檔案的頁面",
+  "img_incomplete": "缺少檔案：{parts}",
+  "img_banner_incomplete": "模型「{name}」缺少檔案：{parts}。請複製到它的資料夾中。",
+  "img_misplaced": "「{name}」在聊天的模型資料夾中：圖像模型應放在圖像模型資料夾中。"
 }

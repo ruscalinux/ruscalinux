@@ -221,5 +221,20 @@
   "img_te_device_sub": "Siirrä se toiselle näytönohjaimelle tai suorittimelle, jotta pääkortti jää vapaaksi mallille",
   "img_te_same": "Samalla näytönohjaimella",
   "img_te_cpu": "Suorittimella (CPU)",
-  "img_open_models_folder": "Avaa kuvamallien kansio"
+  "img_open_models_folder": "Avaa kuvamallien kansio",
+  "img_setup_title": "Tarvitaan kuvamalli",
+  "img_setup_desc": "Malli koostuu kolmesta tiedostosta: mallista, tekstikooderista ja VAE:sta. Lataa ne ja laita ne yhdessä yhteen kansioon kuvamallien kansion sisälle:",
+  "img_guide_button": "Mitkä tiedostot ladataan?",
+  "img_guide_title": "Mitkä tiedostot ladataan",
+  "img_guide_intro": "Valitse malli. Napsauta kolmea riviä avataksesi tiedostojen sivut ja lataa ne, sitten ”Luo kansio ja avaa se” ja kopioi kolme tiedostoa sinne. Malli ilmestyy itsestään Kuvat-näkymään.",
+  "img_guide_versions": "Mallista on useita versioita: jos näytönohjaimen muistia on 6 Gt tai vähemmän, valitse Q4_K_M (tai Q4_0); jos 8 Gt tai enemmän, Q8_0, jonka laatu on paras.",
+  "img_guide_ernie": "Suositeltu: paras laatu, toimii jopa 6 Gt:n näytönohjaimen muistilla. Lisenssi Apache 2.0.",
+  "img_guide_zimage": "Kevyempi ja nopeampi, toimii jopa 4 Gt:n näytönohjaimen muistilla. Lisenssi Apache 2.0.",
+  "img_part_model": "Malli",
+  "img_part_te": "Tekstikooderi",
+  "img_create_folder": "Luo kansio ja avaa se",
+  "img_open_link": "Avaa sivu tiedoston lataamista varten",
+  "img_incomplete": "Tiedostoja puuttuu: {parts}",
+  "img_banner_incomplete": "Mallista ”{name}” puuttuu tiedostoja: {parts}. Kopioi ne sen kansioon.",
+  "img_misplaced": "”{name}” on keskustelun mallikansiossa: kuvamallit kuuluvat kuvamallien kansioon."
 }
