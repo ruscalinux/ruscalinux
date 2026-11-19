@@ -70,7 +70,7 @@ Puoi anche trascinare un file `.md` dentro la finestra.
 
 **Resa live (Ctrl+L)** — modalità predefinita. Titoli, grassetti, corsivi, codice, link, citazioni ed elenchi assumono subito il loro aspetto e i marcatori (`**`, `#`, `>`…) si nascondono. Quando porti il cursore su un elemento, la sua sintassi riappare per poterla modificare. Le tabelle restano in carattere monospazio, così le colonne allineate rimangono incolonnate. La resa live riconosce il Markdown esattamente come l'anteprima e gli export, anche quando un grassetto o un corsivo continua sulla riga successiva. Le formule `$…$` appaiono in corsivo, con esponenti e pedici veri (`x^2`, `a_{i}`); le righe `$$` delle formule su più righe spariscono e la formula è centrata; le barre rovesciate degli escape (`\*`) e dell'a capo forzato si nascondono; `---` diventa una linea. I trattini degli elenchi restano trattini: un editor di testo non può mostrare un carattere diverso da quello scritto nel file.
 
-**Anteprima classica (Ctrl+P)** — divide la finestra: a sinistra il sorgente con la sintassi colorata, a destra il documento impaginato. Solo l'anteprima mostra le immagini vere, le tabelle disegnate a griglia e le note raccolte in fondo. Con lo stile chiaro l'anteprima usa gli stessi colori dell'export PDF e HTML; con lo stile scuro resta prugna.
+**Anteprima classica (Ctrl+P)** — divide la finestra: a sinistra il sorgente con la sintassi colorata, a destra il documento impaginato. Solo l'anteprima mostra le immagini vere, le tabelle disegnate a griglia e le note raccolte in fondo. Con lo stile chiaro l'anteprima usa i colori del tema di PDF e HTML scelto nelle Preferenze; con lo stile scuro resta prugna.
 
 Le due modalità si escludono: accendendone una, l'altra si spegne.
 
@@ -264,17 +264,40 @@ Fai clic su **🎯 Obiettivo** nella barra di stato (o usa il menu) e imposta il
 
 ## 11. Esportare in PDF e in HTML
 
-PDF e HTML hanno lo **stesso stile**, quello delle guide di riferimento dei RuscaLinux OS Tools, indipendentemente dallo stile chiaro o scuro dell'editor:
+PDF e HTML hanno lo **stesso stile**, indipendentemente dallo stile chiaro o scuro dell'editor: quello del **tema** scelto in Preferenze → Esportazione → *Tema di PDF e HTML*. Con lo stile chiaro anche l'anteprima usa i colori del tema.
 
-- i titoli di livello 1 diventano un **banner** con sfumatura dal rosa al prugna e testo bianco; il paragrafo subito dopo è un'introduzione in corpo più grande;
-- i titoli di livello 2 sono prugna con un filetto rosa sotto, quelli di livello 3 e successivi in malva;
-- il codice in linea è una «pillola» rosa chiaro; i blocchi di codice sono riquadri prugna scuro con testo chiaro e barra rosa a sinistra;
-- le citazioni sono riquadri rosa chiaro con barra malva;
-- le tabelle hanno l'intestazione prugna con testo bianco, righe alternate rosate e occupano tutta la larghezza;
-- i caratteri sono DejaVu Sans e DejaVu Sans Mono (pacchetto `fonts-dejavu-core`);
-- in fondo a ogni pagina c'è il piè di pagina «*titolo* - pag. *N* / *totale*», dove il titolo è il primo titolo di livello 1 (o il nome del file).
+### Temi
 
-Non ci sono riferimenti al programma o al sito.
+| Tema | Aspetto |
+|---|---|
+| **RuscaLinux – Guida** (predefinito) | Lo stile delle guide di riferimento dei RuscaLinux OS Tools: titolo di livello 1 in un **banner** sfumato dal rosa al prugna, titoli di livello 2 prugna con filetto rosa, codice su prugna scuro con barra rosa, tabelle con intestazione prugna, DejaVu Sans. |
+| **Neutro** | Sobrio, in grigi: titolo con filetto, codice su grigio chiaro, link blu. Stampa bene anche in bianco e nero. |
+| **RuscaLinux – Fascia** | La palette RuscaLinux in forma leggera: fascia sfumata in cima alla prima pagina, titolo prugna senza riquadro, codice su prugna scuro, piè di pagina diviso (titolo a sinistra, pagine a destra). |
+| **Classico** | Carattere con grazie (Noto Serif o DejaVu Serif) e toni seppia, come un libro. |
+| **Mare** | Blu e azzurri, con il banner sfumato del titolo. |
+
+In tutti i temi il paragrafo subito dopo il titolo principale è un'introduzione in corpo più grande, il codice in linea è una «pillola» colorata, le tabelle occupano tutta la larghezza con righe alternate e in fondo a ogni pagina c'è il piè di pagina «*titolo* - pag. *N* / *totale*», dove il titolo è il primo titolo di livello 1 (o il nome del file). Non ci sono riferimenti al programma o al sito.
+
+### Temi personali
+
+Un tema è un file `.css` con variabili, come un foglio di stile. Per crearne uno:
+
+1. In Preferenze → Esportazione premi **Apri la cartella** accanto a *Temi personali*: si apre `~/.local/share/ruscamark/themes/`.
+2. Copia lì uno dei temi inclusi da `/usr/share/ruscamark/themes/` (in `ruscalinux.css` ogni variabile è spiegata) e dagli un nome nuovo, per esempio `mio-tema.css`.
+3. Cambia i valori e scegli il tema nelle Preferenze (riaprile se erano aperte). Gli export rileggono il file ogni volta, quindi non serve riavviare.
+
+Un tema può anche cambiare solo poche cose e prendere il resto da un altro tema con `--base`:
+
+```css
+:root {
+  --name: "Neutro blu";
+  --base: neutral;
+  --title: #1A5FB4;
+  --rule-h2: #99C1F1;
+}
+```
+
+Le variabili principali: colori di testo e titoli (`--fg`, `--title`, `--h3`, `--link`…), codice (`--code-bg`, `--pre-bg`, `--pre-bar-width`…), citazioni, tabelle (`--th-bg`, `--stripe`), caratteri (`--font`, `--mono`, elenchi di famiglie come in `font-family`), forma del titolo (`--h1-style: banner | text | rule`), fascia in cima (`--strip: none | top`) e piè di pagina (`--footer-align: center | split`). Un valore non valido viene ignorato e resta quello del tema di base. RuscaMark legge solo le variabili: le altre regole CSS del file non contano, e un file con lo stesso nome di un tema incluso lo sostituisce.
 
 ### PDF
 
@@ -288,7 +311,7 @@ Non ci sono riferimenti al programma o al sito.
 
 ### HTML
 
-**Ctrl+Maiusc+E** crea una pagina HTML con lo stile descritto sopra, il titolo preso dal primo titolo di livello 1 e la lingua del documento presa dal dizionario ortografico in uso. Sullo schermo il documento appare come un foglio bianco centrato su fondo rosato.
+**Ctrl+Maiusc+E** crea una pagina HTML con lo stile descritto sopra, il titolo preso dal primo titolo di livello 1 e la lingua del documento presa dal dizionario ortografico in uso. Sullo schermo il documento appare come un foglio bianco centrato su un fondo leggermente colorato.
 
 - **Immagini locali**: i percorsi vengono ricalcolati rispetto alla cartella in cui salvi l'HTML, quindi funzionano anche esportando in un'altra cartella.
 - **File unico**: attivando in Preferenze «Incorpora le immagini nell'export HTML» le immagini vengono inserite dentro il file (base64). Il file è più pesante ma si può inviare o spostare da solo.
@@ -308,6 +331,8 @@ Dal menu principale → **Preferenze…** (Ctrl+,). Ogni modifica vale subito.
 | Scrittura | Resa live della formattazione | Come Ctrl+L. |
 | Scrittura | Pagina centrata | Se attiva, il testo resta in una colonna centrata; se disattiva occupa tutta la larghezza e una linea guida verticale indica la larghezza di pagina. |
 | Scrittura | Larghezza pagina (caratteri) | Da 40 a 140; misurata sul carattere medio del font scelto. 60–75 è la misura più comoda da leggere. |
+| Esportazione | Tema di PDF e HTML | Colori, caratteri e titoli degli export e dell'anteprima: vedi sezione 11. |
+| Esportazione | Temi personali | *Apri la cartella* apre `~/.local/share/ruscamark/themes/`, dove mettere i propri temi `.css`. |
 | Esportazione | Incorpora le immagini nell'export HTML | Vedi sezione 11. |
 
 I margini laterali si adattano alla finestra: nelle finestre strette restano almeno al 4% della larghezza (da 16 a 48 pixel), in quelle larghe lo spazio libero viene diviso in parti uguali ai due lati.

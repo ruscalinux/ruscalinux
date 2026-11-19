@@ -1,0 +1,41 @@
+/* RuscaMark — tema «Neutro»
+ * Sobrio, in grigi, adatto a qualunque documento: titolo con filetto,
+ * codice su grigio chiaro, link blu GNOME. Stampa bene anche in bianco e nero.
+ * Le variabili sono spiegate in ruscalinux.css.
+ */
+:root {
+  --name: "Neutro";
+  --page: #FFFFFF;
+  --fg: #1F2328;
+  --title: #1F2328;
+  --h3: #33383F;
+  --lead: #3D444D;
+  --accent: #57606A;
+  --em: #1F2328;
+  --link: #1A5FB4;
+  --mark: #FFF1A8;
+  --footer: #656D76;
+  --rule-h2: #D0D7DE;
+  --rule: #D8DEE4;
+  --code-bg: #EFF1F3;
+  --code-fg: #1F2328;
+  --pre-bg: #F6F8FA;
+  --pre-fg: #1F2328;
+  --pre-bar: #D0D7DE;
+  --pre-bar-width: 3pt;
+  --quote-bg: #F6F8FA;
+  --quote-bar: #D0D7DE;
+  --quote-bar-width: 3pt;
+  --th-bg: #EAEEF2;
+  --th-fg: #1F2328;
+  --stripe: #F6F8FA;
+  --h1-style: rule;
+  --banner-fg: #FFFFFF;
+  --grad-start: #D0D7DE;
+  --grad-mid: #8C959F;
+  --grad-end: #424A53;
+  --strip: none;
+  --footer-align: center;
+  --font: "Adwaita Sans", "Cantarell", "DejaVu Sans";
+  --mono: "Adwaita Mono", "DejaVu Sans Mono";
+}

@@ -248,14 +248,15 @@ class _Op:
 @unittest.skipIf(rm is None or PdfReader is None,
                  "GTK 4, libadwaita, pycairo o pypdf non disponibili")
 class PdfLinks(unittest.TestCase):
-    def export(self, text):
-        items = rm.MarkdownDoc(text).to_print(rm.PRINT_COLORS, t=lambda k, **kw: k)
+    def export(self, text, theme=None):
+        colors = rm.print_colors(theme) if theme else rm.PRINT_COLORS
+        items = rm.MarkdownDoc(text).to_print(colors, t=lambda k, **kw: k)
         path = os.path.join(tempfile.mkdtemp(), "prova.pdf")
         surface = cairo.PDFSurface(path, _PrintContext.W, _PrintContext.H)
         cr = cairo.Context(surface)
         ctx, op = _PrintContext(cr), _Op()
         exporter = rm.PdfExporter(items, load_image=lambda src: None, title="Prova",
-                                  t=lambda k, **kw: k)
+                                  t=lambda k, **kw: k, theme=theme)
         exporter._begin(op, ctx)
         for page in range(op.n):
             exporter._draw(op, ctx, page)
@@ -296,6 +297,110 @@ class PdfLinks(unittest.TestCase):
         found = self.annots(self.export("[" + "parola " * 40 + "](https://x.org)"))
         self.assertGreaterEqual(len(found), 2)
         self.assertTrue(all(u == "https://x.org" for u, _ in found))
+
+    def test_every_theme_exports(self):
+        # Ogni tema incluso impagina lo stesso documento con link validi:
+        # banner o titolo come testo, fascia in cima, piè di pagina diviso.
+        text = ("# Titolo\n\nVedi [il sito](https://www.ruscalinux.org) e [su](#titolo).\n\n"
+                "```\ncodice\n```\n\n> citazione\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n"
+                + "Testo lungo. " * 400)
+        for tid, theme in rm.load_export_themes().items():
+            with self.subTest(theme=tid):
+                reader = self.export(text, theme)
+                self.assertGreaterEqual(len(reader.pages), 2)
+                self.assertEqual([u for u, _ in self.annots(reader)],
+                                 ["https://www.ruscalinux.org", "interno"])
+                footer = reader.pages[0].extract_text()
+                self.assertIn("1 / ", footer)
+
+
+@unittest.skipIf(rm is None, "GTK 4 o libadwaita non disponibili")
+class ExportThemes(unittest.TestCase):
+    """Temi di PDF, HTML e anteprima: file .css con variabili (themes/)."""
+
+    def write(self, folder, name, text):
+        with open(os.path.join(folder, name), "w", encoding="utf-8") as f:
+            f.write(text)
+
+    def load_from(self, *folders):
+        saved = rm.THEME_DIRS
+        rm.THEME_DIRS = folders
+        try:
+            return rm.load_export_themes()
+        finally:
+            rm.THEME_DIRS = saved
+
+    def test_builtin_themes(self):
+        themes = self.load_from(os.path.join(RUSCAMARK, "themes"))
+        self.assertEqual(list(themes), list(rm.BUILTIN_THEMES))
+        for tid, th in themes.items():
+            with self.subTest(theme=tid):
+                self.assertEqual(set(th), set(rm.GUIDE))
+                for k in rm._THEME_COLORS:
+                    self.assertIsNotNone(rm._theme_color(th[k]), k)
+                self.assertNotEqual(rm.theme_label(tid, th, lambda k, **kw: rm._BUILTIN_STRINGS["it"].get(k, k)),
+                                    tid)
+
+    def test_ruscalinux_file_matches_builtin(self):
+        # Il file del tema predefinito documenta le variabili: deve dare
+        # esattamente il tema incorporato nel programma.
+        with open(os.path.join(RUSCAMARK, "themes", "ruscalinux.css"), encoding="utf-8") as f:
+            raw = rm.parse_theme_css(f.read())
+        self.assertEqual(rm.theme_from_vars(raw), rm.GUIDE)
+        names = set(raw) - {"name"}
+        documented = set(rm._THEME_COLORS) | set(rm._THEME_GRAD) | set(rm._THEME_CHOICES) \
+            | set(rm._THEME_WIDTHS) | {"font", "mono"}
+        self.assertEqual(names, documented)
+
+    def test_without_theme_folders(self):
+        self.assertEqual(list(self.load_from()), [rm.DEFAULT_EXPORT_THEME])
+
+    def test_invalid_values_fall_back(self):
+        d = tempfile.mkdtemp()
+        self.write(d, "prova.css", """/* --title: #000000; nel commento non conta */
+            :root { --base: neutral; --title: #123456; --fg: rossiccio; --h1-style: enorme;
+                    --strip: top; --pre-bar-width: 99pt; --font: "Bad</style>", Noto Serif;
+                    --name: "Prova"; }""")
+        neutral = self.load_from(os.path.join(RUSCAMARK, "themes"))["neutral"]
+        th = self.load_from(d, os.path.join(RUSCAMARK, "themes"))["prova"]
+        self.assertEqual(th["title"], "#123456")
+        self.assertEqual(th["fg"], neutral["fg"])              # colore non valido
+        self.assertEqual(th["h1_style"], neutral["h1_style"])  # valore non previsto
+        self.assertEqual(th["strip"], "top")
+        self.assertEqual(th["pre_bar_width"], 12.0)
+        self.assertEqual(th["font"], "Noto Serif")
+        self.assertEqual(rm.theme_label("prova", th, lambda k, **kw: k), "Prova")
+
+    def test_user_folder_wins_and_bases_do_not_loop(self):
+        user, system = tempfile.mkdtemp(), tempfile.mkdtemp()
+        self.write(system, "a.css", ":root { --title: #111111; }")
+        self.write(user, "a.css", ":root { --base: b; --title: #222222; }")
+        self.write(user, "b.css", ":root { --base: a; --fg: #333333; }")
+        self.write(user, "c.css", ":root { --base: manca; }")
+        self.write(user, "grande.css", ":root { --fg: #444444; }" + " " * rm._THEME_MAX_BYTES)
+        self.write(user, "non tema.txt", ":root { --fg: #555555; }")
+        themes = self.load_from(user, system)
+        self.assertEqual(list(themes), ["ruscalinux", "a", "b", "c"])
+        self.assertEqual(themes["a"]["title"], "#222222")
+        self.assertEqual(themes["c"], rm.GUIDE)
+
+    def test_html_follows_theme(self):
+        themes = self.load_from(os.path.join(RUSCAMARK, "themes"))
+        for tid, th in themes.items():
+            with self.subTest(theme=tid):
+                out = rm.markdown_to_html("# T\n\n```\nx\n```", "T</style>", theme=th)
+                self.assertIn(th["pre_bg"], out)
+                self.assertEqual(out.count("</style>"), 1)
+                self.assertEqual('<div class="strip"></div>' in out, th["strip"] == "top")
+                self.assertEqual("@bottom-right" in out, th["footer_align"] == "split")
+        self.assertIn("linear-gradient(135deg", rm.markdown_to_html("# T", "T"))
+        self.assertIn("border-left: none", rm.markdown_to_html("```\nx\n```", "T",
+                                                               theme=themes["ruscalinux-strip"]))
+
+    def test_preview_follows_theme(self):
+        th = self.load_from(os.path.join(RUSCAMARK, "themes"))["sea"]
+        self.assertEqual(rm.preview_colors(th)["heading"], th["title"])
+        self.assertEqual(rm.preview_colors(), rm.PREVIEW_GUIDE)
 
 
 if __name__ == "__main__":

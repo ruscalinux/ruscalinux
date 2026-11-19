@@ -3,7 +3,7 @@
 # dei RuscaLinux OS Tools (SPECIFICHE-RUSCALINUX-OS-TOOLS.md).
 #
 # Uso: bash make-deb.sh
-#   (dalla cartella con ruscamark.py, lang/, docs/, ruscamark.svg)
+#   (dalla cartella con ruscamark.py, lang/, themes/, docs/, ruscamark.svg)
 #   i18n integrato in ruscamark.py: il vecchio i18n.py non serve più.
 #
 # Conformità alle specifiche:
@@ -136,6 +136,14 @@ install -d "${ROOT}/usr/share/${APP}/lang"
 for f in lang/*.json; do
     [ -e "$f" ] || continue
     install -m 644 "$f" "${ROOT}/usr/share/${APP}/lang/"
+done
+
+# ---- temi di PDF, HTML e anteprima (file .css con variabili) -----------------
+# Quelli personali stanno in ~/.local/share/ruscamark/themes e vincono su questi.
+install -d "${ROOT}/usr/share/${APP}/themes"
+for f in themes/*.css; do
+    [ -e "$f" ] || continue
+    install -m 644 "$f" "${ROOT}/usr/share/${APP}/themes/"
 done
 
 # ---- icona -------------------------------------------------------------------

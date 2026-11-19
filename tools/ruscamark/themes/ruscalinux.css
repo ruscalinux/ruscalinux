@@ -1,0 +1,71 @@
+/* RuscaMark — tema «RuscaLinux – Guida» (predefinito)
+ *
+ * Lo stile delle guide di riferimento dei RuscaLinux OS Tools: banner del
+ * titolo con sfumatura rosa → prugna, titoli prugna con filetto rosa, codice
+ * su fondo prugna scuro, tabelle con intestazione prugna.
+ *
+ * COME FARE UN TEMA PERSONALE
+ * Copiare questo file in ~/.local/share/ruscamark/themes/ con un altro nome
+ * (per esempio mio-tema.css), cambiare i valori e scegliere il tema in
+ * Preferenze → Esportazione. Il nome del file, senza .css, identifica il
+ * tema; un file con lo stesso nome di un tema incluso lo sostituisce.
+ * RuscaMark legge solo le variabili qui sotto (--nome: valore;). Quelle
+ * assenti o non valide prendono il valore del tema indicato da --base
+ * (predefinito: ruscalinux), quindi un tema può cambiare anche solo due
+ * colori:
+ *     :root { --base: neutral; --title: #1A5FB4; --rule-h2: #99C1F1; }
+ * Colori: #rgb, #rrggbb, rgb(…) o nomi CSS. Caratteri: elenco di famiglie
+ * come in font-family; si usa la prima installata.
+ */
+:root {
+  --name: "RuscaLinux – Guida";   /* nome mostrato, se non è tradotto */
+
+  /* Testo e pagina */
+  --page: #FFFFFF;          /* fondo della pagina */
+  --fg: #2B1027;            /* testo */
+  --title: #4A1238;         /* titoli di livello 1 (in forma text/rule) e 2 */
+  --h3: #6B2252;            /* titoli di livello 3–6 */
+  --lead: #4A1238;          /* paragrafo subito sotto il titolo principale */
+  --accent: #B0598C;        /* caselle delle attività, segni */
+  --em: #6B2252;            /* corsivo */
+  --link: #6B2252;          /* link */
+  --mark: #F6C6DC;          /* ==evidenziato== */
+  --footer: #5A2A4A;        /* piè di pagina, note, barrato */
+
+  /* Linee */
+  --rule-h2: #D98BB4;       /* filetto sotto i titoli di livello 2 (e 1 con rule) */
+  --rule: #ECC7DA;          /* linee orizzontali e righe delle tabelle */
+
+  /* Codice */
+  --code-bg: #FBEEF4;       /* `codice` nella frase */
+  --code-fg: #4A1238;
+  --pre-bg: #2E0F26;        /* blocchi di codice */
+  --pre-fg: #FDF2E9;
+  --pre-bar: #D98BB4;       /* barra a sinistra dei blocchi */
+  --pre-bar-width: 4pt;     /* 0 = nessuna barra */
+
+  /* Citazioni */
+  --quote-bg: #FBEEF4;
+  --quote-bar: #B0598C;
+  --quote-bar-width: 4pt;
+
+  /* Tabelle */
+  --th-bg: #6B2252;         /* intestazione */
+  --th-fg: #FFFFFF;
+  --stripe: #FDF4F8;        /* righe alternate */
+
+  /* Titolo principale e fascia */
+  --h1-style: banner;       /* banner (riquadro sfumato) | text | rule (testo con filetto) */
+  --banner-fg: #FFFFFF;     /* testo del banner */
+  --grad-start: #F6C6DC;    /* sfumatura del banner e della fascia */
+  --grad-mid: #B0598C;
+  --grad-end: #4A1238;
+  --strip: none;            /* none | top: fascia sfumata in cima alla prima pagina */
+
+  /* Piè di pagina */
+  --footer-align: center;   /* center: «titolo - pag. N / M» | split: titolo a sinistra, N / M a destra */
+
+  /* Caratteri */
+  --font: "DejaVu Sans", "Verdana", "Bitstream Vera Sans";
+  --mono: "DejaVu Sans Mono", "Bitstream Vera Sans Mono";
+}

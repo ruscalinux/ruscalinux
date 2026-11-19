@@ -70,7 +70,7 @@ You can also drag a `.md` file into the window.
 
 **Live rendering (Ctrl+L)** — the default mode. Headings, bold, italic, code, links, quotes and lists take on their final look immediately and the markers (`**`, `#`, `>`…) are hidden. When you move the cursor onto an element, its syntax reappears so you can edit it. Tables stay in a monospaced font, so aligned columns remain aligned. Live rendering reads Markdown exactly as the preview and the exports do, even when bold or italic text continues on the next line. `$…$` formulas appear in italics, with real superscripts and subscripts (`x^2`, `a_{i}`); the `$$` lines of multi-line formulas disappear and the formula is centred; the backslashes of escapes (`\*`) and of forced line breaks are hidden; `---` becomes a line. List dashes stay dashes: a text editor cannot show a character other than the one written in the file.
 
-**Classic preview (Ctrl+P)** — splits the window: source with syntax colouring on the left, the laid-out document on the right. Only the preview shows real images, tables drawn as grids and footnotes collected at the end. With the light style the preview uses the same colours as the PDF and HTML exports; with the dark style it stays plum.
+**Classic preview (Ctrl+P)** — splits the window: source with syntax colouring on the left, the laid-out document on the right. Only the preview shows real images, tables drawn as grids and footnotes collected at the end. With the light style the preview uses the colours of the PDF and HTML theme chosen in Preferences; with the dark style it stays plum.
 
 The two modes are mutually exclusive: turning one on turns the other off.
 
@@ -264,17 +264,40 @@ Click **🎯 Goal** in the status bar (or use the menu) and set the number of wo
 
 ## 11. Exporting to PDF and HTML
 
-PDF and HTML share the **same style**, that of the RuscaLinux OS Tools reference guides, whatever the editor's light or dark style:
+PDF and HTML share the **same style**, whatever the editor's light or dark style: that of the **theme** chosen in Preferences → Export → *PDF and HTML theme*. With the light style the preview uses the theme's colours too.
 
-- level-1 headings become a **banner** with a pink-to-plum gradient and white text; the paragraph right after it is an introduction in a larger size;
-- level-2 headings are plum with a pink rule underneath, level 3 and below are mauve;
-- inline code is a light pink "pill"; code blocks are dark plum boxes with light text and a pink bar on the left;
-- quotes are light pink boxes with a mauve bar;
-- tables have a plum header with white text, alternating pinkish rows, and span the full width;
-- the typefaces are DejaVu Sans and DejaVu Sans Mono (package `fonts-dejavu-core`);
-- every page ends with the footer "*title* - page *N* / *total*", where the title is the first level-1 heading (or the file name).
+### Themes
 
-There is no reference to the program or the website.
+| Theme | Look |
+|---|---|
+| **RuscaLinux – Guide** (default) | The style of the RuscaLinux OS Tools reference guides: level-1 heading in a **banner** with a pink-to-plum gradient, plum level-2 headings with a pink rule, code on dark plum with a pink bar, tables with a plum header, DejaVu Sans. |
+| **Neutral** | Plain greys: heading with a rule, code on light grey, blue links. Prints well in black and white too. |
+| **RuscaLinux – Strip** | The RuscaLinux palette, lighter: a gradient strip at the top of the first page, plum heading without a box, code on dark plum, split footer (title on the left, pages on the right). |
+| **Classic** | A serif typeface (Noto Serif or DejaVu Serif) and sepia tones, like a book. |
+| **Sea** | Blues, with the gradient heading banner. |
+
+In every theme the paragraph right after the main heading is an introduction in a larger size, inline code is a coloured "pill", tables span the full width with alternating rows, and every page ends with the footer "*title* - page *N* / *total*", where the title is the first level-1 heading (or the file name). There is no reference to the program or the website.
+
+### Personal themes
+
+A theme is a `.css` file with variables, like a style sheet. To make one:
+
+1. In Preferences → Export press **Open Folder** next to *Personal themes*: `~/.local/share/ruscamark/themes/` opens.
+2. Copy one of the included themes there from `/usr/share/ruscamark/themes/` (`ruscalinux.css` explains every variable) and give it a new name, for example `my-theme.css`.
+3. Change the values and choose the theme in Preferences (reopen them if they were open). Exports read the file again every time, so there is no need to restart.
+
+A theme can also change just a few things and take the rest from another theme with `--base`:
+
+```css
+:root {
+  --name: "Blue neutral";
+  --base: neutral;
+  --title: #1A5FB4;
+  --rule-h2: #99C1F1;
+}
+```
+
+The main variables: text and heading colours (`--fg`, `--title`, `--h3`, `--link`…), code (`--code-bg`, `--pre-bg`, `--pre-bar-width`…), quotes, tables (`--th-bg`, `--stripe`), typefaces (`--font`, `--mono`, lists of families as in `font-family`), heading shape (`--h1-style: banner | text | rule`), top strip (`--strip: none | top`) and footer (`--footer-align: center | split`). An invalid value is ignored and the base theme's value stays. RuscaMark reads only the variables: other CSS rules in the file have no effect, and a file with the same name as an included theme replaces it.
 
 ### PDF
 
@@ -288,7 +311,7 @@ There is no reference to the program or the website.
 
 ### HTML
 
-**Ctrl+Shift+E** creates an HTML page in the style described above, with the title taken from the first level-1 heading and the document language taken from the spelling dictionary in use. On screen the document appears as a white sheet centred on a pinkish background.
+**Ctrl+Shift+E** creates an HTML page in the style described above, with the title taken from the first level-1 heading and the document language taken from the spelling dictionary in use. On screen the document appears as a white sheet centred on a lightly tinted background.
 
 - **Local images**: paths are recalculated relative to the folder where you save the HTML, so they work even when exporting to a different folder.
 - **Single file**: when "Embed images in HTML export" is on in Preferences, images are stored inside the file (base64). The file is larger but can be sent or moved on its own.
@@ -308,6 +331,8 @@ Main menu → **Preferences…** (Ctrl+,). Every change applies immediately.
 | Writing | Live rendering of formatting | Same as Ctrl+L. |
 | Writing | Centred page | When on, text stays in a centred column; when off it uses the full width and a vertical guide line marks the page width. |
 | Writing | Page width (characters) | From 40 to 140, measured on the average character of the chosen font. 60–75 is the most comfortable reading measure. |
+| Export | PDF and HTML theme | Colours, typefaces and headings of exports and preview: see section 11. |
+| Export | Personal themes | *Open Folder* opens `~/.local/share/ruscamark/themes/`, where your own `.css` themes go. |
 | Export | Embed images in HTML export | See section 11. |
 
 Side margins adapt to the window: in narrow windows they are at least 4% of the width (16 to 48 pixels); in wide windows the free space is split evenly between both sides.

@@ -1,0 +1,41 @@
+/* RuscaMark — tema «Classico»
+ * Carattere con grazie e toni seppia, come un libro: per relazioni,
+ * lettere e testi lunghi da leggere.
+ * Le variabili sono spiegate in ruscalinux.css.
+ */
+:root {
+  --name: "Classico";
+  --page: #FFFFFF;
+  --fg: #2B2118;
+  --title: #5C2A12;
+  --h3: #7A3E1D;
+  --lead: #4A3728;
+  --accent: #8B5A2B;
+  --em: #5C2A12;
+  --link: #7A3E1D;
+  --mark: #F3E2B5;
+  --footer: #75604D;
+  --rule-h2: #C9A27A;
+  --rule: #E5D5C3;
+  --code-bg: #F5EEE4;
+  --code-fg: #5C2A12;
+  --pre-bg: #F8F3EC;
+  --pre-fg: #2B2118;
+  --pre-bar: #C9A27A;
+  --pre-bar-width: 3pt;
+  --quote-bg: #FAF6F0;
+  --quote-bar: #8B5A2B;
+  --quote-bar-width: 3pt;
+  --th-bg: #5C2A12;
+  --th-fg: #FFF8EE;
+  --stripe: #FBF7F1;
+  --h1-style: rule;
+  --banner-fg: #FFF8EE;
+  --grad-start: #F3E2B5;
+  --grad-mid: #C9A27A;
+  --grad-end: #5C2A12;
+  --strip: none;
+  --footer-align: center;
+  --font: "Noto Serif", "DejaVu Serif";
+  --mono: "DejaVu Sans Mono";
+}

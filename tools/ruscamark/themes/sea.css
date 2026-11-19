@@ -1,0 +1,41 @@
+/* RuscaMark — tema «Mare»
+ * Blu e azzurri, con il banner sfumato del titolo come nelle guide
+ * RuscaLinux: per documentazione tecnica e presentazioni.
+ * Le variabili sono spiegate in ruscalinux.css.
+ */
+:root {
+  --name: "Mare";
+  --page: #FFFFFF;
+  --fg: #0F2537;
+  --title: #0B4F6C;
+  --h3: #146C8F;
+  --lead: #1F4E66;
+  --accent: #1C7CA5;
+  --em: #0B4F6C;
+  --link: #0B6E99;
+  --mark: #BDE7F7;
+  --footer: #3D6178;
+  --rule-h2: #7CC4E4;
+  --rule: #CFE6F1;
+  --code-bg: #E8F4FA;
+  --code-fg: #0B4F6C;
+  --pre-bg: #0F2537;
+  --pre-fg: #EAF6FB;
+  --pre-bar: #7CC4E4;
+  --pre-bar-width: 4pt;
+  --quote-bg: #EEF7FB;
+  --quote-bar: #1C7CA5;
+  --quote-bar-width: 4pt;
+  --th-bg: #0B4F6C;
+  --th-fg: #FFFFFF;
+  --stripe: #F3F9FC;
+  --h1-style: banner;
+  --banner-fg: #FFFFFF;
+  --grad-start: #BDE7F7;
+  --grad-mid: #1C7CA5;
+  --grad-end: #0B4F6C;
+  --strip: none;
+  --footer-align: center;
+  --font: "DejaVu Sans";
+  --mono: "DejaVu Sans Mono";
+}

@@ -1,0 +1,45 @@
+/* RuscaMark — tema «RuscaLinux – Fascia»
+ * La palette RuscaLinux (specifiche, sezione 4.1) in forma leggera: fascia
+ * sfumata in cima alla prima pagina, titolo prugna senza riquadro, codice
+ * su prugna scuro senza barra, piè di pagina diviso (titolo a sinistra,
+ * pagine a destra).
+ *   prugna scuro #2D0A1D   prugna #7A2357   rosa #F2A7C8
+ *   rosa chiaro  #F6E4EC   rosa 50 #FBF4F7  crema #FFF7F0
+ * Le variabili sono spiegate in ruscalinux.css.
+ */
+:root {
+  --name: "RuscaLinux – Fascia";
+  --page: #FFFFFF;
+  --fg: #2D0A1D;
+  --title: #7A2357;
+  --h3: #2D0A1D;
+  --lead: #2D0A1D;
+  --accent: #7A2357;
+  --em: #7A2357;
+  --link: #7A2357;
+  --mark: #F8D7E6;
+  --footer: #7A2357;
+  --rule-h2: #F2A7C8;
+  --rule: #F2D3E1;
+  --code-bg: #F6E4EC;
+  --code-fg: #2D0A1D;
+  --pre-bg: #2D0A1D;
+  --pre-fg: #FFF7F0;
+  --pre-bar: #F2A7C8;
+  --pre-bar-width: 0;
+  --quote-bg: #FBF4F7;
+  --quote-bar: #F2A7C8;
+  --quote-bar-width: 3pt;
+  --th-bg: #7A2357;
+  --th-fg: #FFFFFF;
+  --stripe: #FBF4F7;
+  --h1-style: text;
+  --banner-fg: #FFFFFF;
+  --grad-start: #F8D7E6;
+  --grad-mid: #927081;
+  --grad-end: #2D0A1D;
+  --strip: top;
+  --footer-align: split;
+  --font: "Adwaita Sans", "Inter", "DM Sans", "DejaVu Sans";
+  --mono: "Adwaita Mono", "DejaVu Sans Mono";
+}

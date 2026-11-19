@@ -10,9 +10,9 @@ Resa live della formattazione, pagina centrata che segue la larghezza
 della finestra, controllo ortografico live (libspelling / GSpell 2) con
 elisioni it/fr, motore Markdown integrato (tabelle, immagini, liste di
 attività, note a piè di pagina, link a riferimento, evidenziato), export
-HTML e PDF nello stile delle guide RuscaLinux, interfaccia nelle 26 lingue
-ufficiali RuscaLinux tramite la cartella lang/ (i18n integrato in questo
-file: niente più i18n.py).
+HTML e PDF con temi (file .css in themes/; predefinito lo stile delle
+guide RuscaLinux), interfaccia nelle 26 lingue ufficiali RuscaLinux tramite
+la cartella lang/ (i18n integrato in questo file: niente più i18n.py).
 
 Privacy: tutta l'elaborazione è locale. L'anteprima non scarica mai
 immagini remote e l'export HTML non contatta alcun server.
@@ -229,6 +229,15 @@ _BUILTIN_STRINGS = {
         'default_name': 'document',
         'html_default_title': 'Markdown document',
         'pref_embed': 'Embed images in HTML export',
+        'pref_export_theme': 'PDF and HTML theme',
+        'pref_export_theme_sub': 'Colours, fonts and headings of exports and preview',
+        'pref_themes_folder': 'Personal themes (.css files)',
+        'btn_open_folder': 'Open Folder',
+        'theme_neutral': 'Neutral',
+        'theme_ruscalinux': 'RuscaLinux – Guide',
+        'theme_ruscalinux_strip': 'RuscaLinux – Strip',
+        'theme_classic': 'Classic',
+        'theme_sea': 'Sea',
         'tbl_col': 'Column {n}',
         'link_text': 'link text',
         'img_remote': 'Remote image not loaded: {alt}',
@@ -377,6 +386,15 @@ _BUILTIN_STRINGS = {
         'default_name': 'documento',
         'html_default_title': 'Documento Markdown',
         'pref_embed': "Incorpora le immagini nell'export HTML",
+        'pref_export_theme': 'Tema di PDF e HTML',
+        'pref_export_theme_sub': "Colori, caratteri e titoli degli export e dell'anteprima",
+        'pref_themes_folder': 'Temi personali (file .css)',
+        'btn_open_folder': 'Apri la cartella',
+        'theme_neutral': 'Neutro',
+        'theme_ruscalinux': 'RuscaLinux – Guida',
+        'theme_ruscalinux_strip': 'RuscaLinux – Fascia',
+        'theme_classic': 'Classico',
+        'theme_sea': 'Mare',
         'tbl_col': 'Colonna {n}',
         'link_text': 'testo del link',
         'img_remote': 'Immagine remota non caricata: {alt}',
@@ -543,6 +561,7 @@ DEFAULT_CONFIG = {
     "live": True, "center_page": True, "page_chars": 80,
     "line_spacing": "normal",      # interlinea dell'editor: compact | normal | airy
     "html_embed_images": False,    # export HTML autonomo (immagini in base64)
+    "export_theme": "ruscalinux",  # tema di PDF, HTML e anteprima (load_export_themes())
     "spell_on": True,              # persiste lo stato del controllo ortografico
     "spell_panel_hidden": True,    # primo avvio: pannello nascosto
     "win_w": 1240, "win_h": 800, "paned": 620,
@@ -1644,13 +1663,27 @@ class MarkdownDoc:
             prev = kind
         return out
 # ----------------------------------------------------------------------------
-# Tema degli export (HTML e PDF): lo stile delle guide di riferimento dei
-# RuscaLinux OS Tools. Banner del titolo con sfumatura rosa → prugna,
-# titoli prugna con filetto rosa, codice su fondo prugna scuro con barra
-# rosa, citazioni su rosa chiaro, tabelle con intestazione prugna e righe
-# alternate, DejaVu Sans / DejaVu Sans Mono (fonts-dejavu-core su Debian).
+# Temi degli export (PDF, HTML e anteprima con il tema chiaro).
+# Un tema è un file .css con variabili, come un foglio di stile:
+#   :root { --title: #7A2357; --font: "DejaVu Sans"; --h1-style: banner; … }
+# RuscaMark legge solo le variabili (--nome: valore;): il PDF le usa per
+# colori, caratteri e forma di titoli e riquadri, l'export HTML le mette nel
+# suo foglio di stile. Una variabile assente o non valida prende il valore
+# del tema indicato da --base (predefinito: «ruscalinux», qui sotto).
+# Cartelle dei temi, in ordine di precedenza (lo stesso nome vince nella
+# prima): ~/.local/share/ruscamark/themes (temi personali),
+# <cartella del programma>/themes, /usr/share/ruscamark/themes.
+#
+# Il tema «ruscalinux» è anche incorporato qui, così il programma funziona
+# senza cartella themes/: lo stile delle guide di riferimento dei RuscaLinux
+# OS Tools. Banner del titolo con sfumatura rosa → prugna, titoli prugna con
+# filetto rosa, codice su fondo prugna scuro con barra rosa, citazioni su
+# rosa chiaro, tabelle con intestazione prugna e righe alternate,
+# DejaVu Sans / DejaVu Sans Mono (fonts-dejavu-core su Debian).
 # I colori sono fissi: l'export non dipende dal tema chiaro/scuro dell'editor.
 # ----------------------------------------------------------------------------
+GUIDE_FONT = "DejaVu Sans, Verdana, Bitstream Vera Sans"
+GUIDE_MONO = "DejaVu Sans Mono, Bitstream Vera Sans Mono"
 GUIDE = {
     "page": "#FFFFFF", "fg": "#2B1027", "title": "#4A1238", "h3": "#6B2252",
     "lead": "#4A1238", "accent": "#B0598C", "rule_h2": "#D98BB4", "rule": "#ECC7DA",
@@ -1663,21 +1696,160 @@ GUIDE = {
     # sfumatura del banner: 135°, rosa 0 % → malva 45 % → prugna 100 %
     # (con punto medio al 50 %: il prugna arriva presto, come nelle guide)
     "grad": ("#F6C6DC", "#B0598C", "#4A1238"),
+    # caratteri (elenchi di famiglie, come font-family) e forma
+    "font": GUIDE_FONT, "mono": GUIDE_MONO,
+    "h1_style": "banner",         # banner | text | rule
+    "strip": "none",              # none | top: fascia sfumata in cima alla prima pagina
+    "footer_align": "center",     # center | split: titolo a sinistra, pagine a destra
+    "pre_bar_width": 4.0,         # barra a sinistra del codice (pt, 0 = nessuna)
+    "quote_bar_width": 4.0,       # barra a sinistra delle citazioni (pt)
+    "name": "RuscaLinux – Guida",
 }
-GUIDE_FONT = "DejaVu Sans"
-GUIDE_MONO = "DejaVu Sans Mono"
-# Anteprima classica con il tema chiaro: i colori degli export, così quello
-# che si vede accanto all'editor è quello che uscirà in PDF e in HTML.
-# Con il tema scuro l'anteprima resta prugna, per non affiancare un pannello
-# bianco all'editor scuro.
-PREVIEW_GUIDE = dict(LIGHT)
-PREVIEW_GUIDE.update({
-    "preview_bg": GUIDE["page"], "fg": GUIDE["fg"], "heading": GUIDE["title"],
-    "heading3": GUIDE["h3"], "accent": GUIDE["accent"], "subtle": GUIDE["footer"],
-    "code_bg": GUIDE["code_bg"], "code_fg": GUIDE["code_fg"],
-    "pre_bg": GUIDE["pre_bg"], "pre_fg": GUIDE["pre_fg"], "quote": GUIDE["footer"],
-    "quote_bar": GUIDE["quote_bar"], "link": GUIDE["link"], "selection": GUIDE["mark"],
-})
+DEFAULT_EXPORT_THEME = "ruscalinux"
+# I temi inclusi, nell'ordine delle Preferenze; poi quelli personali.
+BUILTIN_THEMES = ("neutral", "ruscalinux", "ruscalinux-strip", "classic", "sea")
+THEME_DIRS = (
+    os.path.join(GLib.get_user_data_dir(), "ruscamark", "themes"),
+    os.path.join(_PROGRAM_DIR, "themes"),
+    "/usr/share/ruscamark/themes",
+)
+USER_THEMES_DIR = THEME_DIRS[0]
+_THEME_COLORS = tuple(k for k, v in GUIDE.items() if isinstance(v, str) and v.startswith("#"))
+_THEME_GRAD = ("grad_start", "grad_mid", "grad_end")
+_THEME_CHOICES = {"h1_style": ("banner", "text", "rule"), "strip": ("none", "top"),
+                  "footer_align": ("center", "split")}
+_THEME_WIDTHS = ("pre_bar_width", "quote_bar_width")
+_THEME_MAX_BYTES = 64 * 1024
+
+
+def _theme_color(value):
+    """Il colore se Gdk lo riconosce (#rgb, #rrggbb, rgb(…), nomi CSS)."""
+    v = value.strip()
+    if not re.fullmatch(r"[#\w(),.%\s-]{1,40}", v):
+        return None
+    rgba = Gdk.RGBA()
+    return v if rgba.parse(v) else None
+
+
+def _theme_fonts(value):
+    """Elenco di famiglie («"Noto Serif", DejaVu Serif») ripulito: nomi
+    con lettere, cifre, spazi, punti e trattini. Pango e CSS lo leggono
+    entrambi come «la prima famiglia installata»."""
+    names = []
+    for part in value.split(","):
+        name = part.strip().strip("\"'").strip()
+        if name and re.fullmatch(r"[\w .-]{1,60}", name):
+            names.append(name)
+    return ", ".join(names[:6]) or None
+
+
+def parse_theme_css(text):
+    """Le variabili --nome: valore; di un tema (commenti esclusi), con i
+    trattini dei nomi resi trattini bassi: --rule-h2 → rule_h2."""
+    text = re.sub(r"/\*.*?\*/", " ", text, flags=re.S)
+    return {name.lower().replace("-", "_"): value.strip()
+            for name, value in re.findall(r"--([A-Za-z][\w-]*)\s*:\s*([^;{}]*);", text)}
+
+
+def theme_from_vars(raw, base=None):
+    """Tema completo: le variabili valide di raw sopra quelle di base."""
+    th = dict(base or GUIDE)
+    grad = list(th["grad"])
+    for k, v in raw.items():
+        if k in _THEME_COLORS:
+            th[k] = _theme_color(v) or th[k]
+        elif k in _THEME_GRAD:
+            grad[_THEME_GRAD.index(k)] = _theme_color(v) or grad[_THEME_GRAD.index(k)]
+        elif k in ("font", "mono"):
+            th[k] = _theme_fonts(v) or th[k]
+        elif k in _THEME_CHOICES:
+            v = v.strip("\"' ").lower()
+            if v in _THEME_CHOICES[k]:
+                th[k] = v
+        elif k in _THEME_WIDTHS:
+            try:
+                th[k] = max(0.0, min(12.0, float(v.lower().removesuffix("pt"))))
+            except ValueError:
+                pass
+        elif k == "name":
+            name = re.sub(r"[\x00-\x1f\x7f]", "", v.strip().strip("\"'"))[:60]
+            th[k] = name or th[k]
+    th["grad"] = tuple(grad)
+    return th
+
+
+def load_export_themes():
+    """Tutti i temi disponibili: {id: tema}, prima quelli inclusi (nel loro
+    ordine) e poi gli altri in ordine alfabetico. L'id è il nome del file
+    senza .css. Un file illeggibile o troppo grande si ignora."""
+    raw = {}
+    for d in reversed(THEME_DIRS):           # le cartelle precedenti vincono
+        try:
+            names = sorted(os.listdir(d))
+        except OSError:
+            continue
+        for fn in names:
+            tid = fn[:-4]
+            if not fn.endswith(".css") or not re.fullmatch(r"[\w][\w.-]{0,63}", tid):
+                continue
+            path = os.path.join(d, fn)
+            try:
+                if not os.path.isfile(path) or os.path.getsize(path) > _THEME_MAX_BYTES:
+                    continue
+                with open(path, encoding="utf-8") as f:
+                    raw[tid] = parse_theme_css(f.read())
+            except (OSError, UnicodeDecodeError):
+                continue
+    built = {}
+
+    def build(tid, seen):
+        if tid in built:
+            return built[tid]
+        variables = raw.get(tid, {})
+        base_id = variables.get("base", "").strip("\"' ")
+        if tid == DEFAULT_EXPORT_THEME or base_id in seen or base_id == tid \
+                or (base_id not in raw and base_id != DEFAULT_EXPORT_THEME):
+            base = GUIDE
+        else:
+            base = build(base_id, seen | {tid})
+        built[tid] = theme_from_vars(variables, base)
+        return built[tid]
+
+    build(DEFAULT_EXPORT_THEME, frozenset())
+    for tid in raw:
+        build(tid, frozenset())
+    order = [t for t in BUILTIN_THEMES if t in built] + sorted(t for t in built if t not in BUILTIN_THEMES)
+    return {t: built[t] for t in order}
+
+
+def theme_label(tid, theme, t=None):
+    """Nome del tema nelle Preferenze: tradotto per quelli inclusi
+    (chiave theme_<id>), altrimenti --name o il nome del file."""
+    key = "theme_" + tid.replace("-", "_").replace(".", "_")
+    label = t(key) if t else key
+    if label and label != key:
+        return label
+    return theme.get("name") or tid
+
+
+def preview_colors(theme=None):
+    """Anteprima classica con il tema chiaro: i colori degli export, così
+    quello che si vede accanto all'editor è quello che uscirà in PDF e in
+    HTML. Con il tema scuro l'anteprima resta prugna (DARK), per non
+    affiancare un pannello bianco all'editor scuro."""
+    g = theme or GUIDE
+    c = dict(LIGHT)
+    c.update({
+        "preview_bg": g["page"], "fg": g["fg"], "heading": g["title"],
+        "heading3": g["h3"], "accent": g["accent"], "subtle": g["footer"],
+        "code_bg": g["code_bg"], "code_fg": g["code_fg"],
+        "pre_bg": g["pre_bg"], "pre_fg": g["pre_fg"], "quote": g["footer"],
+        "quote_bar": g["quote_bar"], "link": g["link"], "selection": g["mark"],
+    })
+    return c
+
+
+PREVIEW_GUIDE = preview_colors(GUIDE)
 
 HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="{lang}"><head><meta charset="utf-8">
@@ -1686,7 +1858,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <title>{title}</title><style>
 @page {{
   size: A4; margin: 2cm 2cm 2cm 2cm;
-  @bottom-center {{ content: {footer}; font-family: {font}; font-size: 8pt; color: {c[footer]}; }}
+{page_footer}
 }}
 * {{ -webkit-print-color-adjust: exact; print-color-adjust: exact; box-sizing: border-box; }}
 html {{ background: {c[stripe]}; }}
@@ -1694,10 +1866,10 @@ body {{ background: {c[page]}; color: {c[fg]}; font-family: {font};
         font-size: 15px; line-height: 1.5; max-width: 860px; margin: 2rem auto;
         padding: 2.6rem 3rem 3rem; border-radius: 10px;
         box-shadow: 0 2px 18px rgba(74,18,56,.10); overflow-wrap: break-word; }}
-h1 {{ color: {c[banner_fg]}; font-size: 2.1em; line-height: 1.45; margin: 1.2em 0 .7em;
-      padding: .8em .75em; border-radius: 6px;
-      background: {c[grad][2]} linear-gradient(135deg, {c[grad][0]} 0%, {c[grad][1]} 45%, 50%, {c[grad][2]} 100%); }}
-body > h1:first-child {{ margin-top: 0; }}
+{h1_css}
+body > h1:first-child, .strip + h1 {{ margin-top: 0; }}
+.strip {{ height: 6pt; border-radius: 3pt; margin: 0 0 18pt;
+          background: linear-gradient(90deg, {c[grad][0]}, {c[grad][1]}, {c[grad][2]}); }}
 h1 code {{ color: {c[code_fg]}; }}
 h1 + p {{ font-size: 1.1em; color: {c[lead]}; }}
 h2 {{ color: {c[title]}; font-size: 1.4em; line-height: 1.3; margin: 1.45em 0 .7em;
@@ -1711,11 +1883,11 @@ strong {{ color: inherit; }}
 hr {{ border: none; border-top: 1px solid {c[rule]}; margin: 1.6em 0; }}
 code {{ font-family: {mono}; font-size: .88em; background: {c[code_bg]}; color: {c[code_fg]};
         padding: .1em .35em; border-radius: 3px; }}
-pre {{ background: {c[pre_bg]}; color: {c[pre_fg]}; border-left: 4px solid {c[pre_bar]};
+pre {{ background: {c[pre_bg]}; color: {c[pre_fg]}; border-left: {pre_border};
        border-radius: 6px; padding: .95em 1.2em; margin: 0 0 1em; line-height: 1.75;
        overflow-x: auto; }}
 pre code {{ background: none; color: inherit; padding: 0; font-size: .85em; border-radius: 0; }}
-blockquote {{ background: {c[quote_bg]}; border-left: 4px solid {c[quote_bar]};
+blockquote {{ background: {c[quote_bg]}; border-left: {quote_border};
               margin: 0 0 1em; padding: .8em 1.1em; border-radius: 0 4px 4px 0; }}
 blockquote > :last-child {{ margin-bottom: 0; }}
 ul, ol {{ margin: 0 0 .9em; padding-left: 2.2em; }}
@@ -1750,8 +1922,18 @@ sup.fnref a {{ text-decoration: none; }}
   pre {{ white-space: pre-wrap; overflow: visible; }}
 }}
 </style></head><body>
-{body}
+{strip}{body}
 </body></html>"""
+
+# Il titolo di livello 1 nelle tre forme dei temi (--h1-style).
+_H1_CSS = {
+    "banner": """h1 {{ color: {c[banner_fg]}; font-size: 2.1em; line-height: 1.45; margin: 1.2em 0 .7em;
+      padding: .8em .75em; border-radius: 6px;
+      background: {c[grad][2]} linear-gradient(135deg, {c[grad][0]} 0%, {c[grad][1]} 45%, 50%, {c[grad][2]} 100%); }}""",
+    "text": """h1 {{ color: {c[title]}; font-size: 2.2em; line-height: 1.2; margin: 1.2em 0 .5em; }}""",
+    "rule": """h1 {{ color: {c[title]}; font-size: 2.2em; line-height: 1.2; margin: 1.2em 0 .6em;
+      padding-bottom: .25em; border-bottom: 3px solid {c[rule_h2]}; }}""",
+}
 
 
 def _css_string(s):
@@ -1760,6 +1942,11 @@ def _css_string(s):
     s = s.replace("\\", "\\\\").replace('"', '\\"')
     # < e > in forma di escape CSS: il titolo non può chiudere il blocco <style>.
     return '"' + s.replace("<", "\\3C ").replace(">", "\\3E ") + '"'
+
+
+def _css_fonts(families, generic):
+    """font-family CSS da un elenco di famiglie del tema."""
+    return ", ".join([f'"{f.strip()}"' for f in families.split(",") if f.strip()] + [generic])
 
 
 def _footer_template(t):
@@ -1793,30 +1980,57 @@ def footer_text(title, page, pages, t=None):
         return f"{title} - {page} / {pages}"
 
 
-def markdown_to_html(text, title, lang="en", img_src=None, t=None):
-    """Export HTML con il motore integrato, nello stile delle guide RuscaLinux.
-    Contiene solo il documento; stampato (o convertito in PDF da un browser)
-    mostra in fondo a ogni pagina titolo e numero di pagina, come il PDF."""
+def _page_footer_css(title, theme, t=None):
+    """Le regole del piè di pagina in @page: centrato («titolo - pag. N / M»)
+    o diviso (titolo a sinistra, «N / M» a destra)."""
+    c, font = theme, _css_fonts(theme["font"], "sans-serif")
+    style = f"font-family: {font}; font-size: 8pt; color: {c['footer']};"
+    if theme.get("footer_align") == "split":
+        return (f"  @bottom-left {{ content: {_css_string(title)}; {style} }}\n"
+                f'  @bottom-right {{ content: counter(page) " / " counter(pages); {style} }}')
+    return f"  @bottom-center {{ content: {footer_css_content(title, t)}; {style} }}"
+
+
+def _css_bar(width, color):
+    return f"{width:g}px solid {color}" if width > 0 else "none"
+
+
+def markdown_to_html(text, title, lang="en", img_src=None, t=None, theme=None):
+    """Export HTML con il motore integrato, nel tema scelto (predefinito: lo
+    stile delle guide RuscaLinux). Contiene solo il documento; stampato (o
+    convertito in PDF da un browser) mostra in fondo a ogni pagina titolo e
+    numero di pagina, come il PDF."""
+    th = theme or GUIDE
     body = MarkdownDoc(text).to_html(img_src=img_src, t=t)
     return HTML_TEMPLATE.format(
-        lang=html.escape(lang), title=html.escape(title), body=body, c=GUIDE,
-        font=f'"{GUIDE_FONT}", "Verdana", "Bitstream Vera Sans", sans-serif',
-        mono=f'"{GUIDE_MONO}", "Bitstream Vera Sans Mono", monospace',
-        footer=footer_css_content(title, t))
+        lang=html.escape(lang), title=html.escape(title), body=body, c=th,
+        font=_css_fonts(th["font"], "sans-serif"), mono=_css_fonts(th["mono"], "monospace"),
+        page_footer=_page_footer_css(title, th, t),
+        h1_css=_H1_CSS.get(th["h1_style"], _H1_CSS["banner"]).format(c=th),
+        pre_border=_css_bar(th["pre_bar_width"], th["pre_bar"]),
+        quote_border=_css_bar(th["quote_bar_width"], th["quote_bar"]),
+        strip='<div class="strip"></div>\n' if th["strip"] == "top" else "")
 # ----------------------------------------------------------------------------
 # Export PDF nativo (GtkPrintOperation → file PDF, nessun dialogo di stampa)
-# nello stile delle guide RuscaLinux: stessi colori, caratteri e riquadri
-# dell'export HTML, piè di pagina «titolo - pag. N / totale».
+# nel tema scelto: stessi colori, caratteri e riquadri dell'export HTML,
+# piè di pagina «titolo - pag. N / totale».
 # ----------------------------------------------------------------------------
-PRINT_COLORS = dict(LIGHT)
-PRINT_COLORS.update({
-    "guide": True, "mono": GUIDE_MONO,
-    "fg": GUIDE["fg"], "heading": GUIDE["title"], "accent": GUIDE["accent"],
-    "accent2": GUIDE["accent"], "subtle": GUIDE["footer"], "quote": GUIDE["fg"],
-    "border": GUIDE["rule"], "link": GUIDE["link"], "link_line": GUIDE["rule_h2"],
-    "code_bg": GUIDE["code_bg"], "code_fg": GUIDE["code_fg"], "em": GUIDE["em"],
-    "selection": GUIDE["mark"], "sel_fg": GUIDE["fg"],
-})
+def print_colors(theme=None):
+    """Colori del markup Pango del PDF (testo in linea) dal tema."""
+    g = theme or GUIDE
+    c = dict(LIGHT)
+    c.update({
+        "guide": True, "mono": g["mono"],
+        "fg": g["fg"], "heading": g["title"], "accent": g["accent"],
+        "accent2": g["accent"], "subtle": g["footer"], "quote": g["fg"],
+        "border": g["rule"], "link": g["link"], "link_line": g["rule_h2"],
+        "code_bg": g["code_bg"], "code_fg": g["code_fg"], "em": g["em"],
+        "selection": g["mark"], "sel_fg": g["fg"],
+    })
+    return c
+
+
+PRINT_COLORS = print_colors(GUIDE)
 
 
 def _cairo_str(s):
@@ -1843,7 +2057,9 @@ def _pdf_link_target(url, dests):
 
 class PdfExporter:
     """Impagina gli elementi di MarkdownDoc.to_print() su pagine del formato
-    carta predefinito del sistema (A4 o Letter), con margini di 2 cm.
+    carta predefinito del sistema (A4 o Letter), con margini di 2 cm, nei
+    colori, caratteri e forme del tema (load_export_themes(); predefinito
+    GUIDE).
     I paragrafi e i blocchi di codice vanno a capo tra una pagina e l'altra
     riga per riga (i riquadri si spezzano con loro); i titoli non restano
     soli in fondo alla pagina; le tabelle si adattano alla larghezza utile
@@ -1863,9 +2079,8 @@ class PdfExporter:
         "code": ("pre_bg", "pre_bar", 5.0, 9.0),
         "quote": ("quote_bg", "quote_bar", 3.0, 9.0),
     }
-    BAR_W = 4.0
-
-    def __init__(self, items, load_image, title="", t=None):
+    def __init__(self, items, load_image, title="", t=None, theme=None):
+        self.G = theme or GUIDE
         self.items = items
         self.load_image = load_image      # src -> GdkPixbuf.Pixbuf | None
         self.title = title
@@ -1899,15 +2114,19 @@ class PdfExporter:
         self.PW, self.PH = ctx.get_width(), ctx.get_height()
         W, H = self.PW - 2 * M, self.PH - 2 * M
         S = Pango.SCALE
-        G = GUIDE
+        G = self.G
         self.pages, self._keep, self._boxes = [[]], [], []
         self._y = 0.0
+        if G["strip"] == "top":
+            # Fascia sfumata in cima alla prima pagina (come .fascia nel CSS).
+            self.pages[0].append(("strip", 0.0, 0.0, W, 6.0))
+            self._y = 24.0
         # Titoli del documento: le sole destinazioni dei link interni.
         self._dests = {it[6] for it in self.items if it[0] == "h"}
         self._ctx = ctx
 
         def font(size, bold=False, mono=False):
-            fd = Pango.FontDescription.from_string(GUIDE_MONO if mono else GUIDE_FONT)
+            fd = Pango.FontDescription.from_string(G["mono"] if mono else G["font"])
             fd.set_size(int(size * S))
             if bold:
                 fd.set_weight(Pango.Weight.BOLD)
@@ -2162,6 +2381,19 @@ class PdfExporter:
             if kind == "gap":
                 if self._y > 0:
                     self._y = min(self._y + it[1], H)
+            elif kind == "h" and it[1] == 1 and G["h1_style"] != "banner":
+                # Titolo come testo (--h1-style: text), con filetto se «rule».
+                _, _lvl, markup, l, r, links, hid = it
+                fs = 22.0
+                lay = layout(markup, W - l - r, font(fs, bold=True))
+                h = text_height(lay, fs * 1.2) + (6.5 if G["h1_style"] == "rule" else 0.0)
+                keep_room(h + self.BODY * self.LEADING * 2)
+                emit(("dest", hid, l, self._y))
+                flow(lay, l, G["title"], fs * 1.2, links=links)
+                if G["h1_style"] == "rule":
+                    self._y += 4.0
+                    emit(("fill", l, self._y, W - l - r, 2.5, G["rule_h2"]))
+                    self._y += 2.5
             elif kind == "h" and it[1] == 1:
                 _, _lvl, markup, l, r, links, hid = it
                 px, py = 15.0, 19.0
@@ -2198,7 +2430,7 @@ class PdfExporter:
                      break_at=split_point(lay, fs * self.LEADING), links=links)
             elif kind == "code":
                 _, text, l, r = it
-                inner = l + self.BAR_W + 12.0
+                inner = l + G["pre_bar_width"] + 12.0
                 lay = layout(text.rstrip("\n") or " ", W - inner - r - 12.0,
                              font(8.5, mono=True), plain=True)
                 total = text_height(lay, 8.5 * 1.75) + 2 * self.BOXES["code"][3]
@@ -2262,7 +2494,7 @@ class PdfExporter:
         L = (w + h) / 2 ** 0.5
         cx, cy, d = x + w / 2, y + h / 2, 0.5 ** 0.5
         pat = cairo.LinearGradient(cx - d * L / 2, cy - d * L / 2, cx + d * L / 2, cy + d * L / 2)
-        c0, c1, c2 = (self._rgb(c) for c in GUIDE["grad"])
+        c0, c1, c2 = (self._rgb(c) for c in self.G["grad"])
         pat.add_color_stop_rgb(0.0, *c0)
         pat.add_color_stop_rgb(0.45, *c1)
         # Tra il 45 % e il 100 % il colore segue t^0,289 (punto medio al 50 %).
@@ -2295,13 +2527,25 @@ class PdfExporter:
             elif kind == "box":
                 _, x, y, w, h, bkind = item
                 bg, bar, rad, _pad = self.BOXES[bkind]
+                bar_w = self.G[f"{bkind if bkind == 'quote' else 'pre'}_bar_width"]
                 cr.save()
                 self._rounded(cr, x, y, w, h, rad)
                 cr.clip()
-                cr.set_source_rgb(*self._rgb(GUIDE[bg]))
+                cr.set_source_rgb(*self._rgb(self.G[bg]))
                 cr.paint()
-                cr.set_source_rgb(*self._rgb(GUIDE[bar]))
-                cr.rectangle(x, y, self.BAR_W, h)
+                if bar_w > 0:
+                    cr.set_source_rgb(*self._rgb(self.G[bar]))
+                    cr.rectangle(x, y, bar_w, h)
+                    cr.fill()
+                cr.restore()
+            elif kind == "strip":
+                _, x, y, w, h = item
+                pat = cairo.LinearGradient(x, y, x + w, y)
+                for stop, col in zip((0.0, 0.5, 1.0), self.G["grad"]):
+                    pat.add_color_stop_rgb(stop, *self._rgb(col))
+                cr.save()
+                self._rounded(cr, x, y, w, h, h / 2)
+                cr.set_source(pat)
                 cr.fill()
                 cr.restore()
             elif kind == "grad":
@@ -2345,20 +2589,37 @@ class PdfExporter:
                 except Exception:
                     pass
         cr.restore()
-        # Piè di pagina: «titolo - pag. N / totale», centrato.
+        # Piè di pagina: «titolo - pag. N / totale», centrato, oppure
+        # (--footer-align: split) il titolo a sinistra e «N / totale» a destra.
+        n, tot = page_nr + 1, len(self.pages)
+        if self.G["footer_align"] == "split":
+            num = f"{n} / {tot}"
+            num_w = self._footer_line(ctx, num, M, self.PW - 2 * M, Pango.Alignment.RIGHT)
+            if self.title:
+                self._footer_line(ctx, self.title, M, self.PW - 2 * M - num_w - 18.0,
+                                  Pango.Alignment.LEFT, Pango.EllipsizeMode.END)
+        else:
+            self._footer_line(ctx, footer_text(self.title, n, tot, self.t), M,
+                              self.PW - 2 * M, Pango.Alignment.CENTER)
+
+    def _footer_line(self, ctx, text, x, width, align, ellipsize=Pango.EllipsizeMode.MIDDLE):
+        """Una riga del piè di pagina nello spazio [x, x + width]; restituisce
+        la larghezza del testo (pt)."""
+        cr = ctx.get_cairo_context()
         lay = ctx.create_pango_layout()
-        fd = Pango.FontDescription.from_string(GUIDE_FONT)
+        fd = Pango.FontDescription.from_string(self.G["font"])
         fd.set_size(int(8 * Pango.SCALE))
         lay.set_font_description(fd)
-        lay.set_text(footer_text(self.title, page_nr + 1, len(self.pages), self.t), -1)
-        lay.set_width(int((self.PW - 2 * M) * Pango.SCALE))
-        lay.set_ellipsize(Pango.EllipsizeMode.MIDDLE)
-        lay.set_alignment(Pango.Alignment.CENTER)
+        lay.set_text(text, -1)
+        lay.set_width(int(max(1.0, width) * Pango.SCALE))
+        lay.set_ellipsize(ellipsize)
+        lay.set_alignment(align)
         line = lay.get_line_readonly(0)
-        x_off = lay.get_iter().get_line_extents()[1].x / Pango.SCALE   # include la centratura
-        cr.set_source_rgb(*self._rgb(GUIDE["footer"]))
-        cr.move_to(M + x_off, self.PH - self.FOOTER_PT)
+        ext = lay.get_iter().get_line_extents()[1]       # include l'allineamento
+        cr.set_source_rgb(*self._rgb(self.G["footer"]))
+        cr.move_to(x + ext.x / Pango.SCALE, self.PH - self.FOOTER_PT)
         PangoCairo.show_layout_line(cr, line)
+        return ext.width / Pango.SCALE
 # ---- correzione dell'elisione (italiano, francese) -------------------------
 _ELISION_FRAGMENTS = {
     "it": [
@@ -2917,7 +3178,18 @@ class RuscaWindow(Adw.ApplicationWindow):
         return DARK if self._is_dark() else LIGHT
 
     def _preview_palette(self):
-        return DARK if self._is_dark() else PREVIEW_GUIDE
+        return DARK if self._is_dark() else preview_colors(self._export_theme())
+
+    def _reload_export_themes(self):
+        """Rilegge le cartelle dei temi (un tema aggiunto vale senza riavvio)."""
+        self._export_themes = load_export_themes()
+        return self._export_themes
+
+    def _export_theme(self):
+        """Il tema scelto nelle Preferenze; se il suo file non c'è più, quello
+        predefinito."""
+        themes = getattr(self, "_export_themes", None) or self._reload_export_themes()
+        return themes.get(self.cfg.get("export_theme")) or themes.get(DEFAULT_EXPORT_THEME) or GUIDE
 
     def _apply_spacing(self):
         """Interlinea come line-height in CSS: lo spazio oltre quello naturale
@@ -2941,8 +3213,9 @@ class RuscaWindow(Adw.ApplicationWindow):
         css = css.replace("__FONT__", self.cfg.get("font", "Sans"))
         css = css.replace("__SIZE__", str(self.cfg.get("font_size", 13)))
         if not dark:
-            css += (f"\n.preview, .preview text {{ background-color: {GUIDE['page']};"
-                    f" color: {GUIDE['fg']}; }}\n")
+            g = self._export_theme()
+            css += (f"\n.preview, .preview text {{ background-color: {g['page']};"
+                    f" color: {g['fg']}; }}\n")
         if getattr(self, "_css_provider", None):
             try:
                 Gtk.StyleContext.remove_provider_for_display(
@@ -4228,9 +4501,11 @@ class RuscaWindow(Adw.ApplicationWindow):
         out_dir = os.path.dirname(os.path.abspath(path))
         embed = bool(self.cfg.get("html_embed_images", False))
         lang = self._current_lang().split("_")[0] or "en"
+        self._reload_export_themes()
         out = markdown_to_html(
             text, title, lang=lang,
-            img_src=lambda src: self._html_img_src(src, out_dir, embed), t=self.t)
+            img_src=lambda src: self._html_img_src(src, out_dir, embed), t=self.t,
+            theme=self._export_theme())
         try:
             with open(path, "w", encoding="utf-8") as f:
                 f.write(out)
@@ -4306,8 +4581,10 @@ class RuscaWindow(Adw.ApplicationWindow):
         title = MarkdownDoc("").plain(m.group(1)) if m else \
             os.path.splitext(os.path.basename(path))[0]
         try:
-            items = MarkdownDoc(text).to_print(PRINT_COLORS, t=self.t)
-            PdfExporter(items, self._pdf_image, title=title, t=self.t).export(path)
+            self._reload_export_themes()
+            theme = self._export_theme()
+            items = MarkdownDoc(text).to_print(print_colors(theme), t=self.t)
+            PdfExporter(items, self._pdf_image, title=title, t=self.t, theme=theme).export(path)
             self._toast_file("toast_pdf_done", path)
         except Exception as e:
             self._message(self.t("err_export", e=getattr(e, "message", None) or e))
@@ -4510,6 +4787,44 @@ class RuscaWindow(Adw.ApplicationWindow):
             self.cfg["html_embed_images"] = r.get_active()
             save_config(self.cfg)
         embed_row.connect("notify::active", on_embed)
+
+        # Tema di PDF, HTML e anteprima: i file .css delle cartelle dei temi.
+        themes = self._reload_export_themes()
+        theme_ids = list(themes)
+        theme_row = Adw.ComboRow(title=t("pref_export_theme"), subtitle=t("pref_export_theme_sub"),
+                                 model=Gtk.StringList.new(
+                                     [theme_label(k, themes[k], t) for k in theme_ids]))
+        current = self.cfg.get("export_theme")
+        if current not in themes:
+            current = DEFAULT_EXPORT_THEME
+        if current in theme_ids:
+            theme_row.set_selected(theme_ids.index(current))
+
+        def on_theme(r, _p):
+            i = r.get_selected()
+            if 0 <= i < len(theme_ids):
+                self.cfg["export_theme"] = theme_ids[i]
+                save_config(self.cfg)
+                self._apply_theme()
+                self._schedule_refresh()
+        theme_row.connect("notify::selected", on_theme)
+        export.add(theme_row)
+
+        folder_row = Adw.ActionRow(title=t("pref_themes_folder"),
+                                   subtitle=GLib.markup_escape_text(
+                                       USER_THEMES_DIR.replace(os.path.expanduser("~"), "~", 1)))
+        folder_btn = Gtk.Button(label=t("btn_open_folder"), valign=Gtk.Align.CENTER)
+
+        def open_folder(_b):
+            try:
+                os.makedirs(USER_THEMES_DIR, exist_ok=True)
+                Gtk.FileLauncher.new(Gio.File.new_for_path(USER_THEMES_DIR)).launch(self, None, None)
+            except Exception as e:
+                self._message(str(e))
+        folder_btn.connect("clicked", open_folder)
+        folder_row.add_suffix(folder_btn)
+        folder_row.set_activatable_widget(folder_btn)
+        export.add(folder_row)
         export.add(embed_row)
         page.add(export)
 
