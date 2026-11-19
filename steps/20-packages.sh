@@ -306,6 +306,7 @@ thunderbird-l10n-zh-cn
 
 # --- Hindi (hi) ---
 task-hindi
+hyphen-hi
 libreoffice-l10n-hi
 firefox-esr-l10n-hi-in
 
@@ -316,6 +317,7 @@ firefox-esr-l10n-bn
 
 # --- Indonesian (id) ---
 hunspell-id
+hyphen-id
 libreoffice-l10n-id
 firefox-esr-l10n-id
 thunderbird-l10n-id
@@ -432,6 +434,8 @@ thunderbird-l10n-da
 
 # --- Finlandese (fi) ---
 task-finnish
+# (nessun hyphen-fi in Debian: la sillabazione finlandese di LibreOffice
+# e' Voikko, che Pyphen non sa usare)
 voikko-fi
 libreoffice-voikko
 libreoffice-l10n-fi
@@ -441,6 +445,7 @@ thunderbird-l10n-fi
 # --- Greco (el) ---
 task-greek
 hunspell-el
+hyphen-el
 aspell-el
 libreoffice-l10n-el
 firefox-esr-l10n-el
@@ -457,6 +462,7 @@ thunderbird-l10n-bg
 # --- Ucraino (uk) ---
 task-ukrainian
 hunspell-uk
+hyphen-uk
 aspell-uk
 libreoffice-l10n-uk
 firefox-esr-l10n-uk

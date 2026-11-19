@@ -208,7 +208,7 @@ Main menu → Export → *Export to typeset PDF (LuaLaTeX)…* typesets the book
 - the typeface's **kerning and ligatures** (fi, fl), and every script: Greek, Cyrillic, Arabic (right to left), Devanagari, Chinese, Japanese and Korean (with the Noto fonts of RuscaLinux);
 - **book structure**: full-page cover, title page, colophon on its back, table of contents with page numbers, chapters opening on a right-hand page, running heads (book title on left-hand pages, chapter on right-hand ones), no widows or orphans.
 
-Page size, margins, justification and hyphenation come from the page setup, which opens before the file chooser. The typeface is the book's (usually EB Garamond); symbols it lacks come from DejaVu Sans and Noto. Each line break in the text starts a paragraph with a first-line indent, as in printed books.
+Page size and margins come from the page setup, which opens before the file chooser. Justification and hyphenation start switched on, and the typeset PDF remembers them separately, without changing those of the ordinary PDF. Hyphenation works for the languages that have a `hyphen-<lang>` dictionary: in RuscaLinux all those that split words into syllables, except Finnish and Turkish, which have none in Debian. The typeface is the book's (usually EB Garamond); symbols it lacks come from DejaVu Sans and Noto. Each line break in the text starts a paragraph with a first-line indent, as in printed books.
 
 Typesetting takes from a few seconds to a minute, depending on the length of the book, and runs in the background: you can keep writing. Hyphenation is Pyphen's, the same as the ordinary PDF. Everything happens on the computer, in a temporary folder that is deleted afterwards; the text of the book can never become a TeX command.
 

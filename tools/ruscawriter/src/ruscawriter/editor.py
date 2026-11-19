@@ -899,6 +899,10 @@ class RuscaWriterWindow(Adw.ApplicationWindow):
         self._pdf_hyphenate = bool(
             self.settings.get("pdf_hyphenate", False)) and hyphenation_available(
                 getattr(self, "lang", "it"))
+        # Il PDF tipografico ha le sue due scelte, attive all'inizio: un
+        # libro composto da TeX è giustificato e sillabato.
+        self._tex_justify = bool(self.settings.get("pdf_tex_justify", True))
+        self._tex_hyphenate = bool(self.settings.get("pdf_tex_hyphenate", True))
 
         # Evita che gli entry/spinbutton selezionino tutto il testo quando
         # ricevono il focus (in GTK 4 e' il comportamento predefinito): senza
@@ -5542,8 +5546,8 @@ class RuscaWriterWindow(Adw.ApplicationWindow):
             # di lavoro restano solo file e lualatex
             book = self.project.typeset_data(
                 fonts=self._doc_font_files(), font_size=self.font_size,
-                page_size=size, justify=getattr(self, "_pdf_justify", True),
-                hyphenate=getattr(self, "_pdf_hyphenate", True),
+                page_size=size, justify=self._tex_justify,
+                hyphenate=self._tex_hyphenate,
                 lang=getattr(self, "lang", "it"),
                 margins=self.project.page_margins(size))
         except Exception as exc:
@@ -5596,6 +5600,9 @@ class RuscaWriterWindow(Adw.ApplicationWindow):
         vivo della doppia pagina con la gabbia del testo, la sua misura e le
         battute per riga. Per l'export PDF contiene anche giustificazione e
         sillabazione, e termina nella scelta del file."""
+        # export: chi riceve il file scelto (None = il PDF normale). Il PDF
+        # tipografico ricorda giustificazione e sillabazione a parte.
+        tex = export is not None
         sizes = list(PDF_PAGE_SIZES.keys())
         cur = getattr(self, "_pdf_page_size", PDF_DEFAULT_PAGE_SIZE)
         if cur not in PDF_PAGE_SIZES:
@@ -5714,13 +5721,15 @@ class RuscaWriterWindow(Adw.ApplicationWindow):
             chk_justify = Gtk.CheckButton(
                 label=self._t_or("dlg_pdf_justify", "Giustifica il testo"))
             chk_justify.add_css_class("rusca-dialog-text")
-            chk_justify.set_active(getattr(self, "_pdf_justify", False))
+            chk_justify.set_active(self._tex_justify if tex
+                                   else getattr(self, "_pdf_justify", False))
             left.append(chk_justify)
             chk_hyphen = Gtk.CheckButton(label=self._t_or(
                 "dlg_pdf_hyphenate", "Sillaba le parole a fine riga"))
             chk_hyphen.add_css_class("rusca-dialog-text")
             chk_hyphen.set_active(
-                hyph_ok and getattr(self, "_pdf_hyphenate", False))
+                hyph_ok and (self._tex_hyphenate if tex
+                             else getattr(self, "_pdf_hyphenate", False)))
             left.append(chk_hyphen)
             opts["justify"], opts["hyphenate"] = chk_justify, chk_hyphen
 
@@ -6010,7 +6019,12 @@ class RuscaWriterWindow(Adw.ApplicationWindow):
             self._pdf_page_size = st["size"]
             self.settings["pdf_page_size"] = st["size"]
             self.settings["page_unit"] = st["unit"]
-            if for_export:
+            if for_export and tex:
+                self._tex_justify = bool(opts["justify"].get_active())
+                self._tex_hyphenate = bool(opts["hyphenate"].get_active())
+                self.settings["pdf_tex_justify"] = self._tex_justify
+                self.settings["pdf_tex_hyphenate"] = self._tex_hyphenate
+            elif for_export:
                 self._pdf_justify = bool(opts["justify"].get_active())
                 self._pdf_hyphenate = bool(
                     opts["hyphenate"].get_active()) and hyphenation_available(
