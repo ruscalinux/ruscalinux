@@ -1,11 +1,12 @@
 """RuscaLinux OS Tools — test della generazione di immagini di RuscaLLama —
 1.99.3 — GPL-3.0
 
-rusca_diffusion.py riconosce i modelli per immagini (un file solo o una
-cartella di file), sceglie i valori consigliati, prepara il comando di
+rusca_diffusion.py riconosce i modelli per immagini e per video (un file
+solo o una cartella di file), sceglie i valori consigliati, prepara il comando di
 sd-cli (ruscadiffusion-engine) e ne segue l'avanzamento. Qui si controlla
 tutto questo e l'intero percorso di una generazione, con un sd-cli finto
-che scrive barre di avanzamento, anteprime e PNG veri: i test non hanno
+che scrive barre di avanzamento, anteprime, PNG veri e video AVI in Motion
+JPEG come quelli di sd-cli: i test non hanno
 bisogno né del motore né di un modello. Si lanciano dalla radice del
 repository:
     python3 -m unittest tests/test_ruscallama_diffusion.py
@@ -46,6 +47,38 @@ def png(path, w, h, rgb):
         f.write(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0))
                 + chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b""))
 
+# Un fotogramma JPEG 8x8 vero (scritto con Pillow) e un AVI fatto come
+# quello di sd-cli (examples/common/media_io.cpp): "movi" con un "00dc"
+# per fotogramma, poi "idx1".
+JPEG = bytes.fromhex(
+    "ffd8ffe000104a46494600010100000100010000ffdb004300100b0c0e0c0a100e0d0e1211101318281a"
+    "181616183123251d283a333d3c3933383740485c4e404457453738506d51575f626768673e4d71797064"
+    "785c656763ffdb0043011112121815182f1a1a2f63423842636363636363636363636363636363636363"
+    "6363636363636363636363636363636363636363636363636363636363636363ffc00011080008000803"
+    "012200021101031101ffc4001f0000010501010101010100000000000000000102030405060708090a0b"
+    "ffc400b5100002010303020403050504040000017d010203000411051221314106135161072271143281"
+    "91a1082342b1c11552d1f02433627282090a161718191a25262728292a3435363738393a434445464748"
+    "494a535455565758595a636465666768696a737475767778797a838485868788898a9293949596979899"
+    "9aa2a3a4a5a6a7a8a9aab2b3b4b5b6b7b8b9bac2c3c4c5c6c7c8c9cad2d3d4d5d6d7d8d9dae1e2e3e4e5"
+    "e6e7e8e9eaf1f2f3f4f5f6f7f8f9faffc4001f0100030101010101010101010000000000000102030405"
+    "060708090a0bffc400b51100020102040403040705040400010277000102031104052131061241510761"
+    "711322328108144291a1b1c109233352f0156272d10a162434e125f11718191a262728292a3536373839"
+    "3a434445464748494a535455565758595a636465666768696a737475767778797a82838485868788898a"
+    "92939495969798999aa2a3a4a5a6a7a8a9aab2b3b4b5b6b7b8b9bac2c3c4c5c6c7c8c9cad2d3d4d5d6d7"
+    "d8d9dae2e3e4e5e6e7e8e9eaf2f3f4f5f6f7f8f9faffda000c03010002110311003f00a745145667d01f"
+    "ffd9")
+
+def avi(path, frames):
+    movi = b""
+    for i in range(frames):
+        data = JPEG + (b"\x00" if i % 2 else b"")      # JPEG di lunghezza pari e dispari
+        movi += b"00dc" + struct.pack("<I", len(data)) + data + b"\x00" * (len(data) & 1)
+    body = (b"AVI " + b"LIST" + struct.pack("<I", 8) + b"hdrl" + b"avih"
+            + struct.pack("<I", 0) + b"LIST" + struct.pack("<I", 4 + len(movi)) + b"movi"
+            + movi + b"idx1" + struct.pack("<I", 0))
+    with open(path, "wb") as f:
+        f.write(b"RIFF" + struct.pack("<I", len(body)) + body)
+
 a = sys.argv[1:]
 if a == ["--list-devices"]:
     print("CPU\tFake CPU")
@@ -65,6 +98,8 @@ if os.environ.get("FAKE_SD_FAIL"):
 w, h = int(opt("-W", 512)) // 8, int(opt("-H", 512)) // 8
 steps, count = int(opt("--steps", 4)), int(opt("-b", 1))
 preview, out = opt("--preview-path"), opt("-o")
+video = opt("-M") == "vid_gen"
+frames = int(opt("--video-frames", 1))
 print("[INFO ] stable-diffusion.cpp:200 - loading model", file=sys.stderr, flush=True)
 delay = float(os.environ.get("FAKE_SD_DELAY", "0"))
 for i in range(1, 4):
@@ -74,13 +109,20 @@ for i in range(1, 4):
 sys.stdout.write("\n")
 for b in range(count):
     for s in range(1, steps + 1):
-        png(preview, w, h, (s * 40 % 256, 80, 120))
+        if video:
+            avi(preview, (frames - 1) // 4 + 1)       # i fotogrammi latenti
+        else:
+            png(preview, w, h, (s * 40 % 256, 80, 120))
         bar = "=" * (s * 50 // steps) + ">"
         sys.stdout.write(f"\r  |{bar[:50]:<50}| {s}/{steps} - 1.52s/it\033[K")
         sys.stdout.flush()
         time.sleep(delay)
     sys.stdout.write("\n")
     print("[INFO ] image.cpp:900 - decoding 1 latents", file=sys.stderr, flush=True)
+if video:
+    avi(out, frames)
+    print(f"[INFO ] main.cpp:553 - save result video to '{out}'", file=sys.stderr)
+    sys.exit(0)
 for b in range(count):
     png(out.replace("%03d", f"{b:03d}"), w, h, (200, 100, b * 50))
 print(f"[INFO ] main.cpp:540 - {count}/{count} images saved", file=sys.stderr)
@@ -141,7 +183,17 @@ class TestModels(unittest.TestCase):
                            ("Qwen3-VL-4B-Instruct-mmproj-BF16.gguf", "llm_vision"),
                            ("flux2_ae.safetensors", "vae"), ("ae.sft", "vae"),
                            ("ideogram4_uncond-Q8_0.gguf", "uncond-diffusion-model"),
-                           ("animagine-xl-4.0.safetensors", "")):
+                           ("animagine-xl-4.0.safetensors", ""),
+                           # video
+                           ("Wan2.2-TI2V-5B-Q5_K_M.gguf", ""), ("wan2.2_vae.safetensors", "vae"),
+                           ("wan_2.1_vae.safetensors", "vae"), ("umt5_xxl_fp16.safetensors", "t5xxl"),
+                           ("umt5xxl_fp32-q5_k_m.gguf", "t5xxl"),
+                           ("clip_vision_h.safetensors", "clip_vision"),
+                           ("Wan2.2-T2V-A14B-HighNoise-Q4_K_M.gguf", "high-noise-diffusion-model"),
+                           ("Wan2.2-T2V-A14B-LowNoise-Q4_K_M.gguf", ""),
+                           ("byt5_small_glyphxl_fp16.safetensors", "t5xxl"),
+                           ("hunyuanvideo1.5_720p_t2v_fp16.safetensors", ""),
+                           ("taew2_1.safetensors", "skip")):
             self.assertEqual(rd.file_role(name), role, name)
 
     def test_checkpoint_info(self):
@@ -234,7 +286,7 @@ class TestModels(unittest.TestCase):
     def test_guide_files_are_recognised(self):
         """I nomi dei file della guida «Quali file scaricare?» danno un
         modello completo."""
-        for entry in rd.GUIDE:
+        for entry in rd.GUIDE + rd.VIDEO_GUIDE:
             with self.subTest(entry["name"]):
                 for role, hint, _url in entry["files"]:
                     name = "vae.safetensors" if hint.startswith("vae/") else hint
@@ -242,7 +294,9 @@ class TestModels(unittest.TestCase):
                                size=100 if role == "model" else 10)
                 (m,) = rd.scan_folder(os.path.join(self.dir, entry["name"]))
                 self.assertEqual(m.missing(), [])
-                self.assertEqual(rd.recommended(m)["steps"], 8)
+                video = entry in rd.VIDEO_GUIDE
+                self.assertEqual(m.video, video)
+                self.assertEqual(rd.recommended(m)["steps"], 20 if video else 8)
 
     def test_find_models_no_duplicates(self):
         self.touch("a.safetensors", SD15_KEYS)
@@ -387,6 +441,111 @@ class TestModels(unittest.TestCase):
                 job = rd.make_job(m, "x", {"img_quality": "normal"})
                 self.assertEqual((job.steps, job.cfg, job.sampler, job.extra),
                                  (steps, cfg, sampler, extra))
+
+    # Cartelle dei modelli per video (docs/models/wan.md, hunyuan_video.md,
+    # lingbot_video.md): opzioni attese e (famiglia, passi, cfg, fps,
+    # immagine di partenza, passi HighNoise, mancanti).
+    VIDEO_LAYOUTS = {
+        "Wan2.2-TI2V-5B": (["Wan2.2-TI2V-5B-Q5_K_M.gguf", "wan2.2_vae.safetensors",
+                            "umt5-xxl-encoder-Q8_0.gguf"],
+                           {"--diffusion-model": "Wan2.2-TI2V-5B-Q5_K_M.gguf",
+                            "--vae": "wan2.2_vae.safetensors",
+                            "--t5xxl": "umt5-xxl-encoder-Q8_0.gguf"},
+                           ("wan22_5b", 20, 6.0, 24, "optional", 0, [])),
+        "Wan2.1-T2V-1.3B": (["wan2.1_t2v_1.3B_fp16.safetensors", "wan_2.1_vae.safetensors",
+                             "umt5_xxl_fp16.safetensors"], {},
+                            ("wan21", 20, 6.0, 16, "", 0, [])),
+        "Wan2.1-I2V-14B-480P": (["wan2.1-i2v-14b-480p-Q4_K_M.gguf", "wan_2.1_vae.safetensors",
+                                 "umt5-xxl-encoder-Q8_0.gguf"], {},
+                                ("wan21_i2v", 20, 6.0, 16, "required", 0, ["clip_vision"])),
+        "Wan2.2-I2V-A14B": (["Wan2.2-I2V-A14B-LowNoise-Q4_K_M.gguf",
+                             "Wan2.2-I2V-A14B-HighNoise-Q4_K_M.gguf",
+                             "wan_2.1_vae.safetensors", "umt5-xxl-encoder-Q8_0.gguf"],
+                            {"--diffusion-model": "Wan2.2-I2V-A14B-LowNoise-Q4_K_M.gguf",
+                             "--high-noise-diffusion-model":
+                                 "Wan2.2-I2V-A14B-HighNoise-Q4_K_M.gguf"},
+                            ("wan22_14b", 10, 3.5, 16, "required", 8, [])),
+        # Cartella e file senza "A14B" nel nome: lo dice il file HighNoise.
+        "video": (["wan-low.gguf", "wan-HighNoise.gguf", "wan_2.1_vae.safetensors",
+                   "umt5-xxl-encoder-Q8_0.gguf"], {},
+                  ("wan22_14b", 10, 3.5, 16, "", 8, [])),
+        "HunyuanVideo-1.5": (["hunyuanvideo1.5_720p_t2v_fp16.safetensors",
+                              "hunyuanvideo15_vae_fp16.safetensors",
+                              "qwen_2.5_vl_7b.safetensors",
+                              "byt5_small_glyphxl_fp16.safetensors"],
+                             {"--llm": "qwen_2.5_vl_7b.safetensors",
+                              "--t5xxl": "byt5_small_glyphxl_fp16.safetensors"},
+                             ("hunyuanvideo", 20, 6.0, 24, "", 0, [])),
+        "LingBot-Video": (["lingbot-video-dense-1.3b.safetensors", "wan_2.1_vae.safetensors",
+                           "Qwen3-VL-4B-Instruct-Q4_K_M.gguf"], {},
+                          ("lingbot", 20, 3.0, 16, "", 0, [])),
+        "Wan2.2-S2V-14B": (["wan2.2_s2v-14B-Q4_K_M.gguf", "wan_2.1_vae.safetensors",
+                            "umt5-xxl-encoder-Q8_0.gguf"], {},
+                           ("unsupported", 10, 3.5, 16, "", 8, [])),
+    }
+
+    def test_video_layouts(self):
+        for folder, (names, expected, (family, steps, cfg, fps, init, high, missing)) \
+                in self.VIDEO_LAYOUTS.items():
+            with self.subTest(folder):
+                for n in names:
+                    self.touch(os.path.join(folder, n), size=100 if n.lower().startswith(
+                        ("wan2", "wan-low", "hunyuanvideo1", "lingbot")) and "vae" not in n
+                        else 10)
+                (m,) = rd.scan_folder(os.path.join(self.dir, folder))
+                self.assertTrue(m.video)
+                rec = rd.recommended(m)
+                self.assertEqual((rec["family"], rec["init"]), (family, init))
+                self.assertEqual(m.missing(), missing)
+                args = m.args()
+                flags = dict(zip(args[::2], (os.path.basename(a) for a in args[1::2])))
+                for flag, name in expected.items():
+                    self.assertEqual(flags.get(flag), name, flag)
+                job = rd.make_job(m, "x", {"vid_length": "short"}, prefix="vid_",
+                                  init_image="/tmp/start.png")
+                self.assertTrue(job.video)
+                self.assertEqual((job.steps, job.cfg, job.fps, job.high_steps, job.count),
+                                 (steps, cfg, fps, high, 1))
+                self.assertEqual(job.frames, rd.video_frames(2, fps))
+                self.assertEqual(job.init_image, "/tmp/start.png" if init else "")
+                if family.startswith("wan"):
+                    self.assertEqual(job.negative, rd.WAN_NEGATIVE)
+                    self.assertEqual(job.sampler, "euler")
+                    self.assertEqual(job.extra, ["--flow-shift", "3"])
+
+    def test_video_frames_and_job(self):
+        # 4n+1 fotogrammi: 2 s a 16 fps = 33, 5 s = 81; a 24 fps 49 e 121.
+        self.assertEqual([rd.video_frames(s, 16) for s in (2, 3, 5)], [33, 49, 81])
+        self.assertEqual([rd.video_frames(s, 24) for s in (2, 3, 5)], [49, 73, 121])
+        self.touch("Wan2.1-T2V-1.3B/wan2.1_t2v_1.3B_fp16.safetensors", size=100)
+        self.touch("Wan2.1-T2V-1.3B/wan_2.1_vae.safetensors", size=10)
+        self.touch("Wan2.1-T2V-1.3B/umt5_xxl_fp16.safetensors", size=10)
+        (m,) = rd.scan_folder(self.dir)
+        job = rd.make_job(m, "un gatto", {"vid_length": "long", "vid_negative": "sfocato",
+                                          "vid_aspect": "landscape", "vid_quality": "fast",
+                                          "img_count": 4}, prefix="vid_")
+        self.assertEqual((job.frames, job.negative, job.count), (81, "sfocato", 1))
+        self.assertEqual((job.width, job.height), (768, 512))
+        self.assertEqual(job.steps, 12)
+        # Un modello per immagini non diventa un video con le chiavi vid_.
+        sd = rd.Model("v1-5", self.touch("v1-5.safetensors", SD15_KEYS), True, "sd1")
+        self.assertFalse(sd.video)
+        self.assertFalse(rd.make_job(sd, "x", {}, prefix="vid_").video)
+
+    def test_avi_frames(self):
+        body = b"AVI LIST" + struct.pack("<I", 4) + b"movi"
+        for data in (b"\xff\xd8uno\xff\xd9", b"\xff\xd8due!\xff\xd9", b"\xff\xd8tre\xff\xd9"):
+            body += b"00dc" + struct.pack("<I", len(data)) + data + b"\x00" * (len(data) & 1)
+        body += b"01wb" + struct.pack("<I", 2) + b"au" + b"idx1" + struct.pack("<I", 0)
+        data = b"RIFF" + struct.pack("<I", len(body)) + body
+        frames = rd.avi_frames(data)
+        self.assertEqual(len(frames), 3)
+        self.assertEqual(rd.video_frame(data), frames[1])
+        self.assertEqual(rd.video_frame(data, 0), frames[0])
+        self.assertEqual(rd.video_frame(data, 1), frames[2])
+        self.assertIsNone(rd.video_frame(b"niente"))
+        self.assertIsNone(rd.video_frame(data[:30]))        # troncato
+        self.assertIsNone(rd.video_frame("/non/esiste.avi"))
 
     def test_image_size(self):
         self.assertEqual(rd.image_size(1024, "square"), (1024, 1024))
@@ -575,6 +734,82 @@ class TestGenerator(unittest.TestCase):
             gen.start(self.model, rd.Job(prompt="x"))
         self.assertEqual(e.exception.key, "img_err_no_engine")
 
+    def video_model(self, name="Wan2.2-TI2V-5B", files=("Wan2.2-TI2V-5B-Q5_K_M.gguf",
+                    "wan2.2_vae.safetensors", "umt5-xxl-encoder-Q8_0.gguf")):
+        folder = os.path.join(self.tmp.name, "models", name)
+        os.makedirs(folder)
+        for i, n in enumerate(files):
+            with open(os.path.join(folder, n), "wb") as f:
+                f.truncate(100 if i == 0 else 10)
+        (m,) = rd.scan_folder(folder)
+        return m
+
+    def test_video_generation(self):
+        self.model = self.video_model()
+        start = os.path.join(self.tmp.name, "partenza.png")
+        with open(start, "wb") as f:
+            f.write(b"\x89PNG\r\n\x1a\nfinto")
+        job = rd.make_job(self.model, "un gatto che salta", {"vid_steps": 3},
+                          prefix="vid_", init_image=start)
+        os.environ["FAKE_SD_DELAY"] = "0.15"
+        ev = self.run_job(job, gpu=False)
+        error, files, _job = ev["done"]
+        self.assertIsNone(error)
+        self.assertEqual([os.path.basename(p) for p in files], ["video.avi"])
+        self.assertEqual(len(rd.avi_frames(open(files[0], "rb").read())), 49)
+        self.assertGreater(ev["previews"], 0)        # fotogramma JPEG dell'anteprima AVI
+        run_dir = os.path.dirname(files[0])
+        self.assertNotIn("preview.avi", os.listdir(run_dir))
+        with open(self.args_log) as f:
+            args = f.read().split("\n")
+        self.assertEqual(args[:2], ["-M", "vid_gen"])
+        for opt, val in (("--video-frames", "49"), ("--fps", "24"), ("--steps", "3"),
+                         ("--flow-shift", "3"), ("--sampling-method", "euler")):
+            self.assertEqual(args[args.index(opt) + 1], val)
+        self.assertNotIn("-b", args)
+        self.assertTrue(args[args.index("-o") + 1].endswith("video.avi"))
+        self.assertTrue(args[args.index("--preview-path") + 1].endswith("preview.avi"))
+        # L'immagine di partenza e' una copia nella cartella di lavoro.
+        init = args[args.index("-i") + 1]
+        self.assertEqual(os.path.dirname(init), run_dir)
+        self.assertNotEqual(init, start)
+        self.assertEqual(open(init, "rb").read(), open(start, "rb").read())
+        self.assertIn("--negative-prompt-file", args)     # quello di Wan
+        self.assertEqual(args[args.index("--image-preprocess") + 1],
+                         "target=init,mode=crop-resize,filter=lanczos,antialias=true")
+
+    def test_video_high_noise(self):
+        self.model = self.video_model("Wan2.2-T2V-A14B", (
+            "Wan2.2-T2V-A14B-LowNoise-Q4_K_M.gguf", "Wan2.2-T2V-A14B-HighNoise-Q4_K_M.gguf",
+            "wan_2.1_vae.safetensors", "umt5-xxl-encoder-Q8_0.gguf"))
+        job = rd.make_job(self.model, "x", {"vid_quality": "detailed"}, prefix="vid_")
+        self.assertEqual((job.steps, job.high_steps), (16, 13))
+        self.assertIsNone(self.run_job(job, gpu=False, low_memory=True)["done"][0])
+        with open(self.args_log) as f:
+            args = f.read().split("\n")
+        self.assertTrue(args[args.index("--high-noise-diffusion-model") + 1].endswith(
+            "HighNoise-Q4_K_M.gguf"))
+        for opt, val in (("--high-noise-steps", "13"), ("--high-noise-cfg-scale", "3.5"),
+                         ("--high-noise-sampling-method", "euler"), ("--steps", "16")):
+            self.assertEqual(args[args.index(opt) + 1], val)
+        self.assertNotIn("-i", args)
+
+    def test_video_start_errors(self):
+        gen = rd.Generator()
+        i2v = self.video_model("Wan2.1-I2V-14B", ("wan2.1-i2v-14b-480p-Q4_K_M.gguf",
+                                                  "wan_2.1_vae.safetensors",
+                                                  "umt5-xxl-encoder-Q8_0.gguf",
+                                                  "clip_vision_h.safetensors"))
+        with self.assertRaises(rd.DiffusionError) as e:
+            gen.start(i2v, rd.make_job(i2v, "x", {}, prefix="vid_"))
+        self.assertEqual(e.exception.key, "vid_err_need_image")
+        s2v = self.video_model("Wan2.2-S2V-14B", ("wan2.2_s2v-14B-Q4_K_M.gguf",
+                                                  "wan_2.1_vae.safetensors",
+                                                  "umt5-xxl-encoder-Q8_0.gguf"))
+        with self.assertRaises(rd.DiffusionError) as e:
+            gen.start(s2v, rd.make_job(s2v, "x", {}, prefix="vid_"))
+        self.assertEqual(e.exception.key, "vid_err_unsupported")
+
     def test_list_devices(self):
         self.assertEqual([d["name"] for d in rd.list_devices()], ["Vulkan0", "Vulkan1"])
 
@@ -594,8 +829,16 @@ class TestTranslations(unittest.TestCase):
         for name in ("diffusion_view.py", "ruscallama.py"):
             with open(os.path.join(TOOL, name), encoding="utf-8") as f:
                 src += f.read()
-        used = set(re.findall(r'_\("((?:img|view)_[a-z_]+)"', src))
+        used = set(re.findall(r'_\("((?:img|vid|view)_[a-z_]+)"', src))
         used |= {f"img_aspect_{a}" for a in rd.ASPECTS} | {f"img_quality_{q}" for q in rd.QUALITY}
+        # self.t("nome"): img_nome, e vid_nome per i testi propri della vista Video.
+        own = re.search(r"OWN_TEXTS = \(([^)]*)\)", src.split("class VideoPage")[1]).group(1)
+        own = set(re.findall(r'"(\w+)"', own))
+        for name in set(re.findall(r'self\.t\("([a-z_]+)"', src)):
+            used.add("img_" + name)
+            if name in own:
+                used.add("vid_" + name)
+        used |= {e["desc"] for e in rd.GUIDE + rd.VIDEO_GUIDE}
         self.assertFalse(used - set(en), sorted(used - set(en)))
         fields = lambda v: sorted(re.findall(r"{(\w+)}", v))
         for name in sorted(os.listdir(lang)):

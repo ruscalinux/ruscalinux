@@ -81,7 +81,10 @@ OPZIONI_USATE="-m --diffusion-model --vae --clip_l --clip_g --t5xxl --llm
   --sampling-method -s -b -t -o --backend --list-devices --vae-tiling
   --offload-to-cpu --disable-image-metadata --preview --preview-path
   --preview-interval --llm_vision --tokenizer --embeddings-connectors
-  --uncond-diffusion-model --flow-shift --sigmas --rng --model-args"
+  --uncond-diffusion-model --flow-shift --sigmas --rng --model-args
+  -M --video-frames --fps -i --clip_vision --high-noise-diffusion-model
+  --high-noise-steps --high-noise-cfg-scale --high-noise-sampling-method
+  --image-preprocess"
 
 # File di thirdparty/ compilati in sd-cli. Sono tutti di altri autori e sono
 # dichiarati nel file copyright qui sotto. Se una release aggiunge un file o
@@ -316,7 +319,9 @@ fi
 #                                 sd-cli, non sd-server: cpp-httplib resta
 #                                 fuori);
 #   SD_WEBP=OFF, SD_WEBM=OFF      niente libwebp e libwebm (sottomoduli non
-#                                 inclusi): le immagini sono PNG.
+#                                 inclusi): le immagini sono PNG e i video
+#                                 AVI in Motion JPEG, scritti dal codice di
+#                                 sd-cli stesso (examples/common/media_io.cpp).
 #   Dopo la compilazione si controlla che il binario non usi socket.
 # BUILD_SHARED_LIBS=OFF: ggml e stable-diffusion sono compilati dentro sd-cli,
 #   un solo file senza librerie private.
@@ -461,6 +466,12 @@ done
         Adatta rusca_diffusion.py, oppure costruisci una versione precedente:
         RUSCADIFFUSION_SD_VERSION=<numero> ./make-deb.sh"
 say "sd-cli accetta tutte le opzioni usate da RuscaLLama"
+# I video di RuscaLLama: modo vid_gen e uscita .avi senza libwebm.
+grep -qE -- "vid_gen" <<< "$AIUTO" \
+    || die "sd-cli di stable-diffusion.cpp $TAG non ha il modo vid_gen (video)"
+grep -qF -- ".avi" <<< "$AIUTO" \
+    || die "sd-cli di stable-diffusion.cpp $TAG non scrive piu' video .avi"
+say "sd-cli genera video (vid_gen, .avi)"
 if command -v readelf >/dev/null; then
     for f in "$STAGE_CACHE"/bin/*; do
         [ -L "$f" ] && continue
@@ -498,7 +509,8 @@ fi
 cat > "$DOC/README.md" <<README
 # ruscadiffusion-engine $VER
 
-Motore di generazione delle immagini del RuscaLinux OS Tool RuscaLLama.
+Motore di generazione delle immagini e dei video del RuscaLinux OS Tool
+RuscaLLama.
 
 **Componente esterno:** stable-diffusion.cpp $TAG — $UPSTREAM — licenza
 MIT, copyright leejet; con la sua copia di ggml ($GGML_REPO, licenza MIT,
@@ -723,6 +735,8 @@ $PKG ($VER) unstable; urgency=medium
   * Solo sd-cli: niente server, niente RPC, nessun socket nel binario
     (controllato dalla build).
   * Controllo che sd-cli accetti le opzioni usate da RuscaLLama e che parta.
+  * Video (Wan, HunyuanVideo, LingBot-Video): controllo che sd-cli abbia il
+    modo vid_gen e scriva i video .avi senza librerie in piu'.
   * Binario in /$LIBDIR; profilo AppArmor in complain.
 
  -- $MAINT  $(LC_ALL=C date -Ru -d "@$SOURCE_DATE_EPOCH")
@@ -750,9 +764,10 @@ Recommends: $RECOMMENDS
 Maintainer: $MAINT
 Homepage: $HOMEPAGE
 Installed-Size: $(du -sk --exclude=DEBIAN "$ROOT" | cut -f1)
-Description: image generation engine for RuscaLLama
+Description: image and video generation engine for RuscaLLama
  Runs local image generation models (Stable Diffusion, SDXL, FLUX, SD 3.5,
- Z-Image, Qwen-Image and others, as .safetensors or .gguf files) for the
+ Z-Image, Qwen-Image and others, as .safetensors or .gguf files) and video
+ models (Wan 2.1 and 2.2, HunyuanVideo 1.5, LingBot-Video) for the
  RuscaLinux OS Tool RuscaLLama. Contains sd-cli.
  .
  This is stable-diffusion.cpp $TAG, an external component (MIT license,

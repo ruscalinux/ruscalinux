@@ -8,7 +8,9 @@
 # build-deb/ con suffisso -ruscalinux e SHA256SUMS accanto; Python puro,
 # quindi Architecture: all; versione = VERSION di release.conf.
 # Il programma usa ruscallama-engine (llama.cpp, componente esterno MIT) e,
-# per la vista Immagini, ruscadiffusion-engine (stable-diffusion.cpp, MIT).
+# per le viste Immagini e Video, ruscadiffusion-engine (stable-diffusion.cpp,
+# MIT). I video si riproducono con Gtk.Video: servono il modulo GStreamer di
+# GTK e i plugin "good" (AVI, Motion JPEG), raccomandati qui sotto.
 # ---------------------------------------------------------------------------
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -165,6 +167,8 @@ $PKG \\- chat with local language models
 RuscaLLama is a GNOME chat application for language models in GGUF format that run on this computer through ruscallama-engine (llama.cpp). The engine listens only on 127.0.0.1 with a temporary access key; nothing is sent over the internet. Models are searched in /usr/share/ruscallama/models and ~/.local/share/ruscallama/models.
 .PP
 The Images view creates pictures from a description with ruscadiffusion-engine (stable-diffusion.cpp), started once per generation, without a server or network ports. Image models (.safetensors, .gguf or .ckpt files, or folders with a model made of several files) are searched in /usr/share/ruscadiffusion/models, ~/.local/share/ruscadiffusion/models and in the folders added from the settings panel.
+.PP
+The Videos view creates short clips (AVI, Motion JPEG) from a description or from a starting image with the same engine and video models such as Wan 2.1 and 2.2, kept in the same folders.
 .SH SEE ALSO
 /usr/share/doc/$PKG/MANUAL_en.md.gz
 .SH AUTHOR
@@ -243,6 +247,10 @@ $PKG ($VER) unstable; urgency=medium
     generazione, senza server e senza porte. Modelli in un file solo o in
     una cartella (FLUX, SD 3.5, Z-Image, Qwen-Image); cartelle aggiunte
     senza copiare i file; anteprima durante la generazione.
+  * Vista Video: brevi video (Wan 2.1 e 2.2, HunyuanVideo 1.5,
+    LingBot-Video) da una descrizione o da un'immagine di partenza, con
+    lo stesso motore; un video AVI per volta, tempo rimasto, riproduzione
+    con Gtk.Video. «Anima in un video» porta un'immagine nella vista Video.
 
  -- $MAINT  $(LC_ALL=C date -Ru -d "@$SOURCE_DATE_EPOCH")
 CHANGELOG
@@ -254,7 +262,7 @@ Section: utils
 Priority: optional
 Architecture: $ARCH
 Depends: python3 (>= 3.10), python3-gi, gir1.2-gtk-4.0 (>= 4.18), gir1.2-adw-1 (>= 1.7), gir1.2-gtksource-5, python3-markdown-it (>= 3.0), python3-mdit-py-plugins (>= 0.4), python3-linkify-it (>= 2.0), ruscallama-engine (>= $VER)
-Recommends: ruscadiffusion-engine (>= $VER)
+Recommends: ruscadiffusion-engine (>= $VER), libgtk-4-media-gstreamer, gstreamer1.0-plugins-good
 Maintainer: $MAINT
 Homepage: $HOMEPAGE
 Installed-Size: $(du -sk "$ROOT/usr" | cut -f1)
@@ -263,9 +271,9 @@ Description: chat with local language models
  that run entirely on this computer through ruscallama-engine (llama.cpp).
  Answers stream as they are generated, with optional reasoning, image
  input for vision models, code blocks with highlighting, and saving to
- Markdown or HTML. The Images view creates pictures from a description
- with ruscadiffusion-engine (stable-diffusion.cpp). Nothing you write
- leaves the machine.
+ Markdown or HTML. The Images and Videos views create pictures and short
+ videos from a description with ruscadiffusion-engine (stable-diffusion.cpp).
+ Nothing you write leaves the machine.
 CONTROL
 find "$ROOT" -type d -exec chmod 755 {} +
 

@@ -155,8 +155,11 @@ python3-markdown-it
 python3-mdit-py-plugins
 python3-linkify-it
 
-# RuscaNarrator e RuscaCat: riproduzione della voce (Gtk.MediaFile)
+# RuscaNarrator e RuscaCat: riproduzione della voce (Gtk.MediaFile);
+# RuscaLLama: i video della vista Video (AVI in Motion JPEG, con i plugin
+# "good" di GStreamer)
 libgtk-4-media-gstreamer
+gstreamer1.0-plugins-good
 
 # RuscaWriter: sillabazione del PDF (Pyphen) e generatore di copertine (Pillow)
 python3-pyphen

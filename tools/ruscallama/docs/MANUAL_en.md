@@ -2,7 +2,7 @@
 
 **Version** 1.99.3 · **Author** Nunzio Curcuruto · **Distribution** RuscaLinux ([ruscalinux.org](https://www.ruscalinux.org/)) · **License** GNU GPL v3 or later
 
-RuscaLLama is a chat with language models that run **entirely on this computer**. The model is run by **ruscallama-engine**, that is llama.cpp: an external component under the MIT license, built for RuscaLinux. The **Images** view creates pictures from a description with **ruscadiffusion-engine**, that is stable-diffusion.cpp, also under the MIT license (section 7).
+RuscaLLama is a chat with language models that run **entirely on this computer**. The model is run by **ruscallama-engine**, that is llama.cpp: an external component under the MIT license, built for RuscaLinux. The **Images** view creates pictures from a description with **ruscadiffusion-engine**, that is stable-diffusion.cpp, also under the MIT license (section 7); the **Videos** view creates short videos with the same engine (section 8).
 
 The common Markdown engine includes an external component: the highlight rule `==text==`, a port of the [markdown-it-mark](https://github.com/markdown-it/markdown-it-mark) plugin (MIT license, © Vitaly Puzrin and Alex Kocharin; Python structure from markdown-it-py, © ExecutableBookProject), in its own file `markdown_it_mark.py`.
 
@@ -12,7 +12,7 @@ The common Markdown engine includes an external component: the highlight rule `=
 
 - RuscaLinux or Debian Stable, GNOME;
 - Python ≥ 3.10, GTK ≥ 4.18, libadwaita ≥ 1.7, GtkSourceView 5;
-- the `ruscallama-engine` package, and `ruscadiffusion-engine` for images;
+- the `ruscallama-engine` package, and `ruscadiffusion-engine` for images and videos;
 - at least one model in **GGUF** format.
 
 Memory needs depend on the model: as a rule of thumb, a little more than the size of the GGUF file, plus the context memory.
@@ -31,7 +31,7 @@ You can also pick a file in any folder with **Choose a File…**. Next to the mo
 
 ## 3. The window
 
-- **Header bar**: on the left **+** (new conversation); in the middle the two views, **Chat** and **Images** (in narrow windows they move to the bottom); on the right the settings panel button and the main menu.
+- **Header bar**: on the left **+** (new conversation); in the middle the three views, **Chat**, **Images** and **Videos** (in narrow windows they move to the bottom); on the right the settings panel button and the main menu.
 - **Conversation**: answers appear while they are generated. Code blocks are highlighted and have a copy button. Each answer has **Copy Answer** and a menu to save it as Markdown or save its code blocks.
 - **Reasoning**: when on, the model's reasoning appears in a collapsible section above the answer.
 - **Bottom bar**: attachments, message box, **Send** (which becomes **Stop** during an answer); below, the loaded model or the engine state and the speed in tokens per second.
@@ -114,14 +114,48 @@ With the Images view open, the side panel (F9) shows these settings.
 | Image Engine | Text Encoder | On the same card, on the processor or on another card. With two cards (for example an NVIDIA with little memory and an integrated Radeon) put it on the second one: the first stays free for the model, which works at every step |
 | Image Engine | Save Memory | Keeps all weights in RAM. Slower: leave it off, and try it only if the engine stops for lack of graphics memory |
 
-## 8. Keyboard shortcuts
+## 8. Videos
+
+The **Videos** view (at the top, next to **Images**; Alt+3) creates short videos, a few seconds long, from a description or from a starting image. It uses the same engine as images, **ruscadiffusion-engine**, with a video model: the video is an AVI file (Motion JPEG), which RuscaLLama plays by itself. A video needs much more memory and time than an image: with a 6 GB card, expect several minutes for a 2-second clip at about 480p.
+
+### The video model
+
+As for images, a video model is made of **three files**: the model, the text encoder (UMT5-XXL for Wan) and the VAE. They go in the same folder as the image models, `~/.local/share/ruscadiffusion/models/`, each in its own subfolder: RuscaLLama recognises video models by itself and shows them only in the Videos view. **Which Files to Download?** recommends:
+
+- **Wan2.2-TI2V-5B** (Apache 2.0 license): the best quality for a home graphics card, from a description or from an image, 24 frames per second. The VAE is `wan2.2_vae.safetensors`, not the Wan 2.1 one;
+- **Wan2.1-T2V-1.3B** (Apache 2.0 license): lighter and faster, from a description only, 16 frames per second.
+
+Wan 2.1 and 2.2 with 14 billion parameters (much slower), HunyuanVideo 1.5 and LingBot-Video work too. Wan 2.2 A14B is made of two models, `HighNoise` and `LowNoise`, to put in the same folder; Wan 2.1 I2V also needs `clip_vision_h.safetensors`. Models that start from audio or video (S2V, VACE, Animate) do not work with RuscaLLama: a notice says so.
+
+### Creating a video
+
+1. Describe the scene **and the motion**: who or what moves, how, and what the camera does.
+2. With the models that use one, the **starting image** button appears next to the text box: the video begins from that image. From the Images view, the menu of an image → **Animate in a Video** brings it here.
+3. Choose the format and press **Create Video**. While it works you see a frame of the preview, the step and the time left; **Stop** (Esc) interrupts.
+
+Click a video to watch it. From its menu: **Save Video…** (in the Videos folder), **Open in the Video Player**, **Reuse the Seed**, **Remove**. If GTK cannot play the video (`libgtk-4-media-gstreamer` or `gstreamer1.0-plugins-good` is missing) you see a frame and the button to open it in the system player.
+
+One video or image is created at a time: while one of the two views works, the other waits.
+
+### Video settings
+
+The settings of the Videos view are those of images, with these differences:
+
+| Option | Effect |
+|---|---|
+| Length | 2, 3 or 5 seconds. Time and memory grow more than proportionally |
+| Things to avoid | Empty: for Wan the model's default negative prompt is used |
+| Advanced Settings | As for images; the recommended base size is 640 (about 480p) |
+| Engine (Images and Videos) | The same settings as the Images view: changing them in one view also changes the other. With a 6 GB card put the **Text Encoder** on the processor |
+
+## 9. Keyboard shortcuts
 
 | Keys | Action |
 |---|---|
-| Alt+1 / Alt+2 | Chat view / Images view |
-| Enter | Send (in the Images view: Generate) |
+| Alt+1 / Alt+2 / Alt+3 | Chat / Images / Videos view |
+| Enter | Send (in the Images view: Generate; in the Videos view: Create Video) |
 | Shift+Enter | New line |
-| Esc | Stop the answer or the image |
+| Esc | Stop the answer, the image or the video |
 | Ctrl+N | New conversation |
 | Ctrl+O | Attach files |
 | Ctrl+S | Save the conversation as Markdown |
@@ -131,7 +165,7 @@ With the Images view open, the side panel (F9) shows these settings.
 | F10 | Main menu |
 | Ctrl+W / Ctrl+Q | Close the window / Quit |
 
-## 9. Privacy and security
+## 10. Privacy and security
 
 - The engine listens only on **127.0.0.1**, on a free port chosen at every start.
 - Every start creates a **temporary access key**, stored in `$XDG_RUNTIME_DIR/ruscallama/` with 0600 permissions: other users of the computer cannot use the model or read the conversations.
@@ -140,16 +174,16 @@ With the Images view open, the side panel (F9) shows these settings.
 - The engine has an AppArmor profile (in *complain* mode) that denies it the most sensitive folders of the home.
 - Settings are in `~/.config/ruscallama/settings.json`.
 
-For images:
+For images and videos:
 
 - the image engine has no network code (no server): it starts, creates the images and exits;
 - the description reaches it in a file, not on the command line, where other users of the computer could see it;
-- unsaved images are kept in `~/.cache/ruscallama/images/` (0700 permissions) and deleted when the program closes;
+- unsaved images and videos are kept in `~/.cache/ruscallama/images/` (0700 permissions) and deleted when the program closes; the starting image of a video is copied there, and the engine reads nothing else of the home;
 - the saved PNG does not contain the description unless you turn on **Write the Prompt in the File**.
 
 Answers from a language model can be wrong: check important information.
 
-## 10. Troubleshooting
+## 11. Troubleshooting
 
 | Problem | What to do |
 |---|---|
@@ -162,6 +196,9 @@ Answers from a language model can be wrong: check important information.
 | "ruscadiffusion-engine is not installed" | `sudo apt install ruscadiffusion-engine` |
 | The image model does not appear | It must be `.safetensors`, `.gguf` or `.ckpt`; a model made of several files goes in its own folder, with its parts |
 | The image is not created | Main menu → **Image Engine Log**: memory is often the cause; turn on **Save Memory**, choose **Fast** or a smaller format |
+| The video model does not appear | It must be in its own folder with the VAE and the text encoder; the file or folder name must say which model it is (Wan, HunyuanVideo, LingBot) |
+| The video is not created | Main menu → **Video Engine Log**: memory is almost always the cause; choose 2 seconds, a smaller base size, the text encoder on the processor or **Save Memory** |
+| The video does not play | Install `libgtk-4-media-gstreamer` and `gstreamer1.0-plugins-good`, or use **Open in the Video Player** |
 | Blurry or strange images | Use the recommended values (advanced settings at 0 and "Automatic"); SD 1.5 models work at 512 px, SDXL and FLUX at 1024 |
 
 Support: info@ruscalinux.org — The note on the use of AI tools is in the About window and in the `NOTA-IA.md` file of the repository.

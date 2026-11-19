@@ -75,6 +75,12 @@
   into `~/.local/share/ruscadiffusion/models/`, or add the folder where they
   already are. An image can be attached to the conversation, and an answer
   can become the description of a new image.
+- **Short videos.** A third view, Videos, creates clips of a few seconds
+  from a description or from a starting image, with the same engine and
+  video models such as Wan 2.2 TI2V 5B (Apache 2.0), which runs even on a
+  6 GB graphics card. The result is an AVI video that RuscaLLama plays by
+  itself; the time left is shown while it works. Any image of the Images
+  view can be animated with "Animate in a Video".
 - **Speech to text.** RuscaTranscriber transcribes a video or audio file with a
   Whisper model that runs on your own computer and saves the text as
   Markdown and the subtitles as SRT. Its engine, **ruscawhisper-engine**, is

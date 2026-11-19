@@ -55,12 +55,12 @@ Si trova nel repository in `docs/SPECIFICHE-RUSCALINUX-OS-TOOLS.md`. In caso di 
 | RuscaHub | Gestione AppImages | Gestore applicazioni | `org.ruscalinux.RuscaHub` | `ruscahub` | No |
 | RuscaMark | Editing Markdown | Editor di testo | `org.ruscalinux.RuscaMark` | `ruscamark` | Sì, se c’è il controllo ortografico |
 | RuscaWriter | Scrittura e impaginazione di libri | Word processor | `org.ruscalinux.RuscaWriter` | `ruscawriter` | Sì, sempre |
-| RuscaLLama | Chat con modelli linguistici locali e creazione di immagini da una descrizione | Assistente IA | `org.ruscalinux.RuscaLLama` | `ruscallama` | No |
+| RuscaLLama | Chat con modelli linguistici locali e creazione di immagini e brevi video da una descrizione | Assistente IA | `org.ruscalinux.RuscaLLama` | `ruscallama` | No |
 | RuscaTranslator | Traduzione di documenti Markdown, con RAG ottimizzato per italiano ↔ inglese | Traduttore | `org.ruscalinux.RuscaTranslator` | `ruscatranslator` | No |
 | ruscallama-engine | Motore che esegue i modelli per RuscaLLama e RuscaTranslator: **llama.cpp, software esterno** | Componente di sistema, senza interfaccia | — | `ruscallama-engine` | — |
 | RuscaTranscriber | Trascrizione di video e audio in testo (Markdown) e sottotitoli (SRT) | Riconoscimento vocale | `org.ruscalinux.RuscaTranscriber` | `ruscatranscriber` | No |
 | ruscawhisper-engine | Motore di riconoscimento vocale di RuscaTranscriber: **whisper.cpp, software esterno** | Componente di sistema, senza interfaccia | — | `ruscawhisper-engine` | — |
-| ruscadiffusion-engine | Motore di generazione delle immagini di RuscaLLama: **stable-diffusion.cpp, software esterno** | Componente di sistema, senza interfaccia | — | `ruscadiffusion-engine` | — |
+| ruscadiffusion-engine | Motore di generazione delle immagini e dei video di RuscaLLama: **stable-diffusion.cpp, software esterno** | Componente di sistema, senza interfaccia | — | `ruscadiffusion-engine` | — |
 | RuscaNarrator | Lettura ad alta voce di documenti Markdown e di sottotitoli SRT (rispettandone i tempi) | Sintesi vocale | `org.ruscalinux.RuscaNarrator` | `ruscanarrator` | No |
 | RuscaCat | Un gatto filosofo animato con cui si parla a voce: ascolta, risponde e parla con i motori locali | Assistente vocale | `org.ruscalinux.RuscaCat` | `ruscacat` | No |
 
@@ -192,7 +192,7 @@ python3 -m unittest tests/test_ruscacat.py
 
 ### 1.6 La generazione delle immagini
 
-RuscaLLama ha due viste, **Chat** e **Immagini** (`Adw.ViewStack` con `Adw.ViewSwitcher` nella barra del titolo; sotto i 550 sp il selettore scende in basso, `Adw.ViewSwitcherBar`). Nella vista Immagini si scrive una descrizione, si sceglie il formato (Quadrata, Orizzontale, Verticale) e si preme **Genera**. Le immagini sono create da modelli di diffusione che girano sul computer dell’utente, tramite **ruscadiffusion-engine**.
+RuscaLLama ha tre viste, **Chat**, **Immagini** e **Video** (`Adw.ViewStack` con `Adw.ViewSwitcher` nella barra del titolo; sotto i 550 sp il selettore scende in basso, `Adw.ViewSwitcherBar`). Nella vista Immagini si scrive una descrizione, si sceglie il formato (Quadrata, Orizzontale, Verticale) e si preme **Genera**. Le immagini sono create da modelli di diffusione che girano sul computer dell’utente, tramite **ruscadiffusion-engine**. La vista Video, con lo stesso motore, è descritta nella sezione 1.6.1.
 
 - **ruscadiffusion-engine è stable-diffusion.cpp** (<https://github.com/leejet/stable-diffusion.cpp>), software esterno con licenza MIT, copyright leejet, con la sua copia di ggml (<https://github.com/leejet/ggml>, MIT, The ggml authors), che usa come sottomodulo git. RuscaLinux lo compila dal sorgente senza modificarne il codice, con il backend Vulkan, con le stesse regole di ruscawhisper-engine (sezioni 6 e 7). Il pacchetto contiene solo `sd-cli`, con ggml compilato dentro: niente `sd-server`, niente interfaccia web, niente backend RPC. La build controlla che nel binario non ci sia codice di rete.
 - **Un processo per generazione.** `sd-cli` parte, carica il modello, scrive le immagini PNG ed esce: **non resta acceso nessun server e non si apre nessuna porta**, nemmeno su 127.0.0.1. Ogni generazione ricarica il modello: è più lento di un server, ma per la privacy si è preferito così, come per RuscaNarrator.
@@ -234,6 +234,32 @@ RuscaLLama ha due viste, **Chat** e **Immagini** (`Adw.ViewStack` con `Adw.ViewS
 ```bash
 python3 -m unittest tests/test_ruscallama_diffusion.py
 ```
+
+### 1.6.1 I video
+
+La vista **Video** (Alt+3) crea brevi video, di qualche secondo, da una descrizione o da un’immagine di partenza, con lo stesso motore. È `VideoPage` in `diffusion_view.py`, una sottoclasse di `ImagesPage`: stessa struttura, stessi controlli, poche differenze.
+
+- **Motore.** `sd-cli -M vid_gen` con `--video-frames`, `--fps` e, per i modelli che la usano, `-i` (immagine di partenza). Il video è un **AVI in Motion JPEG**, scritto dal codice di `sd-cli` stesso (`examples/common/media_io.cpp`): resta `SD_WEBM=OFF`, niente librerie in più. La build del motore controlla che `sd-cli` abbia il modo `vid_gen` e scriva i `.avi`, e le opzioni video sono in `OPZIONI_USATE`.
+- **Modelli.** Nelle stesse cartelle dei modelli per immagini: si riconoscono dal nome (`PROFILES`, `"video": True`) e ogni vista mostra solo i suoi (`Model.video`). Ruoli in più: `high-noise-diffusion-model` (Wan 2.2 A14B, il file `HighNoise`; il `LowNoise` è il modello principale) e `clip_vision` (Wan 2.1 I2V); `umt5-xxl` e `byt5` sono `--t5xxl`. Famiglie e file necessari (`REQUIRED_PARTS`):
+
+  | Famiglia | Modelli | File oltre al modello | Passi / CFG / fps | Immagine di partenza |
+  |---|---|---|---|---|
+  | `wan22_5b` | Wan2.2-TI2V-5B | VAE di Wan 2.2, UMT5-XXL | 20 / 6 / 24 | facoltativa |
+  | `wan21` | Wan2.1-T2V 1.3B e 14B | VAE di Wan 2.1, UMT5-XXL | 20 / 6 / 16 | — |
+  | `wan21_i2v` | Wan2.1-I2V 14B | VAE, UMT5-XXL, `clip_vision_h` | 20 / 6 / 16 | obbligatoria |
+  | `wan22_14b` | Wan2.2-T2V e I2V A14B | VAE di Wan 2.1, UMT5-XXL, HighNoise | 10 (+8 HighNoise) / 3,5 / 16 | I2V: obbligatoria |
+  | `hunyuanvideo` | HunyuanVideo 1.5 | VAE, Qwen2.5-VL, byT5 | 20 / 6 / 24 | I2V: obbligatoria |
+  | `lingbot` | LingBot-Video | VAE di Wan 2.1, Qwen3-VL | 20 / 3 / 16 | — |
+
+  Wan usa `euler`, `--flow-shift 3` e, se «Da evitare» è vuota, il prompt negativo predefinito di Wan (`WAN_NEGATIVE`). I modelli che vogliono un audio o un video di partenza (S2V, VACE, FLF2V, Animate) sono la famiglia `unsupported`: compaiono con un avviso e **Crea il video** resta spento. LTX-2 non è nell’elenco: chiede un modello da 22 miliardi di parametri, troppo per una scheda di casa.
+- **Durata e dimensioni.** «Durata» 2, 3 o 5 secondi (`LENGTHS`, impostazione `vid_length`): i fotogrammi sono `4n+1` (`video_frames()`: 2 s a 16 fps = 33, 5 s = 81; a 24 fps 49 e 121). La dimensione di base consigliata è 640 (circa 480p; in orizzontale 768 × 512): Wan arriva a 720p, con tempi molto più lunghi.
+- **Immagine di partenza.** Con i modelli I2V e TI2V compare un pulsante accanto alla descrizione e, scelta l’immagine, una miniatura con **Togli**. Il menu delle immagini della vista Immagini ha **Anima in un video**, che la porta nella vista Video. L’immagine si **copia** nella cartella di lavoro prima di passarla al motore, che così non legge altro della home.
+- **Avanzamento.** Come per le immagini, più il tempo rimasto («Passo n di N · circa M min alla fine»), dalla durata dei passi già fatti. L’anteprima di un video è anch’essa un AVI: se ne mostra il fotogramma a metà (`avi_frames()`, `video_frame()`: i pezzi `00dc` della lista `movi` sono JPEG interi, non serve un decodificatore).
+- **Galleria e riproduzione.** La miniatura è il fotogramma a metà con il simbolo di riproduzione. Il visore usa `Gtk.Video` (GStreamer: `libgtk-4-media-gstreamer` e `gstreamer1.0-plugins-good`, raccomandati dal pacchetto e nell’elenco dei pacchetti della ISO); se GTK non sa riprodurlo, mostra il fotogramma e **Apri nel lettore video**. Menu: **Salva il video…** (`.avi`, nella cartella Video), **Apri nel lettore video**, **Riusa il seme**, **Togli**.
+- **Impostazioni.** Proprie della vista: `vid_model`, `vid_quality`, `vid_aspect` (predefinito Orizzontale), `vid_length`, `vid_negative`, `vid_steps`, `vid_cfg`, `vid_side`, `vid_sampler`, `vid_seed`. In comune con le immagini: le cartelle aggiunte (`img_folders`) e il motore (`img_gpu`, `img_device`, `img_te_device`, `img_threads`, `img_low_memory`, `img_metadata`); ogni vista ha i suoi controlli e li rilegge quando torna in primo piano (`sync_shared()`). Una generazione per volta fra le due viste (`peers`): la scheda è la stessa.
+- **Chiusura.** Se ci sono video non salvati la domanda è «Chiudere senza salvare i video?».
+
+**Test.** `tests/test_ruscallama_diffusion.py` controlla anche i ruoli dei file video, 8 cartelle di modelli video (Wan 2.1 e 2.2, HunyuanVideo, LingBot, S2V), i fotogrammi `4n+1`, la lettura dei fotogrammi di un AVI e l’intero percorso di un video con il `sd-cli` finto, che scrive AVI in Motion JPEG come quelli veri: `-M vid_gen`, fotogrammi e fps, immagine di partenza copiata, HighNoise, errori di partenza.
 
 Gli identificatori di ogni tool devono coincidere tra loro (vedi sezione 5.2).
 
@@ -749,7 +775,7 @@ Componenti esterni in uso:
 | EB Garamond e Courier Prime (caratteri tipografici) | inclusi nei sorgenti | SIL Open Font License 1.1 | `tools/ruscawriter/assets/`, installati in `/usr/share/ruscawriter/assets/` con il testo della licenza | RuscaWriter |
 | llama.cpp (con ggml e le librerie che include: nlohmann/json e cpp-httplib MIT, xxHash BSD-2-Clause, stb, miniaudio, sha1 e sha256 di pubblico dominio) | ultima release stabile al momento della build (1.99.2: 0.9.0; 1.99.3: 1.0.0), scritta nella descrizione del pacchetto e in `/usr/share/doc/ruscallama-engine/README.md.gz` | MIT | Compilato nel pacchetto `ruscallama-engine`, in `/usr/lib/ruscallama-engine/` | RuscaLLama, RuscaTranslator, RuscaNarrator (`llama-tts`), RuscaCat (`llama-server` e `llama-tts`) |
 | whisper.cpp (con ggml e le librerie compilate nei programmi impacchettati: sgemm di llamafile, MIT; miniaudio, pubblico dominio o MIT-0; stb_vorbis, pubblico dominio o MIT) | ultima release stabile al momento della build (1.99.3: 1.9.5), scritta nella descrizione del pacchetto e in `/usr/share/doc/ruscawhisper-engine/README.md.gz` | MIT | Compilato nel pacchetto `ruscawhisper-engine`, in `/usr/lib/ruscawhisper-engine/` | RuscaTranscriber, RuscaCat |
-| stable-diffusion.cpp (con la sua copia di ggml, leejet/ggml, e le librerie compilate in `sd-cli`: nlohmann/json, miniz e sgemm di llamafile, MIT; zip di kuba--, Unlicense; stb, pubblico dominio o MIT; darts-clone, BSD-3-Clause; Oniguruma, BSD-2-Clause; utf8proc, MIT e licenza dei dati Unicode) | ultima release al momento della build (tag `master-<numero>-<commit>`; 1.99.3: master-1106-532d2c1), scritta nella descrizione del pacchetto e in `/usr/share/doc/ruscadiffusion-engine/README.md.gz` | MIT | Compilato nel pacchetto `ruscadiffusion-engine`, in `/usr/lib/ruscadiffusion-engine/` | RuscaLLama (vista Immagini) |
+| stable-diffusion.cpp (con la sua copia di ggml, leejet/ggml, e le librerie compilate in `sd-cli`: nlohmann/json, miniz e sgemm di llamafile, MIT; zip di kuba--, Unlicense; stb, pubblico dominio o MIT; darts-clone, BSD-3-Clause; Oniguruma, BSD-2-Clause; utf8proc, MIT e licenza dei dati Unicode) | ultima release al momento della build (tag `master-<numero>-<commit>`; 1.99.3: master-1106-532d2c1), scritta nella descrizione del pacchetto e in `/usr/share/doc/ruscadiffusion-engine/README.md.gz` | MIT | Compilato nel pacchetto `ruscadiffusion-engine`, in `/usr/lib/ruscadiffusion-engine/` | RuscaLLama (viste Immagini e Video) |
 | Regola dell’evidenziato, porting del plugin markdown-it-mark (© Vitaly Puzrin e Alex Kocharin) con la struttura della regola del barrato di markdown-it-py (© ExecutableBookProject) | — | MIT (Expat) | `markdown_it_mark.py`, file a sé accanto a `rusca_markdown.py`; dichiarato nel file `copyright` del pacchetto, nella finestra Informazioni e nei manuali | RuscaLLama, RuscaMark, RuscaWriter, RuscaTranslator, RuscaNarrator, RuscaCat |
 | Esempi della specifica CommonMark (© John MacFarlane) | 0.30 | CC BY-SA 4.0 | `tests/data/commonmark-0.30-spec.json`, con `README.md`; solo per i test, non installati da nessun pacchetto | Test di `rusca_markdown.py` |
 
@@ -803,7 +829,7 @@ Il suffisso `ruscalinux` nel nome del file indica che il pacchetto appartiene al
 1. stable-diffusion.cpp non ha versioni `X.Y.Z`: ogni release è un tag `master-<numero>-<commit>` e la più recente ha il numero più alto. Il sorgente sono **due archivi**: stable-diffusion.cpp e la sua copia di ggml (sottomodulo git, assente dagli archivi di GitHub). Il commit di ggml è quello registrato nel tag, letto con `git fetch --filter=blob:none`; il commit di ciascun archivio deve essere quello atteso, e il file di `checksums/` registra le impronte di tutti e due;
 2. si compila solo `sd-cli`, con ggml dentro (`BUILD_SHARED_LIBS=OFF`), con `SD_RPC=OFF`, `GGML_RPC=OFF`, `SD_SERVER_BUILD_FRONTEND=OFF`, `SD_WEBP=OFF` e `SD_WEBM=OFF`; stessi controlli di rete sui simboli;
 3. le librerie di altri autori stanno in `thirdparty/`: la build si ferma se compare un file che non è in `TERZI_DICHIARATI`;
-4. il sorgente non ha un modello di prova: la build controlla che `sd-cli` dica la sua versione, elenchi le schede nel formato `nome<TAB>descrizione` e accetti le opzioni usate da RuscaLLama (`OPZIONI_USATE`).
+4. il sorgente non ha un modello di prova: la build controlla che `sd-cli` dica la sua versione, elenchi le schede nel formato `nome<TAB>descrizione`, accetti le opzioni usate da RuscaLLama (`OPZIONI_USATE`, anche quelle dei video) e abbia il modo `vid_gen` con l’uscita `.avi`.
 
 Esempio di output:
 
@@ -1019,14 +1045,15 @@ Regole aggiuntive per il riconoscimento vocale (RuscaTranscriber):
 | Confinamento | Profilo AppArmor per `whisper-cli`, in modalità complain: nega la rete, `.ssh`, `.gnupg`, `.config`, profili di Firefox e Thunderbird |
 | Avviso all’utente | Il manuale ricorda che la trascrizione automatica va riletta |
 
-Regole aggiuntive per la generazione delle immagini (RuscaLLama, vista Immagini):
+Regole aggiuntive per la generazione delle immagini e dei video (RuscaLLama, viste Immagini e Video):
 
 | Regola | Come è applicata |
 |---|---|
 | Nessuna rete, nemmeno locale | `sd-cli` è avviato una volta per generazione e non ha codice di rete (lo controlla la build del motore: niente server, niente RPC); `rusca_diffusion.py` e `diffusion_view.py` non usano moduli di rete |
 | Programma esterno | `/usr/lib/ruscadiffusion-engine/sd-cli`, con percorso assoluto e lista di argomenti |
 | La descrizione | Passa al motore in un file (`--prompt-file`, `--negative-prompt-file`), non sulla riga di comando, dove altri utenti la vedrebbero con `ps`; il file si cancella appena il motore esce |
-| Immagini di lavoro | In `~/.cache/ruscallama/images/` con permessi 0700; cancellate all’avvio e alla chiusura; prima di chiudere con immagini non salvate si chiede conferma |
+| Immagini e video di lavoro | In `~/.cache/ruscallama/images/` con permessi 0700; cancellati all’avvio e alla chiusura; prima di chiudere con immagini o video non salvati si chiede conferma |
+| Immagine di partenza di un video | Copiata nella cartella di lavoro prima di passarla al motore: `sd-cli` non legge immagini nel resto della home |
 | Metadati | Per impostazione predefinita `--disable-image-metadata`: il PNG salvato non contiene descrizione e impostazioni, salvo scelta contraria |
 | Modelli | Solo file locali, letti dall’utente; le cartelle aggiunte non vengono copiate né modificate; dei `.safetensors` si legge solo l’intestazione |
 | Confinamento | Profilo AppArmor per `sd-cli`, in modalità complain: nega la rete, `.ssh`, `.gnupg`, `.config`, profili di Firefox e Thunderbird; scrive solo nella cartella di lavoro |
@@ -1113,7 +1140,7 @@ Un tool è pronto quando:
 14. Ha `make-deb.sh` che produce un solo `ruscafoo-ruscalinux_<versione>_all.deb` (o `_amd64.deb` per ruscallama-engine, ruscawhisper-engine e ruscadiffusion-engine) e `SHA256SUMS` in `build-deb/`.
 15. Ha la versione uguale a `VERSION` di `release.conf`.
 16. È licenziato GPL-3.0, con componenti esterni dichiarati.
-17. Non usa rete, telemetria o comandi pericolosi (per RuscaLLama, RuscaTranslator e RuscaCat: rete solo verso 127.0.0.1, sezione 11, e la vista Immagini di RuscaLLama non la usa in nessun modo; RuscaTranscriber e RuscaNarrator non usano la rete in nessun modo).
+17. Non usa rete, telemetria o comandi pericolosi (per RuscaLLama, RuscaTranslator e RuscaCat: rete solo verso 127.0.0.1, sezione 11, e le viste Immagini e Video di RuscaLLama non la usano in nessun modo; RuscaTranscriber e RuscaNarrator non usano la rete in nessun modo).
 18. Se mostra, converte o divide Markdown, usa `rusca_markdown.py` (sezione 1.2), e i test di `tests/` passano.
 
 ---
@@ -1217,13 +1244,14 @@ Chat con modelli linguistici che girano su questo computer.
 3. Scrivere un messaggio e premere Invio: il motore parte da solo.
 4. Copiare o salvare le risposte dal menu di ogni risposta; salvare la conversazione con Ctrl+S.
 
-Immagini (vista **Immagini**, Alt+2):
+Immagini (vista **Immagini**, Alt+2) e video (vista **Video**, Alt+3):
 
 1. Copiare un modello per immagini in `~/.local/share/ruscadiffusion/models/`: un file `.safetensors` o `.gguf` (per esempio Stable Diffusion 1.5 o SDXL), oppure una cartella con il modello e i suoi file (FLUX, Z-Image…). Se il modello sta già in un’altra cartella: pannello laterale (F9) → “Aggiungi una cartella…”.
 2. Scrivere la descrizione, scegliere Quadrata, Orizzontale o Verticale e premere “Genera” (Invio).
 3. Ogni immagine si salva, si copia o si allega alla conversazione dal suo menu. Le immagini non salvate si cancellano alla chiusura.
+4. Per i video: copiare un modello per video (per esempio Wan2.2-TI2V-5B: “Quali file scaricare?”) nella stessa cartella, descrivere la scena e il movimento e premere “Crea il video”. Un video di 2 secondi richiede diversi minuti; il menu di un’immagine ha “Anima in un video”.
 
-La vista Immagini usa **ruscadiffusion-engine**, cioè stable-diffusion.cpp, software esterno con licenza MIT. Non usa la rete.
+Le viste Immagini e Video usano **ruscadiffusion-engine**, cioè stable-diffusion.cpp, software esterno con licenza MIT. Non usa la rete.
 
 ## 🌐 RuscaTranslator
 
@@ -1317,7 +1345,7 @@ Tutti i dati elaborati dai RuscaLinux OS Tools rimangono in locale. Nessun dato 
 | ruscallama-engine | Engine that runs the models: llama.cpp, an external component (MIT) |
 | RuscaTranscriber | Transcription of video and audio into text (Markdown) and subtitles (SRT) |
 | ruscawhisper-engine | Speech recognition engine: whisper.cpp, an external component (MIT) |
-| ruscadiffusion-engine | Image generation engine of RuscaLLama: stable-diffusion.cpp, an external component (MIT) |
+| ruscadiffusion-engine | Image and video generation engine of RuscaLLama: stable-diffusion.cpp, an external component (MIT) |
 | RuscaNarrator | Reading Markdown documents and SRT subtitles (following their timing) aloud |
 | RuscaCat | An animated philosopher cat you talk to out loud: it listens, answers and speaks with the local engines |
 
@@ -1418,13 +1446,14 @@ Chat with language models that run on this computer.
 3. Write a message and press Enter: the engine starts on its own.
 4. Copy or save answers from each answer's menu; save the conversation with Ctrl+S.
 
-Images (**Images** view, Alt+2):
+Images (**Images** view, Alt+2) and videos (**Videos** view, Alt+3):
 
 1. Copy an image model into `~/.local/share/ruscadiffusion/models/`: a `.safetensors` or `.gguf` file (for example Stable Diffusion 1.5 or SDXL), or a folder with the model and its files (FLUX, Z-Image…). If the model is already in another folder: side panel (F9) → "Add a Folder…".
 2. Write the description, choose Square, Landscape or Portrait and press "Generate" (Enter).
 3. Save, copy or attach each image to the conversation from its menu. Images you have not saved are deleted when the program closes.
+4. For videos: copy a video model (for example Wan2.2-TI2V-5B: "Which Files to Download?") into the same folder, describe the scene and the motion and press "Create Video". A 2-second video takes several minutes; the menu of an image has "Animate in a Video".
 
-The Images view uses **ruscadiffusion-engine**, that is stable-diffusion.cpp, an external component under the MIT license. It does not use the network.
+The Images and Videos views use **ruscadiffusion-engine**, that is stable-diffusion.cpp, an external component under the MIT license. It does not use the network.
 
 ## 🌐 RuscaTranslator
 

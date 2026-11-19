@@ -109,8 +109,14 @@ DEFAULTS = {
     "img_te_device": "",
     "img_threads": rusca_diffusion.physical_cores(), "img_low_memory": False,
     "img_metadata": False,
+    # Video (diffusion_view.VideoPage): stesse regole; il motore (img_gpu,
+    # img_device, img_te_device, img_threads, img_low_memory, img_metadata)
+    # e le cartelle aggiunte (img_folders) sono in comune con le immagini.
+    "vid_model": "", "vid_quality": "normal", "vid_aspect": "landscape",
+    "vid_length": "short", "vid_negative": "", "vid_steps": 0, "vid_cfg": 0.0,
+    "vid_side": 0, "vid_sampler": "", "vid_seed": -1,
 }
-VIEWS = ("chat", "images")
+VIEWS = ("chat", "images", "videos")
 THEMES = ("system", "light", "dark")         # ordine delle voci nel menu
 
 
@@ -694,9 +700,11 @@ class RuscaLLamaWindow(FontSizeMixin, Adw.ApplicationWindow):
                          ("engine-restart", self.restart_engine),
                          ("show-log", self.show_log),
                          ("show-image-log", self.show_image_log),
+                         ("show-video-log", self.show_video_log),
                          ("image-from-answer", self.image_from_answer),
                          ("view-chat", lambda: self.show_view("chat")),
                          ("view-images", lambda: self.show_view("images")),
+                         ("view-videos", lambda: self.show_view("videos")),
                          ("stop", self.stop_current),
                          ("toggle-sidebar", self.toggle_sidebar),
                          ("shortcuts", self.show_shortcuts),
@@ -708,7 +716,7 @@ class RuscaLLamaWindow(FontSizeMixin, Adw.ApplicationWindow):
     # ── interfaccia ───────────────────────────────────────────────────────
     def _build_ui(self):
         header = Adw.HeaderBar()
-        # Due viste, Chat e Immagini (specifiche, sezione 3.2): il selettore
+        # Tre viste, Chat, Immagini e Video (specifiche, sezione 3.2): il selettore
         # sta nella barra del titolo; nelle finestre strette scende in basso.
         self.views = Adw.ViewStack(vexpand=True)
         self.switcher = Adw.ViewSwitcher(stack=self.views,
@@ -728,6 +736,7 @@ class RuscaLLamaWindow(FontSizeMixin, Adw.ApplicationWindow):
         eng.append(_("engine_stop"), "win.engine-stop")
         eng.append(_("engine_log"), "win.show-log")
         eng.append(_("img_log"), "win.show-image-log")
+        eng.append(_("vid_log"), "win.show-video-log")
         menu.append_section(None, eng)
         app_menu = Gio.Menu()
         app_menu.append(_("shortcuts"), "win.shortcuts")
@@ -771,6 +780,13 @@ class RuscaLLamaWindow(FontSizeMixin, Adw.ApplicationWindow):
         self.views.add_titled_with_icon(self.images, "images", _("view_images"),
                                         "image-x-generic-symbolic")
 
+        # Video: stesso motore; una generazione per volta fra le due viste.
+        self.videos = diffusion_view.VideoPage(self, _)
+        self.views.add_titled_with_icon(self.videos, "videos", _("view_videos"),
+                                        "camera-video-symbolic")
+        self.images.peers = [self.videos]
+        self.videos.peers = [self.images]
+
         self.toasts = Adw.ToastOverlay(child=self.views)
         self.switcher_bar = Adw.ViewSwitcherBar(stack=self.views)
         view = Adw.ToolbarView(content=self.toasts)
@@ -783,6 +799,7 @@ class RuscaLLamaWindow(FontSizeMixin, Adw.ApplicationWindow):
         self.sidebar_stack = Gtk.Stack(transition_type=Gtk.StackTransitionType.CROSSFADE)
         self.sidebar_stack.add_named(self._build_sidebar(), "chat")
         self.sidebar_stack.add_named(self.images.settings_page, "images")
+        self.sidebar_stack.add_named(self.videos.settings_page, "videos")
         sidebar = Adw.ToolbarView(content=self.sidebar_stack)
         sidebar.add_top_bar(Adw.HeaderBar(show_title=False))
         self.split = Adw.OverlaySplitView(content=view, sidebar=sidebar,
@@ -1526,15 +1543,25 @@ class RuscaLLamaWindow(FontSizeMixin, Adw.ApplicationWindow):
         self.new_btn.set_visible(name == "chat")
         if name != self.cfg["view"]:
             self._set("view", name)
-        (self.images.focus if name == "images" else self.input.grab_focus)()
+        page = self._diffusion_page(name)
+        if page is not None:
+            page.sync_shared()           # il motore e' in comune fra le due viste
+            page.focus()
+        else:
+            self.input.grab_focus()
+
+    def _diffusion_page(self, name=None):
+        name = name or self.views.get_visible_child_name()
+        return {"images": self.images, "videos": self.videos}.get(name)
 
     def show_view(self, name):
         self.views.set_visible_child_name(name)
 
     def stop_current(self):
         """Esc: ferma cio' che si sta facendo nella vista in primo piano."""
-        if self.views.get_visible_child_name() == "images":
-            self.images.stop()
+        page = self._diffusion_page()
+        if page is not None:
+            page.stop()
         else:
             self.stop_generation()
 
@@ -1543,6 +1570,17 @@ class RuscaLLamaWindow(FontSizeMixin, Adw.ApplicationWindow):
         messaggio della chat (serve un modello con la Visione)."""
         self._add_attachment(path)
         self.show_view("chat")
+
+    def animate_image(self, path, prompt=""):
+        """Un'immagine della vista Immagini diventa l'immagine di partenza di
+        un video."""
+        self.videos.set_start_image(path)
+        if prompt and not self.videos._prompt():
+            self.videos.set_prompt(prompt)
+        self.show_view("videos")
+        if not self.videos._start_mode():
+            # Il modello scelto non parte da un'immagine (o non c'e').
+            self.toasts.add_toast(Adw.Toast(title=_("vid_start_unused")))
 
     def image_from_answer(self):
         """Usa una risposta come descrizione di un'immagine: il primo blocco
@@ -1576,9 +1614,13 @@ class RuscaLLamaWindow(FontSizeMixin, Adw.ApplicationWindow):
     def show_image_log(self):
         self.show_log(self.images.log_lines, _("img_log"))
 
+    def show_video_log(self):
+        self.show_log(self.videos.log_lines, _("vid_log"))
+
     def show_shortcuts(self):
         group = Adw.PreferencesGroup()
         for title, accel in ((_("view_chat"), "<Alt>1"), (_("view_images"), "<Alt>2"),
+                             (_("view_videos"), "<Alt>3"),
                              (_("send") + " / " + _("img_generate"), "Return"),
                              (_("newline"), "<Shift>Return"),
                              (_("stop"), "Escape"), (_("new_chat"), "<Control>n"),
@@ -1612,8 +1654,12 @@ class RuscaLLamaWindow(FontSizeMixin, Adw.ApplicationWindow):
     def _on_close(self, *_a):
         # Le immagini non salvate stanno nella cache e si cancellano alla
         # chiusura: prima si chiede (specifiche, sezione 3.8).
-        if self.images.unsaved() and not getattr(self, "_closing", False):
-            dialog = Adw.AlertDialog(heading=_("img_close_title"), body=_("img_close_body"))
+        if (self.images.unsaved() or self.videos.unsaved()) and \
+                not getattr(self, "_closing", False):
+            if self.videos.unsaved():
+                dialog = Adw.AlertDialog(heading=_("vid_close_title"), body=_("vid_close_body"))
+            else:
+                dialog = Adw.AlertDialog(heading=_("img_close_title"), body=_("img_close_body"))
             dialog.add_response("cancel", _("cancel"))
             dialog.add_response("close", _("img_close_confirm"))
             dialog.set_response_appearance("close", Adw.ResponseAppearance.DESTRUCTIVE)
@@ -1627,6 +1673,7 @@ class RuscaLLamaWindow(FontSizeMixin, Adw.ApplicationWindow):
             dialog.connect("response", answered)
             dialog.present(self)
             return True
+        self.videos.shutdown()
         self.images.shutdown()
         self.stop_generation()
         self.engine.stop(wait=True)
@@ -1665,6 +1712,7 @@ class RuscaLLamaApp(Adw.Application):
                                ("win.new-chat", ["<Control>n"]), ("win.attach", ["<Control>o"]),
                                ("win.save-md", ["<Control>s"]), ("win.stop", ["Escape"]),
                                ("win.view-chat", ["<Alt>1"]), ("win.view-images", ["<Alt>2"]),
+                               ("win.view-videos", ["<Alt>3"]),
                                ("win.toggle-sidebar", ["F9"]),
                                ("win.zoom-in", ["<Control>plus", "<Control>equal", "<Control>KP_Add"]),
                                ("win.zoom-out", ["<Control>minus", "<Control>KP_Subtract"]),

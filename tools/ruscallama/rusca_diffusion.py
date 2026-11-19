@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 # rusca_diffusion.py — RuscaLinux OS Tools 1.99.3 — GPL-3.0-or-later
 #
-# Generazione delle immagini di RuscaLLama con ruscadiffusion-engine (sd-cli,
-# cioe' stable-diffusion.cpp: software esterno, licenza MIT).
+# Generazione delle immagini e dei video di RuscaLLama con
+# ruscadiffusion-engine (sd-cli, cioe' stable-diffusion.cpp: software
+# esterno, licenza MIT).
 #
 # Un'immagine (o un gruppo di immagini con lo stesso prompt) e' un processo:
 # sd-cli parte, carica il modello, scrive le immagini PNG ed esce. Non resta
@@ -19,15 +20,22 @@
 # I file si riconoscono dal nome e, per i .safetensors, dai nomi dei tensori
 # scritti nell'intestazione (si legge solo l'intestazione, mai i pesi).
 #
+# I modelli per i video (Wan 2.1 e 2.2, HunyuanVideo 1.5, LingBot-Video) sono
+# cartelle come le altre, nelle stesse cartelle dei modelli: si riconoscono
+# dal nome (PROFILES, "video": True) e li mostra solo la vista Video. sd-cli
+# li usa con -M vid_gen e scrive un video AVI in Motion JPEG.
+#
 # Privacy e sicurezza (specifiche, sezione 11):
 #   * nessun modulo di rete;
 #   * sd-cli e' avviato con percorso assoluto e lista di argomenti, mai
 #     tramite shell; il prompt non e' un argomento (lo vedrebbe chiunque
 #     con ps) ma un file (--prompt-file) nella cartella di lavoro;
 #   * cartella di lavoro ~/.cache/ruscallama/images con permessi 0700:
-#     prompt, anteprime e immagini generate. Si cancella a ogni avvio e alla
+#     prompt, anteprime, immagini e video generati, immagine di partenza di
+#     un video (una copia). Si cancella a ogni avvio e alla
 #     chiusura: restano solo le immagini che l'utente salva altrove.
 import collections
+import dataclasses
 import json
 import os
 import random
@@ -54,6 +62,8 @@ WORK_DIR = os.path.join(GLib.get_user_cache_dir(), "ruscallama", "images")
 MODEL_EXTENSIONS = (".safetensors", ".sft", ".gguf", ".ckpt")
 MAX_HEADER = 64 * 1024 * 1024          # intestazione .safetensors piu' grande: file strano
 MAX_COUNT = 4                          # immagini per volta
+# Durata di un video, in secondi (impostazione Durata della vista Video).
+LENGTHS = {"short": 2, "normal": 3, "long": 5}
 SAMPLERS = ("euler", "euler_a", "dpm++2m", "dpm++2s_a", "heun", "lcm", "ddim_trailing")
 QUALITY = {"fast": 0.6, "normal": 1.0, "detailed": 1.6}     # moltiplica i passi
 ASPECTS = {"square": 1.0, "landscape": 1.5, "portrait": 1 / 1.5}
@@ -130,16 +140,22 @@ def clean_work_dir():
 _W = r"(^|[^a-z])"                     # inizio di parola
 _E = r"([^a-z]|$)"                     # fine di parola
 _ROLE_RULES = (
-    ("skip", re.compile(_W + r"(taesd|taef1|taef2|tae|lora|controlnet|esrgan|upscaler?|"
-                        r"embedding|pulid|photomaker|adetailer)" + _E)),
+    ("skip", re.compile(_W + r"(taesd|taef1|taef2|taew\d(_\d)?|taehv|tae|lora|controlnet|"
+                        r"esrgan|upscaler?|embedding|pulid|photomaker|adetailer)" + _E)),
     ("uncond-diffusion-model", re.compile(_W + r"uncond")),
+    # Wan 2.2 A14B: due modelli, HighNoise (i primi passi) e LowNoise (il
+    # modello principale, --diffusion-model).
+    ("high-noise-diffusion-model", re.compile(r"high[-_ ]?noise")),
+    # Wan 2.1 I2V: il codificatore dell'immagine di partenza.
+    ("clip_vision", re.compile(r"clip[-_ ]?vision")),
     ("embeddings-connectors", re.compile(r"connector")),
     ("tokenizer", re.compile(_W + r"tokenizer")),
     ("llm_vision", re.compile(_W + r"mmproj")),
     ("vae", re.compile(_W + r"(vae|ae)" + _E)),
     ("clip_l", re.compile(r"clip[_-]?(l|vit[_-]?l)" + _E)),
     ("clip_g", re.compile(r"clip[_-]?(g|vit[_-]?(g|bigg))" + _E)),
-    ("t5xxl", re.compile(_W + r"(u?mt5|t5[_-]?(xxl|v1|base)?)" + _E)),
+    # umt5-xxl e' il codificatore di Wan, byt5 il secondo di HunyuanVideo.
+    ("t5xxl", re.compile(_W + r"(u?mt5[_-]?(xxl)?|by?t5|t5[_-]?(xxl|v1|base)?)" + _E)),
     # Codificatori con un nome che si confonderebbe con il modello.
     ("llm", re.compile(r"ling[_-]?mini|text[_-]?encoder|ovis[_-]?2|ministral|gpt[_-]?oss")),
     # Modelli di diffusione con il nome di un modello linguistico dentro
@@ -149,9 +165,10 @@ _ROLE_RULES = (
 )
 # Ruolo -> opzione di sd-cli (--<ruolo>), nell'ordine in cui si passano.
 COMPONENT_ROLES = ("vae", "clip_l", "clip_g", "t5xxl", "llm", "llm_vision", "tokenizer",
-                   "embeddings-connectors", "uncond-diffusion-model")
+                   "embeddings-connectors", "uncond-diffusion-model",
+                   "high-noise-diffusion-model", "clip_vision")
 # Questi da soli non fanno di una cartella un modello in piu' file.
-_ACCESSORY_ROLES = ("llm_vision", "tokenizer")
+_ACCESSORY_ROLES = ("llm_vision", "tokenizer", "clip_vision")
 
 
 def file_role(name):
@@ -257,6 +274,11 @@ class Model:
     def guess_family(self):
         return recommended(self)["family"]
 
+    @property
+    def video(self):
+        """True per un modello che genera video (vista Video)."""
+        return recommended(self)["video"]
+
     def missing(self):
         """Componenti che mancano a un modello in piu' file (VAE,
         codificatore...), per i modelli di cui si sa che cosa serve. Un file
@@ -354,10 +376,55 @@ def find_models(extra_folders=()):
 #           cambia (con meno passi l'immagine si rovina, con piu' non migliora)
 def _p(family, steps=20, cfg=None, sampler="", extra=(), fixed=False, side=1024):
     return {"family": family, "side": side, "steps": steps, "cfg": cfg,
-            "sampler": sampler, "extra": list(extra), "fixed": fixed}
+            "sampler": sampler, "extra": list(extra), "fixed": fixed,
+            "video": False, "fps": 0, "init": "", "high_steps": 0, "negative": ""}
+
+
+# Il prompt negativo predefinito di Wan (dal codice di Wan, in cinese come lo
+# ha addestrato Alibaba; lo usano anche gli esempi di stable-diffusion.cpp):
+# colori sgargianti, sovraesposizione, immagine statica, dettagli sfocati,
+# sottotitoli, peggiore qualita', artefatti JPEG, mani e volti deformi, dita
+# fuse, sfondo disordinato, tre gambe, folla, camminare all'indietro.
+WAN_NEGATIVE = ("色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，"
+                "最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，"
+                "画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，"
+                "杂乱的背景，三条腿，背景人很多，倒着走")
+
+
+def _v(family, steps=20, cfg=6.0, sampler="euler", extra=("--flow-shift", "3"), fps=16,
+       init="", high_steps=0, negative="", side=640):
+    """Profilo di un modello per i video. fps: fotogrammi al secondo con cui
+    il modello e' addestrato (Wan 2.1 16, Wan 2.2 TI2V 5B 24). init:
+    "required" se serve un'immagine di partenza (I2V), "optional" se si puo'
+    dare (TI2V), "" se non si usa. side 640: circa 480p, la risoluzione che
+    una scheda di casa regge (Wan ne fa anche 720p, con tempi molto piu'
+    lunghi)."""
+    return dict(_p(family, steps, cfg, sampler, extra, side=side), video=True, fps=fps,
+                init=init, high_steps=high_steps, negative=negative)
+
+
+# Modelli per i video che sd-cli sa usare ma che chiedono un ingresso che
+# RuscaLLama non ha (audio, video da modificare, ultimo fotogramma): si
+# mostrano nella vista Video con un avviso.
+_UNSUPPORTED_VIDEO = re.compile(r"(^|[^a-z])(s2v|vace|flf2v|animate|fun)([^a-z]|$)")
 
 
 PROFILES = (
+    # ── video (docs/models/wan.md, hunyuan_video.md, lingbot_video.md) ──
+    # Wan 2.2 A14B: 10 passi del modello LowNoise e 8 del HighNoise, CFG 3.5.
+    (r"(^|[^a-z])wan.*2[._]?2.*(a14b|14b).*(i2v)", _v("wan22_14b", 10, 3.5, init="required",
+                                                       high_steps=8, negative=WAN_NEGATIVE)),
+    (r"(^|[^a-z])wan.*2[._]?2.*(a14b|14b)", _v("wan22_14b", 10, 3.5, high_steps=8,
+                                                negative=WAN_NEGATIVE)),
+    (r"(^|[^a-z])wan.*2[._]?2.*(5b|ti2v)|ti2v", _v("wan22_5b", fps=24, init="optional",
+                                                   negative=WAN_NEGATIVE)),
+    (r"(^|[^a-z])wan.*i2v", _v("wan21_i2v", init="required", negative=WAN_NEGATIVE)),
+    (r"(^|[^a-z])wan[-_ .]?\d|(^|[^a-z])wan([^a-z]|$)", _v("wan21", negative=WAN_NEGATIVE)),
+    (r"hunyuan[-_ ]?video.*i2v", _v("hunyuanvideo", 20, 6.0, extra=["--vae-tiling"], fps=24,
+                                    init="required")),
+    (r"hunyuan[-_ ]?video", _v("hunyuanvideo", 20, 6.0, extra=["--vae-tiling"], fps=24)),
+    (r"lingbot", _v("lingbot", 20, 3.0, sampler="", extra=())),
+    # ── immagini ──
     (r"flux[-_.]?3.*base", _p("flux3", 20, 3.5, "euler")),
     (r"flux[-_.]?3", _p("flux3", 16, 1.0, "euler", fixed=True)),
     (r"flux[-_.]?2.*klein.*base", _p("flux2", 20, 4.0)),
@@ -420,7 +487,16 @@ def recommended(model):
     if not (model.full and model.family in ("sd1", "sdxl")):
         for rule, profile in PROFILES:
             if rule.search(low):
-                return dict(profile, extra=list(profile["extra"]))
+                profile = dict(profile, extra=list(profile["extra"]))
+                if profile["video"] and _UNSUPPORTED_VIDEO.search(low):
+                    profile["family"] = "unsupported"
+                # Wan 2.2 A14B riconosciuto dal secondo modello, non dal nome.
+                if profile["family"] in ("wan21", "wan21_i2v") and model.parts.get(
+                        "high-noise-diffusion-model"):
+                    return recommended_for("wan22_14b", profile["init"])
+                return profile
+    if model.parts.get("high-noise-diffusion-model"):
+        return recommended_for("wan22_14b")
     family = model.family
     if not family:
         if model.parts.get("llm"):
@@ -442,9 +518,21 @@ def recommended(model):
     return profile
 
 
+def recommended_for(family, init=""):
+    """Il profilo di una famiglia di PROFILES (per Wan 2.2 A14B riconosciuto
+    dal file HighNoise)."""
+    found = [p for _, p in PROFILES if p["family"] == family]
+    profile = next((p for p in found if p["init"] == init), found[0])
+    return dict(profile, extra=list(profile["extra"]))
+
+
 # Che cosa serve, oltre al modello di diffusione, ai modelli che si
 # distribuiscono in piu' file (docs/models/ di stable-diffusion.cpp).
 REQUIRED_PARTS = {
+    "wan21": ("vae", "t5xxl"), "wan21_i2v": ("vae", "t5xxl", "clip_vision"),
+    "wan22_5b": ("vae", "t5xxl"),
+    "wan22_14b": ("vae", "t5xxl", "high-noise-diffusion-model"),
+    "hunyuanvideo": ("vae", "llm", "t5xxl"), "lingbot": ("vae", "llm"),
     "zimage": ("vae", "llm"), "ernie": ("vae", "llm"), "flux2": ("vae", "llm"),
     "flux3": ("vae", "llm"), "qwen": ("vae", "llm"), "chroma": ("vae", "t5xxl"),
     "flux": ("vae", "clip_l", "t5xxl"),
@@ -471,11 +559,31 @@ GUIDE = (
          "https://huggingface.co/Comfy-Org/z_image_turbo/tree/main/split_files/vae"))},
 )
 
+# Modelli per i video consigliati (vista Video, «Quali file scaricare?»).
+VIDEO_GUIDE = (
+    {"name": "Wan2.2-TI2V-5B", "desc": "vid_guide_wan22", "files": (
+        ("model", "Wan2.2-TI2V-5B-Q5_K_M.gguf",
+         "https://huggingface.co/QuantStack/Wan2.2-TI2V-5B-GGUF/tree/main"),
+        ("t5xxl", "umt5-xxl-encoder-Q8_0.gguf",
+         "https://huggingface.co/city96/umt5-xxl-encoder-gguf/tree/main"),
+        ("vae", "wan2.2_vae.safetensors",
+         "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/tree/main/split_files/vae"))},
+    {"name": "Wan2.1-T2V-1.3B", "desc": "vid_guide_wan21", "files": (
+        ("model", "wan2.1_t2v_1.3B_fp16.safetensors",
+         "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/tree/main/"
+         "split_files/diffusion_models"),
+        ("t5xxl", "umt5-xxl-encoder-Q8_0.gguf",
+         "https://huggingface.co/city96/umt5-xxl-encoder-gguf/tree/main"),
+        ("vae", "wan_2.1_vae.safetensors",
+         "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/tree/main/split_files/vae"))},
+)
+
 # Cartelle dei modelli della chat: chi copia li' un modello per immagini non
 # lo trova nella vista Immagini.
 CHAT_MODEL_DIRS = ("/usr/share/ruscallama/models",
                    os.path.join(GLib.get_user_data_dir(), "ruscallama", "models"))
 _DIFFUSION_HINT = re.compile(r"(z|qwen|ernie|ovis|ming)[-_ ]?image|flux|chroma|sd[-_]?xl|"
+                             r"(^|[^a-z])wan[-_ .]?\d|hunyuan[-_ ]?video|lingbot|umt5|"
                              r"stable[-_ ]?diffusion|(^|[^a-z])sd[-_ ]?(1[._]?5|3)")
 
 
@@ -527,28 +635,55 @@ class Job:
     count: int = 1
     sampler: str = ""
     extra: list = field(default_factory=list)
+    # Solo per i video:
+    video: bool = False
+    frames: int = 0                    # fotogrammi (4n+1, come vuole Wan)
+    fps: int = 0
+    init_image: str = ""               # immagine di partenza (I2V), o ""
+    high_steps: int = 0                # passi del modello HighNoise (Wan 2.2 A14B)
 
 
-def make_job(model, prompt, settings):
-    """Il lavoro da fare, dalle impostazioni di RuscaLLama (chiavi img_*):
-    0 o "" vuol dire «consigliato per il modello»."""
+def video_frames(seconds, fps):
+    """Fotogrammi per una durata: 4n+1, il numero che vogliono i VAE video
+    (Wan comprime 4 fotogrammi in uno, piu' il primo): 2 s a 16 fps = 33."""
+    return 4 * max(1, round(seconds * fps / 4)) + 1
+
+
+def make_job(model, prompt, settings, prefix="img_", init_image=""):
+    """Il lavoro da fare, dalle impostazioni di RuscaLLama (chiavi img_* per
+    le immagini, vid_* per i video): 0 o "" vuol dire «consigliato per il
+    modello». init_image: immagine di partenza di un video."""
+    def get(key, default=None):
+        return settings.get(prefix + key, default)
+
     rec = recommended(model)
-    side = int(settings.get("img_side") or rec["side"])
-    width, height = image_size(side, settings.get("img_aspect", "square"))
-    steps = int(settings.get("img_steps") or 0)
+    side = int(get("side") or rec["side"])
+    width, height = image_size(side, get("aspect", "square"))
+    steps = int(get("steps") or 0)
     if steps <= 0:
-        steps = recommended_steps(rec, settings.get("img_quality"))
-    cfg = float(settings.get("img_cfg") or 0) or rec["cfg"]
-    seed = int(settings.get("img_seed", -1))
+        steps = recommended_steps(rec, get("quality"))
+    cfg = float(get("cfg") or 0) or rec["cfg"]
+    seed = int(get("seed", -1))
     if seed < 0:
         seed = random.randint(0, 2 ** 31 - 1)
-    sampler = settings.get("img_sampler") or ""
+    sampler = get("sampler") or ""
     if sampler not in SAMPLERS:
         sampler = rec["sampler"]
-    return Job(prompt=prompt.strip(), negative=(settings.get("img_negative") or "").strip(),
-               width=width, height=height, steps=steps, cfg=cfg, seed=seed,
-               count=max(1, min(MAX_COUNT, int(settings.get("img_count") or 1))),
-               sampler=sampler, extra=rec["extra"])
+    negative = (get("negative") or "").strip()
+    job = Job(prompt=prompt.strip(), negative=negative, width=width, height=height,
+              steps=steps, cfg=cfg, seed=seed,
+              count=max(1, min(MAX_COUNT, int(get("count") or 1))),
+              sampler=sampler, extra=rec["extra"])
+    if rec["video"]:
+        job.video, job.count = True, 1
+        job.fps = rec["fps"] or 16
+        job.frames = video_frames(LENGTHS.get(get("length"), LENGTHS["short"]), job.fps)
+        job.negative = negative or rec["negative"]
+        job.init_image = init_image if rec["init"] else ""
+        if rec["high_steps"]:
+            job.high_steps = (rec["high_steps"] if steps == rec["steps"] else
+                              max(1, round(rec["high_steps"] * steps / rec["steps"])))
+    return job
 
 
 # ── schede grafiche ─────────────────────────────────────────────────────────
@@ -616,15 +751,39 @@ def build_command(binary, model, job, run_dir, threads=None, gpu=True, device=No
     prompt_file = os.path.join(run_dir, "prompt.txt")
     with open(prompt_file, "w", encoding="utf-8") as f:
         f.write(job.prompt)
-    cmd = [binary] + model.args() + [
+    cmd = [binary]
+    if job.video:
+        cmd += ["-M", "vid_gen"]
+    cmd += model.args() + [
         "--prompt-file", prompt_file,
         "-W", str(job.width), "-H", str(job.height),
         "--steps", str(job.steps),
-        "-s", str(job.seed), "-b", str(job.count),
-        "-t", str(max(1, int(threads or physical_cores()))),
-        "-o", os.path.join(run_dir, "image_%03d.png"),
-        "--preview", "proj", "--preview-path", os.path.join(run_dir, "preview.png"),
-        "--preview-interval", "1"]
+        "-s", str(job.seed),
+        "-t", str(max(1, int(threads or physical_cores())))]
+    if job.video:
+        # Il video e' un AVI in Motion JPEG (sd-cli e' compilato senza
+        # WebM); l'anteprima di un video e' anch'essa un AVI, dei
+        # fotogrammi ancora rumorosi.
+        cmd += ["--video-frames", str(job.frames), "--fps", str(job.fps),
+                "-o", os.path.join(run_dir, "video.avi"),
+                "--preview", "proj", "--preview-path", os.path.join(run_dir, "preview.avi"),
+                "--preview-interval", "1"]
+        if job.init_image:
+            # Il motore ritaglia l'immagine al formato del video e la
+            # ridimensiona; lanczos invece del predefinito "nearest", che
+            # su una foto grande lascia scalini (docs/guides/image_preprocessing.md).
+            cmd += ["-i", job.init_image, "--image-preprocess",
+                    "target=init,mode=crop-resize,filter=lanczos,antialias=true"]
+        if job.high_steps and model.parts.get("high-noise-diffusion-model"):
+            cmd += ["--high-noise-steps", str(job.high_steps)]
+            if job.cfg is not None:
+                cmd += ["--high-noise-cfg-scale", f"{job.cfg:g}"]
+            if job.sampler:
+                cmd += ["--high-noise-sampling-method", job.sampler]
+    else:
+        cmd += ["-b", str(job.count), "-o", os.path.join(run_dir, "image_%03d.png"),
+                "--preview", "proj", "--preview-path", os.path.join(run_dir, "preview.png"),
+                "--preview-interval", "1"]
     if job.negative:
         negative_file = os.path.join(run_dir, "negative.txt")
         with open(negative_file, "w", encoding="utf-8") as f:
@@ -636,7 +795,7 @@ def build_command(binary, model, job, run_dir, threads=None, gpu=True, device=No
         cmd += ["--sampling-method", job.sampler]
     cmd += list(job.extra)
     if low_memory:
-        cmd += ["--vae-tiling", "--offload-to-cpu"]
+        cmd += [o for o in ("--vae-tiling", "--offload-to-cpu") if o not in cmd]
     if not metadata:
         cmd.append("--disable-image-metadata")
     env = os.environ.copy()
@@ -670,15 +829,54 @@ def parse_progress(chunk):
     return found
 
 
-def collect_images(run_dir):
-    """Immagini scritte da sd-cli, nell'ordine."""
+def collect_images(run_dir, video=False):
+    """Immagini (o il video) scritte da sd-cli, nell'ordine."""
+    prefix, ext = ("video", ".avi") if video else ("image_", ".png")
     try:
         names = sorted(n for n in os.listdir(run_dir)
-                       if n.startswith("image_") and n.endswith(".png"))
+                       if n.startswith(prefix) and n.endswith(ext))
     except OSError:
         return []
     return [os.path.join(run_dir, n) for n in names
             if os.path.getsize(os.path.join(run_dir, n)) > 0]
+
+
+# ── video AVI ───────────────────────────────────────────────────────────────
+# sd-cli scrive i video come AVI in Motion JPEG (examples/common/media_io.cpp):
+# un'intestazione, poi la lista "movi" con un pezzo "00dc" per fotogramma,
+# ognuno un'immagine JPEG intera. Per le miniature e per l'anteprima basta
+# prenderne uno: non serve un decodificatore video.
+def avi_frames(data):
+    """I fotogrammi JPEG (byte) di un AVI Motion JPEG, nell'ordine."""
+    start = data.find(b"movi")
+    if start < 0 or data[:4] != b"RIFF":
+        return []
+    frames, pos = [], start + 4
+    while pos + 8 <= len(data):
+        fourcc = data[pos:pos + 4]
+        (size,) = struct.unpack("<I", data[pos + 4:pos + 8])
+        if fourcc in (b"idx1", b"LIST") or pos + 8 + size > len(data):
+            break
+        chunk = data[pos + 8:pos + 8 + size]
+        if fourcc[2:] == b"dc" and chunk[:2] == b"\xff\xd8":
+            frames.append(chunk)
+        pos += 8 + size + (size & 1)
+    return frames
+
+
+def video_frame(source, where=0.5):
+    """Un fotogramma JPEG di un video (percorso o byte): where 0 il primo,
+    0.5 quello a meta', 1 l'ultimo. None se non si legge."""
+    if isinstance(source, str):
+        try:
+            with open(source, "rb") as f:
+                source = f.read()
+        except OSError:
+            return None
+    frames = avi_frames(source)
+    if not frames:
+        return None
+    return frames[min(len(frames) - 1, int(where * (len(frames) - 1) + 0.5))]
 
 
 # ── generazione ─────────────────────────────────────────────────────────────
@@ -686,7 +884,8 @@ class Generator:
     """Una generazione per volta. Le callback arrivano sempre nel thread
     dell'interfaccia (GLib.idle_add):
         on_progress(stage, step, steps)   "load" | "sample" | "decode"
-        on_preview(data)                  byte PNG dell'anteprima
+        on_preview(data)                  byte PNG (JPEG per un video)
+                                          dell'anteprima
         on_log(line)                      righe scritte dal motore
         on_done(error, images, job)       error: None, "cancelled" o
                                           DiffusionError; images: percorsi
@@ -724,6 +923,10 @@ class Generator:
             raise DiffusionError("img_err_no_model", missing[0])
         if not job.prompt:
             raise DiffusionError("img_err_no_prompt")
+        if job.video and recommended(model)["family"] == "unsupported":
+            raise DiffusionError("vid_err_unsupported")
+        if job.video and recommended(model)["init"] == "required" and not job.init_image:
+            raise DiffusionError("vid_err_need_image")
         self._cancel.clear()
         self._thread = threading.Thread(
             target=self._work, args=(binary, model, job, threads, gpu, gpu_device,
@@ -761,6 +964,14 @@ class Generator:
             # Una cartella per generazione: le immagini restano li' finche'
             # la finestra le mostra.
             run_dir = tempfile.mkdtemp(prefix="run-", dir=WORK_DIR)
+            if job.init_image:
+                # Una copia nella cartella di lavoro: il motore legge solo li'
+                # (e nelle cartelle dei modelli), non in tutta la home.
+                ext = os.path.splitext(job.init_image)[1].lower()
+                start = os.path.join(run_dir, "start" + (ext if ext in (
+                    ".png", ".jpg", ".jpeg", ".webp", ".bmp") else ".png"))
+                shutil.copyfile(job.init_image, start)
+                job = dataclasses.replace(job, init_image=start)
             device = te = None
             if gpu and (gpu_device or (te_device and te_device != "cpu")):
                 if devices is None:
@@ -775,8 +986,9 @@ class Generator:
                                         f"{te or 'scheda non trovata, sulla stessa'}")
             cmd, env = build_command(binary, model, job, run_dir, threads, gpu, device,
                                      low_memory, metadata, te)
-            code, tail = self._run(cmd, env, os.path.join(run_dir, "preview.png"), job)
-            images = collect_images(run_dir)
+            preview = os.path.join(run_dir, "preview.avi" if job.video else "preview.png")
+            code, tail = self._run(cmd, env, preview, job)
+            images = collect_images(run_dir, job.video)
             if code != 0 or not images:
                 raise DiffusionError("img_err_engine", tail)
         except _Cancelled:
@@ -787,7 +999,7 @@ class Generator:
             error = DiffusionError("img_err_engine", str(e))
         finally:
             if run_dir:
-                for name in ("prompt.txt", "negative.txt", "preview.png"):
+                for name in ("prompt.txt", "negative.txt", "preview.png", "preview.avi"):
                     try:
                         os.unlink(os.path.join(run_dir, name))
                     except OSError:
@@ -843,7 +1055,15 @@ class Generator:
                         data = f.read()
                 except OSError:
                     continue
-                if len(data) == st.st_size and data[:8] == b"\x89PNG\r\n\x1a\n":
+                if len(data) != st.st_size:
+                    continue
+                if preview_path.endswith(".avi"):
+                    # Anteprima di un video: il fotogramma a meta'.
+                    data = video_frame(data) if data[:4] == b"RIFF" else None
+                    if data:
+                        last = stamp
+                        self._emit(self.on_preview, data)
+                elif data[:8] == b"\x89PNG\r\n\x1a\n":
                     last = stamp
                     self._emit(self.on_preview, data)
 

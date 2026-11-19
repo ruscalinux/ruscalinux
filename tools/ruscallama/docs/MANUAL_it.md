@@ -2,7 +2,7 @@
 
 **Versione** 1.99.3 · **Autore** Nunzio Curcuruto · **Distribuzione** RuscaLinux ([ruscalinux.org](https://www.ruscalinux.org/)) · **Licenza** GNU GPL v3 o successiva
 
-RuscaLLama è una chat con modelli linguistici che girano **interamente su questo computer**. Il modello viene eseguito da **ruscallama-engine**, cioè llama.cpp: un componente esterno con licenza MIT, compilato per RuscaLinux. La vista **Immagini** crea immagini da una descrizione con **ruscadiffusion-engine**, cioè stable-diffusion.cpp, anch’esso con licenza MIT (sezione 7).
+RuscaLLama è una chat con modelli linguistici che girano **interamente su questo computer**. Il modello viene eseguito da **ruscallama-engine**, cioè llama.cpp: un componente esterno con licenza MIT, compilato per RuscaLinux. La vista **Immagini** crea immagini da una descrizione con **ruscadiffusion-engine**, cioè stable-diffusion.cpp, anch’esso con licenza MIT (sezione 7); la vista **Video** crea brevi video con lo stesso motore (sezione 8).
 
 Il motore Markdown comune include un componente esterno: la regola dell'evidenziato `==testo==`, porting del plugin [markdown-it-mark](https://github.com/markdown-it/markdown-it-mark) (licenza MIT, © Vitaly Puzrin e Alex Kocharin; struttura in Python da markdown-it-py, © ExecutableBookProject), nel file a sé `markdown_it_mark.py`.
 
@@ -12,7 +12,7 @@ Il motore Markdown comune include un componente esterno: la regola dell'evidenzi
 
 - RuscaLinux o Debian Stable, GNOME;
 - Python ≥ 3.10, GTK ≥ 4.18, libadwaita ≥ 1.7, GtkSourceView 5;
-- il pacchetto `ruscallama-engine`, e `ruscadiffusion-engine` per le immagini;
+- il pacchetto `ruscallama-engine`, e `ruscadiffusion-engine` per le immagini e i video;
 - almeno un modello in formato **GGUF**.
 
 Quanta memoria serve dipende dal modello: come regola pratica, un po' più della dimensione del file GGUF, più la memoria del contesto.
@@ -31,7 +31,7 @@ Puoi anche scegliere un file in qualunque cartella con **Scegli un file…**. Ac
 
 ## 3. La finestra
 
-- **Barra del titolo**: a sinistra **+** (nuova conversazione); al centro le due viste, **Chat** e **Immagini** (nelle finestre strette scendono in basso); a destra il pulsante del pannello delle impostazioni e il menu principale.
+- **Barra del titolo**: a sinistra **+** (nuova conversazione); al centro le tre viste, **Chat**, **Immagini** e **Video** (nelle finestre strette scendono in basso); a destra il pulsante del pannello delle impostazioni e il menu principale.
 - **Conversazione**: le risposte compaiono mentre vengono generate. I blocchi di codice sono evidenziati e hanno un pulsante per copiarli. Ogni risposta ha **Copia la risposta** e un menu per salvarla in Markdown o salvarne i blocchi di codice.
 - **Ragionamento**: se è attivo, il ragionamento del modello compare in una sezione richiudibile sopra la risposta.
 - **Barra in basso**: allegati, casella del messaggio, **Invia** (che diventa **Ferma** durante la risposta); sotto, il modello caricato o lo stato del motore e la velocità in token al secondo.
@@ -114,14 +114,48 @@ Con la vista Immagini aperta, il pannello laterale (F9) mostra queste impostazio
 | Motore delle immagini | Codificatore di testo | Sulla stessa scheda, sul processore o su un’altra scheda. Con due schede (per esempio una NVIDIA con poca memoria e una Radeon integrata) mettilo sulla seconda: la prima resta tutta per il modello, che lavora a ogni passo |
 | Motore delle immagini | Risparmia memoria | Tiene tutti i pesi nella RAM. Più lento: lasciala spenta, e provala solo se il motore si ferma per mancanza di memoria video |
 
-## 8. Scorciatoie da tastiera
+## 8. Video
+
+La vista **Video** (in alto, accanto a **Immagini**; Alt+3) crea brevi video, di qualche secondo, da una descrizione o da un’immagine di partenza. Usa lo stesso motore delle immagini, **ruscadiffusion-engine**, con un modello per i video: il video è un file AVI (Motion JPEG), che RuscaLLama riproduce da sé. Un video richiede molta più memoria e molto più tempo di un’immagine: con una scheda da 6 GB conta diversi minuti per una clip di 2 secondi a circa 480p.
+
+### Il modello per i video
+
+Come per le immagini, un modello per i video è fatto di **tre file**: il modello, il codificatore di testo (UMT5-XXL per Wan) e il VAE. Vanno nella stessa cartella dei modelli per immagini, `~/.local/share/ruscadiffusion/models/`, ognuno nella sua sottocartella: RuscaLLama riconosce da sé i modelli per i video e li mostra solo nella vista Video. **Quali file scaricare?** consiglia:
+
+- **Wan2.2-TI2V-5B** (licenza Apache 2.0): la qualità migliore per una scheda di casa, da una descrizione o da un’immagine, 24 fotogrammi al secondo. Il VAE è `wan2.2_vae.safetensors`, non quello di Wan 2.1;
+- **Wan2.1-T2V-1.3B** (licenza Apache 2.0): più leggero e veloce, solo da una descrizione, 16 fotogrammi al secondo.
+
+Vanno bene anche Wan 2.1 e 2.2 da 14 miliardi di parametri (molto più lenti), HunyuanVideo 1.5 e LingBot-Video. Wan 2.2 A14B è fatto di due modelli, `HighNoise` e `LowNoise`, da mettere nella stessa cartella; Wan 2.1 I2V vuole anche `clip_vision_h.safetensors`. I modelli che partono da un audio o da un video (S2V, VACE, Animate) non funzionano con RuscaLLama: un avviso lo dice.
+
+### Creare un video
+
+1. Descrivi la scena **e il movimento**: chi o che cosa si muove, come, e cosa fa la telecamera.
+2. Con i modelli che la usano compare il pulsante dell’**immagine di partenza** accanto alla casella: il video comincia da quell’immagine. Dalla vista Immagini, il menu di un’immagine → **Anima in un video** la porta qui.
+3. Scegli il formato e premi **Crea il video**. Durante il lavoro vedi un fotogramma dell’anteprima, il passo e il tempo che manca; **Ferma** (Esc) interrompe.
+
+Clicca un video per guardarlo. Dal suo menu: **Salva il video…** (nella cartella Video), **Apri nel lettore video**, **Riusa il seme**, **Togli**. Se GTK non sa riprodurre il video (mancano `libgtk-4-media-gstreamer` o `gstreamer1.0-plugins-good`) vedi un fotogramma e il pulsante per aprirlo nel lettore del sistema.
+
+Si crea un video o un’immagine per volta: mentre una delle due viste lavora, l’altra aspetta.
+
+### Impostazioni dei video
+
+Le impostazioni della vista Video sono quelle delle immagini, con queste differenze:
+
+| Opzione | Effetto |
+|---|---|
+| Durata | 2, 3 o 5 secondi. Il tempo e la memoria crescono più che in proporzione |
+| Da evitare | Vuota: per Wan si usa il prompt negativo predefinito del modello |
+| Impostazioni avanzate | Come per le immagini; la dimensione di base consigliata è 640 (circa 480p) |
+| Motore (immagini e video) | Le stesse impostazioni della vista Immagini: cambiarle in una vista vale anche per l’altra. Con una scheda da 6 GB metti il **Codificatore di testo** sul processore |
+
+## 9. Scorciatoie da tastiera
 
 | Tasti | Azione |
 |---|---|
-| Alt+1 / Alt+2 | Vista Chat / Vista Immagini |
-| Invio | Invia (nella vista Immagini: Genera) |
+| Alt+1 / Alt+2 / Alt+3 | Vista Chat / Immagini / Video |
+| Invio | Invia (nella vista Immagini: Genera; nella vista Video: Crea il video) |
 | Maiusc+Invio | A capo |
-| Esc | Ferma la risposta o l’immagine |
+| Esc | Ferma la risposta, l’immagine o il video |
 | Ctrl+N | Nuova conversazione |
 | Ctrl+O | Allega file |
 | Ctrl+S | Salva la conversazione in Markdown |
@@ -131,7 +165,7 @@ Con la vista Immagini aperta, il pannello laterale (F9) mostra queste impostazio
 | F10 | Menu principale |
 | Ctrl+W / Ctrl+Q | Chiudi la finestra / Esci |
 
-## 9. Privacy e sicurezza
+## 10. Privacy e sicurezza
 
 - Il motore ascolta solo su **127.0.0.1**, su una porta libera scelta a ogni avvio.
 - Ogni avvio genera una **chiave di accesso temporanea**, salvata in `$XDG_RUNTIME_DIR/ruscallama/` con permessi 0600: gli altri utenti del computer non possono usare il modello né leggere le conversazioni.
@@ -140,16 +174,16 @@ Con la vista Immagini aperta, il pannello laterale (F9) mostra queste impostazio
 - Il motore ha un profilo AppArmor (in modalità *complain*) che gli nega le cartelle più delicate della home.
 - Le impostazioni sono in `~/.config/ruscallama/settings.json`.
 
-Per le immagini:
+Per le immagini e i video:
 
 - il motore delle immagini non ha codice di rete (niente server): parte, crea le immagini ed esce;
 - la descrizione gli arriva in un file, non sulla riga di comando, dove la vedrebbero gli altri utenti del computer;
-- le immagini non salvate stanno in `~/.cache/ruscallama/images/` (permessi 0700) e si cancellano alla chiusura;
+- le immagini e i video non salvati stanno in `~/.cache/ruscallama/images/` (permessi 0700) e si cancellano alla chiusura; l’immagine di partenza di un video viene copiata lì, e il motore non legge altro della home;
 - il PNG salvato non contiene la descrizione, se non accendi **Scrivi la descrizione nel file**.
 
 Le risposte di un modello linguistico possono essere sbagliate: verifica le informazioni importanti.
 
-## 10. Risoluzione dei problemi
+## 11. Risoluzione dei problemi
 
 | Problema | Cosa fare |
 |---|---|
@@ -162,6 +196,9 @@ Le risposte di un modello linguistico possono essere sbagliate: verifica le info
 | «ruscadiffusion-engine non è installato» | `sudo apt install ruscadiffusion-engine` |
 | Il modello per immagini non compare | Dev’essere `.safetensors`, `.gguf` o `.ckpt`; un modello in più file va in una cartella sua, con i suoi componenti |
 | L’immagine non si crea | Menu principale → **Registro del motore delle immagini**: spesso manca memoria; accendi **Risparmia memoria**, scegli **Veloce** o un formato più piccolo |
+| Il modello per video non compare | Dev’essere in una cartella sua con il VAE e il codificatore di testo; il nome del file o della cartella deve dire di che modello si tratta (Wan, HunyuanVideo, LingBot) |
+| Il video non si crea | Menu principale → **Registro del motore dei video**: quasi sempre manca memoria; scegli 2 secondi, una dimensione di base più piccola, il codificatore di testo sul processore o **Risparmia memoria** |
+| Il video non si vede | Installa `libgtk-4-media-gstreamer` e `gstreamer1.0-plugins-good`, oppure usa **Apri nel lettore video** |
 | Immagini confuse o strane | Usa i valori consigliati (avanzate a 0 e «Automatico»); i modelli SD 1.5 lavorano a 512 px, SDXL e FLUX a 1024 |
 
 Supporto: info@ruscalinux.org — La nota sull'uso di strumenti di intelligenza artificiale è nella finestra Informazioni e nel file `NOTA-IA.md` del repository.

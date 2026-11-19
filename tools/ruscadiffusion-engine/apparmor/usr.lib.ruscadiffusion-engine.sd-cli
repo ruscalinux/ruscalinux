@@ -38,14 +38,17 @@ profile ruscadiffusion-engine /usr/lib/ruscadiffusion-engine/sd-cli {
   /usr/share/ruscadiffusion/models/** r,
 
   # Cartella di lavoro di RuscaLLama: il prompt (file di testo), le
-  # anteprime e le immagini generate. E' l'unico posto in cui il motore
+  # anteprime, le immagini e i video (.avi) generati, l'immagine di
+  # partenza di un video (copiata li' da RuscaLLama). E' l'unico posto in cui il motore
   # scrive.
   owner @{HOME}/.cache/ruscallama/images/ r,
   owner @{HOME}/.cache/ruscallama/images/** rw,
 
-  # Dal terminale: immagini scritte in Immagini.
+  # Dal terminale: immagini scritte in Immagini e video in Video.
   owner @{HOME}/Pictures/** rw,
   owner @{HOME}/Immagini/** rw,
+  owner @{HOME}/Videos/** rw,
+  owner @{HOME}/Video/** rw,
 
   # Il proprio binario.
   /usr/lib/ruscadiffusion-engine/sd-cli mr,

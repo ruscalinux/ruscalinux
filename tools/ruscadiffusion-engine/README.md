@@ -1,6 +1,6 @@
 # ruscadiffusion-engine
 
-Motore di generazione delle immagini di RuscaLLama: **stable-diffusion.cpp**, software esterno con licenza MIT (<https://github.com/leejet/stable-diffusion.cpp>), compilato dal sorgente con il backend Vulkan e senza codice di rete. È fatto come `ruscawhisper-engine`: stesse regole, stessi controlli, stesse dipendenze di compilazione.
+Motore di generazione delle immagini e dei video di RuscaLLama: **stable-diffusion.cpp**, software esterno con licenza MIT (<https://github.com/leejet/stable-diffusion.cpp>), compilato dal sorgente con il backend Vulkan e senza codice di rete. È fatto come `ruscawhisper-engine`: stesse regole, stessi controlli, stesse dipendenze di compilazione.
 
 | File | Cosa contiene |
 |---|---|
@@ -13,7 +13,7 @@ Motore di generazione delle immagini di RuscaLLama: **stable-diffusion.cpp**, so
 
 | Programma | A cosa serve |
 |---|---|
-| `/usr/lib/ruscadiffusion-engine/sd-cli` | Legge un modello e una descrizione e scrive le immagini PNG: lo avvia RuscaLLama, una volta per ogni generazione |
+| `/usr/lib/ruscadiffusion-engine/sd-cli` | Legge un modello e una descrizione e scrive le immagini PNG o un video AVI (Motion JPEG, con `-M vid_gen`): lo avvia RuscaLLama, una volta per ogni generazione |
 
 Non c’è `sd-server`: RuscaLLama non apre porte per le immagini, nemmeno su 127.0.0.1. Il motore parte, crea le immagini ed esce. ggml e stable-diffusion.cpp sono compilati dentro `sd-cli`: un solo file, senza librerie private.
 
@@ -23,6 +23,8 @@ I modelli non fanno parte del pacchetto. Si copiano in `~/.local/share/ruscadiff
 |---|---|---|
 | Un file solo, con tutto dentro | Stable Diffusion 1.5 e 2.1, SDXL, SD-Turbo, SDXL-Turbo | Il file `.safetensors`, `.gguf` o `.ckpt` |
 | Una cartella di file | Z-Image, FLUX.1, FLUX.2, Qwen-Image, Stable Diffusion 3.5, Chroma e gli altri di `docs/models/` di stable-diffusion.cpp | Una cartella con il modello di diffusione, il VAE (`ae.safetensors`, `flux2_ae.safetensors`…) e i codificatori di testo (`clip_l`, `clip_g`, `t5xxl`, o il modello linguistico, come Qwen3-4B per Z-Image e FLUX.2-klein) |
+
+I modelli per i video (Wan 2.1 e 2.2, HunyuanVideo 1.5, LingBot-Video) sono sempre una cartella di file: il modello di diffusione, il suo VAE (`wan_2.1_vae`, `wan2.2_vae`…) e il codificatore di testo (`umt5-xxl` per Wan); per Wan 2.2 A14B anche il secondo modello (`HighNoise`), per Wan 2.1 I2V `clip_vision_h`. Il video si scrive in AVI Motion JPEG con il codice di sd-cli stesso: non servono libwebm né altre librerie.
 
 RuscaLLama riconosce i file dal nome e, per i `.safetensors`, dai nomi dei tensori scritti nell’intestazione. Ogni modello ha la propria licenza, che l’utente deve rispettare.
 
