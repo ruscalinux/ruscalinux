@@ -1,0 +1,63 @@
+# ------------------------------------------------------------------------
+# RuscaLinux — profilo AppArmor per il motore di sintesi vocale
+# (ruscapiper-stream).
+#
+# Consegnato in modalita' COMPLAIN: registra le violazioni nel journal,
+# non blocca niente. E' deliberato: un profilo non provato che blocca il
+# motore e' peggio di nessun profilo.
+#
+# Per vedere cosa avrebbe bloccato, dopo qualche sessione d'uso:
+#     sudo journalctl -b | grep 'apparmor=.*ruscapiper-stream'
+#
+# Per passare a enforce dopo averlo provato:
+#     sudo rm /etc/apparmor.d/force-complain/usr.lib.ruscapiper-engine.ruscapiper-stream
+#     sudo apparmor_parser -r /etc/apparmor.d/usr.lib.ruscapiper-engine.ruscapiper-stream
+# ------------------------------------------------------------------------
+
+abi <abi/4.0>,
+
+include <tunables/global>
+
+profile ruscapiper-engine /usr/lib/ruscapiper-engine/ruscapiper-stream {
+  include <abstractions/base>
+
+  # Il motore e' l'unico processo che apre le voci, cioe' file presi da
+  # internet. Legge solo le cartelle delle voci (.onnx e .onnx.json).
+  owner @{HOME}/.local/share/ruscapiper/voices/ r,
+  owner @{HOME}/.local/share/ruscapiper/voices/** r,
+  /usr/share/ruscapiper/voices/ r,
+  /usr/share/ruscapiper/voices/** r,
+
+  # I propri binari, la libreria e i dati di espeak-ng.
+  /usr/lib/ruscapiper-engine/ruscapiper-stream mr,
+  /usr/lib/ruscapiper-engine/*.so* mr,
+  /usr/lib/ruscapiper-engine/espeak-ng-data/ r,
+  /usr/lib/ruscapiper-engine/espeak-ng-data/** r,
+
+  # ONNX Runtime di Debian.
+  /usr/lib/@{multiarch}/libonnxruntime*.so* mr,
+
+  # Rete: nessuna. ruscapiper-stream non ha codice di rete (la build
+  # controlla che i binari non usino socket) e qui e' negata comunque.
+  deny network,
+
+  # Scrive solo sui propri flussi standard: nessun file.
+
+  # Informazioni sulla macchina, usate da ONNX Runtime per i thread.
+  @{PROC}/cpuinfo r,
+  @{PROC}/meminfo r,
+  owner @{PROC}/@{pid}/** r,
+  /sys/devices/system/cpu/** r,
+  /sys/devices/system/node/** r,
+
+  # Niente di tutto questo serve al motore, e sono le cose che una voce
+  # malevola cercherebbe per prime.
+  deny @{HOME}/.ssh/** rwx,
+  deny @{HOME}/.gnupg/** rwx,
+  deny @{HOME}/.mozilla/** rwx,
+  deny @{HOME}/.thunderbird/** rwx,
+  deny @{HOME}/.config/** rwx,
+  deny /etc/shadow r,
+
+  include if exists <local/ruscapiper-engine>
+}
