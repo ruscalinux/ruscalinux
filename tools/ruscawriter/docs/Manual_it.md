@@ -61,8 +61,8 @@ All'avvio, se non apri un file, RuscaWriter chiede se creare un progetto nuovo o
 
 La finestra:
 
-- **Barra del titolo**: a sinistra mostra/nascondi i capitoli e **+** (nuovo capitolo); al centro il titolo del progetto; a destra mostra/nascondi le note, anteprima, Salva e il **menu principale**.
-- **Menu principale**: in alto nuovo progetto, apri, importa ed esporta; poi il sottomenu **Capitolo**, sezioni editoriali, impostazione pagina e obiettivo di parole; poi ricerca, dizionari e ricucitura dei paragrafi; poi i sottomenu **Visualizza** e **Aspetto**; in fondo guida al Markdown, scorciatoie da tastiera e informazioni.
+- **Barra del titolo**: a sinistra mostra/nascondi i capitoli, **+** (nuovo capitolo) e **Formato** (grassetto, corsivo, sezioni, elenchi, note: vedi sotto); al centro il titolo del progetto; a destra mostra/nascondi le note, anteprima, Salva e il **menu principale**.
+- **Menu principale**: in alto nuovo progetto, apri, importa ed esporta; poi i sottomenu **Capitolo** e **Formato**, sezioni editoriali, impostazione pagina e obiettivo di parole; poi ricerca, dizionari e ricucitura dei paragrafi; poi i sottomenu **Visualizza** e **Aspetto**; in fondo guida al Markdown, scorciatoie da tastiera e informazioni.
 - **Tre colonne**: capitoli (con le frecce per spostarli), testo, note del capitolo.
 - **Barra in basso**: parole del capitolo, caratteri e pagine stimate, totale del progetto, lingua del controllo ortografico e dimensione del testo.
 
@@ -79,7 +79,7 @@ Un progetto è un file `.rwr`: un archivio `tar.gz` che contiene un file Markdow
 | Nuovo progetto | Menu principale → Nuovo progetto | Ctrl+N |
 | Apri | Menu principale → Apri | Ctrl+O |
 | Salva | Pulsante Salva nella barra del titolo | Ctrl+S |
-| Importa capitoli da file .md/.txt | Menu principale → Importa come capitoli | Ctrl+I |
+| Importa capitoli da file .md/.txt | Menu principale → Importa come capitoli | Ctrl+Maiusc+O |
 | Sezioni editoriali (frontespizio, colophon, copertina) | Menu principale → Sezioni editoriali | — |
 | Esci | — | Ctrl+Q |
 
@@ -104,6 +104,41 @@ Un progetto è un file `.rwr`: un archivio `tar.gz` che contiene un file Markdow
 | Guida al Markdown | Maiusc+F1 |
 | Cerca la parola nel dizionario | Ctrl+D oppure Ctrl+clic |
 
+### Formattare senza conoscere il Markdown
+
+Il pulsante **Formato** nella barra del titolo (lo stesso menu è nel menu principale; grassetto e corsivo anche nel menu del tasto destro) scrive il Markdown al posto tuo:
+
+| Comando | Scorciatoia | Cosa scrive |
+|---|---|---|
+| Grassetto | Ctrl+B | `**testo**` |
+| Corsivo | Ctrl+I | `*testo*` |
+| Testo normale | — | toglie titolo, citazione o elenco (anche Ctrl+2 o Ctrl+3 premuto di nuovo) |
+| Sezione | Ctrl+2 | `## …` |
+| Sottosezione | Ctrl+3 | `### …` |
+| Citazione | — | `> …` |
+| Elenco puntato / numerato | — | `- …` / `1. …` |
+| Nota a piè di pagina | Ctrl+Alt+F | `[^1]` nel testo e `[^1]: ` in fondo al capitolo, con il cursore pronto |
+| Separatore di scena | — | `* * *` su una riga sua |
+| Immagine… | Ctrl+Maiusc+I | `![didascalia](immagine)` |
+| Titolo del capitolo… | F2 | il nome del capitolo (vedi sotto) |
+
+Ogni comando mette la formattazione o, se c'è già, la toglie. Senza selezione vale per la parola sotto il cursore (grassetto e corsivo) o per la riga del cursore (sezioni, citazioni, elenchi). Una selezione su più righe si formatta riga per riga, e i segni di titolo ed elenco restano al loro posto. Un solo Ctrl+Z annulla il comando. In anteprima i comandi sono spenti.
+
+Barrato ed evidenziato non ci sono: i formati del libro (PDF, EPUB, ODT, DOCX) non li stampano.
+
+### Titoli di capitolo, sezioni e sottosezioni
+
+| Nel testo | Che cos'è | ODT / DOCX | EPUB / HTML | PDF tipografico |
+|---|---|---|---|---|
+| `# Titolo`, in cima al capitolo | titolo del capitolo | Titolo 1 | `h1` | `\chapter` |
+| `## Titolo` | sezione | Titolo 2 | `h2` | `\section` |
+| `### Titolo` | sottosezione | Titolo 3 | `h3` | `\subsection` |
+
+- **Il titolo del capitolo è il suo nome nella colonna dei capitoli.** Non serve scriverlo nel testo: RuscaWriter lo mette in testa al capitolo in ogni export, una volta sola. Per cambiarlo: F2, oppure Formato → Titolo del capitolo.
+- Se il testo comincia con `# Titolo`, quello è il titolo del capitolo: dà il nome al capitolo e nel libro non si ripete. Rinominando il capitolo, RuscaWriter cambia anche quella riga, così nome e pagina dicono sempre la stessa cosa. Vale anche una prima riga tutta in maiuscolo (`CAPITOLO PRIMO`), come nei testi importati.
+- Ogni altro titolo del testo è una sezione o una sottosezione. Un capitolo non contiene capitoli: un `#` più avanti nel testo vale come `##`.
+- Nei file con tutto il libro (export HTML a file unico e Markdown) il titolo del libro è il primo livello: i capitoli scendono a `h2`/`##` e le sezioni a `h3`/`###`. Reimportando il file Markdown si ottengono gli stessi capitoli.
+
 **Ricuci i paragrafi** (menu principale) unisce le righe spezzate a mano, per esempio nei testi incollati da un PDF.
 
 Il Markdown segue lo standard CommonMark, come in RuscaMark e RuscaLLama: anteprima, evidenziazione ed export lo leggono tutti allo stesso modo. Oltre a titoli, grassetto, corsivo, elenchi, citazioni, link, immagini e tabelle si possono usare blocchi di codice tra tre apici, liste di attività (`- [x]`), note a piè di pagina (`testo[^1]` e, più sotto, `[^1]: la nota`, che finiscono in fondo al capitolo) e formule (`$x^2$`, che diventano simboli). Una sola regola è diversa da CommonMark, perché in un libro è più naturale: **ogni a capo va a capo anche nel libro**, e le righe scritte una sotto l'altra non si fondono in un unico paragrafo. Una riga vuota separa i blocchi di testo. Esportando in Markdown, RuscaWriter aggiunge le righe vuote che servono perché il file si legga allo stesso modo con qualunque programma che segue CommonMark.
@@ -117,7 +152,7 @@ Il Markdown segue lo standard CommonMark, come in RuscaMark e RuscaLLama: antepr
 | Mostra/nascondi la colonna dei capitoli | Ctrl+L |
 | Mostra/nascondi la colonna delle note | Ctrl+R |
 | Schermo intero | F11 |
-| Ingrandisci / riduci il carattere | Ctrl++ / Ctrl+− |
+| Ingrandisci / riduci il carattere / dimensione predefinita | Ctrl++ / Ctrl+− / Ctrl+0 |
 | Passa da chiaro a scuro | Ctrl+Maiusc+D |
 | Scorciatoie da tastiera | Ctrl+? |
 

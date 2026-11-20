@@ -9,6 +9,42 @@ One line per change.
 
 ## [Unreleased]
 
+- **Added** — *Format* button in the header bar (also in the main menu and,
+  bold and italic first, in the right-click menu): bold, italic, normal text,
+  section, subsection, quote, bulleted and numbered list, footnote, scene
+  break, image and chapter title. Each command applies or removes its
+  formatting, works on the word under the cursor when nothing is selected,
+  formats a multi-line selection line by line, and is undone with one Ctrl+Z.
+  Strikethrough and highlight are not offered: the book formats do not print
+  them
+- **Added** — shortcuts Ctrl+B (bold), Ctrl+I (italic), Ctrl+2 (section),
+  Ctrl+3 (subsection), Ctrl+Alt+F (footnote); Ctrl+0 brings the text back to
+  the default size, as in the other RuscaLinux OS Tools
+- **Changed** — *Import as chapters* moves from Ctrl+I to Ctrl+Shift+O,
+  because Ctrl+I is italic in every word processor
+- **Changed** — chapter titles follow one rule everywhere: the title is the
+  chapter's name in the list; a `# Title` at the top of the text is that title
+  and is printed once; every other heading is a section (`##`) or subsection
+  (`###`), and a `#` further down counts as `##`. The preview and all exports
+  (PDF, typeset PDF, EPUB, ODT, DOCX, HTML, Markdown, TXT) now agree
+- **Changed** — renaming a chapter whose title is written in the text
+  rewrites it there, so the list and the page never disagree
+- **Fixed** — EPUB: a chapter without `# Title` in the text had no title on
+  its page
+- **Fixed** — DOCX: chapter, section and subsection titles are Word's real
+  heading styles (navigation pane, automatic table of contents); quotes have a
+  real style; each chapter starts on a new page, as in ODT and PDF
+- **Fixed** — HTML: chapters were `h1` or `h2` depending on whether the text
+  had a title; now always `h2` in a single file and `h1` on their own page
+- **Fixed** — typeset PDF: `##` was a subsection; now `##` is `\section` and
+  `###` is `\subsection`
+- **Fixed** — TXT: chapters without a written title had none
+- **Fixed** — Markdown import cut chapters at every `#` and `##`, even inside
+  code blocks; now it cuts at chapter headings only, and a file with one `#`
+  and several `##` (as written by the Markdown export) comes back with the
+  same chapters, sections and cover lines
+- **Fixed** — a line such as `#tag` is no longer taken for a chapter title
+
 - **Added** — Export → *Typeset PDF (LuaLaTeX)*: the book typeset by LuaLaTeX
   with whole-paragraph line breaking, microtypography, kerning and ligatures,
   every script (Arabic right to left, Devanagari, Chinese, Japanese, Korean),

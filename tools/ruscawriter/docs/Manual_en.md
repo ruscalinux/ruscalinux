@@ -61,8 +61,8 @@ At start, if you did not open a file, RuscaWriter asks whether to create a new p
 
 The window:
 
-- **Header bar**: on the left show/hide chapters and **+** (new chapter); in the middle the project title; on the right show/hide notes, preview, Save and the **main menu**.
-- **Main menu**: at the top new project, open, import and export; then the **Chapter** submenu, editorial sections, page setup and word goal; then search, dictionaries and paragraph reflow; then the **View** and **Appearance** submenus; at the bottom the Markdown guide, keyboard shortcuts and About.
+- **Header bar**: on the left show/hide chapters, **+** (new chapter) and **Format** (bold, italic, sections, lists, footnotes: see below); in the middle the project title; on the right show/hide notes, preview, Save and the **main menu**.
+- **Main menu**: at the top new project, open, import and export; then the **Chapter** and **Format** submenus, editorial sections, page setup and word goal; then search, dictionaries and paragraph reflow; then the **View** and **Appearance** submenus; at the bottom the Markdown guide, keyboard shortcuts and About.
 - **Three columns**: chapters (with arrows to move them), text, chapter notes.
 - **Bottom bar**: chapter words, characters and estimated pages, project total, spell-check language and text size.
 
@@ -79,7 +79,7 @@ A project is a `.rwr` file: a `tar.gz` archive holding one Markdown file per cha
 | New project | Main menu → New project | Ctrl+N |
 | Open | Main menu → Open | Ctrl+O |
 | Save | Save button in the header bar | Ctrl+S |
-| Import chapters from .md/.txt files | Main menu → Import as chapters | Ctrl+I |
+| Import chapters from .md/.txt files | Main menu → Import as chapters | Ctrl+Shift+O |
 | Editorial sections (frontispiece, colophon, cover) | Main menu → Editorial sections | — |
 | Quit | — | Ctrl+Q |
 
@@ -104,6 +104,41 @@ A project is a `.rwr` file: a `tar.gz` archive holding one Markdown file per cha
 | Markdown guide | Shift+F1 |
 | Look up the word in the dictionary | Ctrl+D or Ctrl+click |
 
+### Formatting without knowing Markdown
+
+The **Format** button in the header bar (the same menu is in the main menu; bold and italic are also in the right-click menu) writes the Markdown for you:
+
+| Command | Shortcut | What it writes |
+|---|---|---|
+| Bold | Ctrl+B | `**text**` |
+| Italic | Ctrl+I | `*text*` |
+| Normal text | — | removes heading, quote or list (so does pressing Ctrl+2 or Ctrl+3 again) |
+| Section | Ctrl+2 | `## …` |
+| Subsection | Ctrl+3 | `### …` |
+| Quote | — | `> …` |
+| Bulleted / numbered list | — | `- …` / `1. …` |
+| Footnote | Ctrl+Alt+F | `[^1]` in the text and `[^1]: ` at the end of the chapter, with the cursor ready |
+| Scene break | — | `* * *` on a line of its own |
+| Image… | Ctrl+Shift+I | `![caption](image)` |
+| Chapter title… | F2 | the chapter's name (see below) |
+
+Each command applies its formatting or, if it is already there, removes it. With nothing selected it works on the word under the cursor (bold, italic) or on the cursor's line (sections, quotes, lists). A selection over several lines is formatted line by line, and heading and list marks stay in place. One Ctrl+Z undoes the command. In the preview the commands are off.
+
+There is no strikethrough or highlight: the book formats (PDF, EPUB, ODT, DOCX) do not print them.
+
+### Chapter titles, sections and subsections
+
+| In the text | What it is | ODT / DOCX | EPUB / HTML | Typeset PDF |
+|---|---|---|---|---|
+| `# Title`, at the top of the chapter | chapter title | Heading 1 | `h1` | `\chapter` |
+| `## Title` | section | Heading 2 | `h2` | `\section` |
+| `### Title` | subsection | Heading 3 | `h3` | `\subsection` |
+
+- **A chapter's title is its name in the chapter column.** You do not need to write it in the text: RuscaWriter puts it at the top of the chapter in every export, once. To change it: F2, or Format → Chapter title.
+- If the text starts with `# Title`, that is the chapter title: it names the chapter and is not repeated in the book. Renaming the chapter also changes that line, so the name and the page always agree. A first line all in capitals (`CHAPTER ONE`) works too, as in imported texts.
+- Every other heading in the text is a section or a subsection. A chapter holds no chapters: a `#` further down counts as `##`.
+- In files that hold the whole book (single-file HTML export and Markdown) the book title is the top level: chapters move down to `h2`/`##` and sections to `h3`/`###`. Re-importing the Markdown file gives back the same chapters.
+
 **Reflow paragraphs** (main menu) joins lines that were broken by hand, for example in text pasted from a PDF.
 
 Markdown follows the CommonMark standard, as in RuscaMark and RuscaLLama: preview, highlighting and exports all read it the same way. Besides headings, bold, italic, lists, quotes, links, images and tables you can use code blocks between three backticks, task lists (`- [x]`), footnotes (`text[^1]` and, further down, `[^1]: the note`, which end up at the bottom of the chapter) and formulas (`$x^2$`, which become symbols). One rule differs from CommonMark, because it is more natural in a book: **every line break is a line break in the book too**, and lines written one under the other are not merged into a single paragraph. A blank line separates blocks of text. When exporting to Markdown, RuscaWriter adds the blank lines needed for the file to read the same in any program that follows CommonMark.
@@ -117,7 +152,7 @@ Markdown follows the CommonMark standard, as in RuscaMark and RuscaLLama: previe
 | Show/hide the chapters column | Ctrl+L |
 | Show/hide the notes column | Ctrl+R |
 | Full screen | F11 |
-| Larger / smaller text | Ctrl++ / Ctrl+− |
+| Larger / smaller / default text size | Ctrl++ / Ctrl+− / Ctrl+0 |
 | Switch between light and dark | Ctrl+Shift+D |
 | Keyboard shortcuts | Ctrl+? |
 

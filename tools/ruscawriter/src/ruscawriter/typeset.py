@@ -273,7 +273,9 @@ class _Writer:
             kind = b[0]
             prev, self.last = getattr(self, "last", None), kind
             if kind == "heading":
-                cmd = {1: "section", 2: "subsection"}.get(b[1], "subsubsection")
+                # il capitolo è \chapter (chapter_tex); nel testo i titoli
+                # sono sezioni: «##» -> \section, «###» -> \subsection
+                cmd = {2: "section", 3: "subsection"}.get(b[1], "subsubsection")
                 title = escape(_m.plain_runs(b[2]).strip())
                 if title:
                     self.out.append(f"\\{cmd}*{{{title}}}")
@@ -405,13 +407,12 @@ class _Writer:
 
 
 def chapter_tex(title, text, hy, images, text_w, text_h, font_size=11.0):
-    """Un capitolo: \\chapter con il suo titolo e i blocchi del testo. Se il
-    testo comincia con un titolo uguale a quello del capitolo (il caso
-    normale: il titolo viene dal «# Titolo» del testo), non si ripete."""
-    blocks = _m.book_blocks(text)
-    if blocks and blocks[0][0] == "heading" \
-            and _m.plain_runs(blocks[0][2]).strip() == (title or "").strip():
-        blocks = blocks[1:]
+    """Un capitolo: \\chapter con il suo titolo e i blocchi del testo, con la
+    regola di tutti gli export (model.chapter_blocks): il titolo scritto in
+    testa al testo non si ripete, e ogni altro titolo è una sezione."""
+    blocks = _m.chapter_blocks(title, text)
+    if (title or "").strip():
+        blocks = blocks[1:]          # è il \chapter qui sotto
     w = _Writer(hy, images, text_w, text_h, font_size)
     w._enum_stack = []
     w.out.append(r"\chapter{" + escape(title) + "}")

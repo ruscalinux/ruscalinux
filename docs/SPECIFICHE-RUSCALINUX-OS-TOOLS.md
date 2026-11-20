@@ -99,7 +99,7 @@ L’analisi del Markdown non si scrive a mano: la fa **markdown-it-py** (pacchet
 
 Regole:
 
-1. Nessun programma interpreta il Markdown con espressioni regolari o con un parser proprio: usa `rusca_markdown.py`. Fanno eccezione gli strumenti che lavorano sul sorgente nell’editor e non interpretano il documento: quelli per riga di `rusca_markdown.py` (`table_at()`, `display_math_at()`, `has_inline_math()`, `sub_inline_math()`), da sostituire con le posizioni dei token di `parser()` (`token.map`), in RuscaMark i comandi sulle tabelle (`find_table_blocks()`, `align_table_lines()`), e in RuscaWriter `classify_md_line()`, che guarda una riga per volta per la ricucitura dei paragrafi spezzati (riconosce le righe con il motore). Un editor che deve sapere dove stanno i marcatori nel testo usa `parse_source()`: gli stessi token di `parser()`, con in più la posizione nel sorgente di ogni elemento in linea; è così che la resa live di RuscaMark riconosce la formattazione esattamente come l’anteprima.
+1. Nessun programma interpreta il Markdown con espressioni regolari o con un parser proprio: usa `rusca_markdown.py`. Fanno eccezione gli strumenti che lavorano sul sorgente nell’editor e non interpretano il documento: quelli per riga di `rusca_markdown.py` (`table_at()`, `display_math_at()`, `has_inline_math()`, `sub_inline_math()`), da sostituire con le posizioni dei token di `parser()` (`token.map`), in RuscaMark i comandi sulle tabelle (`find_table_blocks()`, `align_table_lines()`), e in RuscaWriter `classify_md_line()`, che guarda una riga per volta per la ricucitura dei paragrafi spezzati (riconosce le righe con il motore), e i comandi del menu «Formato» (`fmt_toggle_inline()`, `fmt_set_block()`, `fmt_insert_footnote()`, `fmt_insert_break()`, regola 10), che riconoscono le righe con `classify_md_line()` e scrivono solo marcatori. `relevel_headings()` e `split_markdown_chapters()` (regola 10) trovano i titoli con le posizioni dei token (`token.map`) e toccano solo i loro marcatori. Un editor che deve sapere dove stanno i marcatori nel testo usa `parse_source()`: gli stessi token di `parser()`, con in più la posizione nel sorgente di ogni elemento in linea; è così che la resa live di RuscaMark riconosce la formattazione esattamente come l’anteprima.
 2. L’HTML grezzo scritto nel Markdown resta testo (opzione `html` disattivata): le risposte dei modelli e i documenti aperti non possono inserire markup.
 3. I programmi aprono solo link `http://`, `https://` e `mailto:`. markdown-it scarta già `javascript:`, `vbscript:`, `file:` e `data:` (salvo le immagini GIF, PNG, JPEG e WebP).
 4. Una riga che continua il paragrafo (a capo morbido) si mostra andando a capo, come nel sorgente: CommonMark lascia questa scelta al programma.
@@ -108,8 +108,16 @@ Regole:
 7. Il motore non deve mai bloccarsi né fallire, qualunque testo riceva (un modello in RuscaLLama o chi scrive nella resa live può produrre testo malformato). Tre difetti dei plugin di mdit-py-plugins 0.4.2, trovati con prove su testi casuali, sono coperti in `rusca_markdown.py`: la regola dei blocchi `\[…\]` poteva entrare in un ciclo infinito e, dentro citazioni ed elenchi, leggere anche i `>` (lì vale solo su una riga; la protezione guarda le righe del sorgente e non `state.parentType`, che la regola dei titoli sottolineati di markdown-it-py 3.0 lascia sbagliato dopo un paragrafo); il plugin delle note poteva produrre token sbilanciati (un’ultima regola li riequilibra); le note in linea `^[testo]` facevano fallire l’analisi e sono disattivate. Ogni caso ha il suo test.
 8. **Eccezione di RuscaWriter: l’a capo.** In CommonMark le righe consecutive formano un solo paragrafo; in RuscaWriter ogni a capo va a capo anche nel libro, come in un programma di videoscrittura, e la riga vuota separa i blocchi. L’analisi resta quella del motore: RuscaWriter impagina come righe distinte quelle che il motore separa con un a capo morbido (`softbreak`) o forzato (`hardbreak`). L’export Markdown aggiunge le righe vuote necessarie (`commonmark_paragraphs()`), così il file si legge allo stesso modo con RuscaMark e con ogni programma che segue CommonMark.
 9. Quando un programma divide un documento Markdown in parti (come RuscaTranslator per la traduzione), usa le posizioni dei token di `parser()`, così non taglia mai un elenco, una tabella, una nota o un blocco di codice.
+10. **RuscaWriter: titoli di capitolo, sezioni e sottosezioni.** Una regola sola per l’indice dei capitoli, l’anteprima e tutti gli export, scritta in un punto solo (`chapter_blocks()` in `model.py`):
+    - il titolo di un capitolo è il suo nome nell’indice (`Chapter.title_with_fallback()`: nome scelto dall’utente, altrimenti il titolo scritto in testa al testo, altrimenti «Capitolo n»);
+    - il titolo scritto in testa al testo (`leading_title()`) è un titolo Markdown nel primo blocco — `# …` è la forma giusta; vale anche un altro livello, come nei progetti di prima — o una prima riga tutta in maiuscolo. Se dice la stessa cosa del nome nell’indice è il titolo del capitolo e nel libro non si ripete; se l’utente ha dato al capitolo un altro nome, resta nel testo come sezione, così non si perde nulla. Rinominare un capitolo con il titolo scritto riscrive quella riga (`rename_written_title()`), così il titolo sta in un posto solo;
+    - ogni altro titolo del testo è una sezione (`##`) o una sottosezione (`###`): un capitolo non contiene capitoli, quindi un `#` più avanti vale `##`;
+    - ogni formato usa i suoi stili di titolo veri: capitolo = Titolo 1 in ODT e DOCX (stili `Heading_20_1` e `Heading1` con livello di struttura, su pagina nuova), `h1` in EPUB e nell’HTML a una pagina per capitolo, `\chapter` nel PDF tipografico; sezione = Titolo 2, `h2`, `\section`; sottosezione = Titolo 3, `h3`, `\subsection`. Nei file con tutto il libro (HTML a file unico, Markdown) il libro è il primo livello e tutto scende di uno: capitoli `h2`/`##`, sezioni `h3`/`###`;
+    - l’importazione Markdown (`split_markdown_chapters()`) taglia ai titoli di primo livello fuori da citazioni, elenchi e blocchi di codice; con un solo `#` e dei `##` il `#` è il titolo del libro e si taglia ai `##`, che diventano `#` (con `relevel_headings()`). Così un file dell’export Markdown si reimporta con gli stessi capitoli e le stesse sezioni.
 
-**Test.** `tests/test_rusca_markdown.py` controlla che le copie del modulo siano identiche, che la configurazione superi tutti i 652 esempi ufficiali di CommonMark 0.30 (`tests/data/commonmark-0.30-spec.json`) e che i link automatici cambino solo i 4 esempi previsti, che `parse_source()` dia gli stessi token di `parser()` su tutti gli esempi, le posizioni nel sorgente, la resa dei blocchi, le regole delle formule e dei link automatici e la validità del markup per Pango. `tests/test_ruscamark_markdown.py` controlla l’HTML, l’anteprima, il PDF (compresi i link cliccabili) e la resa live di RuscaMark, `tests/test_ruscatranslator_markdown.py` la divisione dei documenti di RuscaTranslator; senza GTK 4 e libadwaita si saltano. La suite di RuscaWriter (`tools/ruscawriter/tests/test_ruscawriter.py`) controlla i blocchi del libro, la regola dell’a capo e la coerenza fra anteprima, PDF, EPUB, ODT, DOCX, HTML e Markdown. La cartella `tests/` sta nella radice del repository, non in `tools/`, che contiene solo programmi da impacchettare. I test si eseguono dalla radice del repository dopo ogni modifica del modulo:
+    Il menu «Formato» dell’editor (barra del titolo, menu principale, tasto destro) offre solo ciò che il libro stampa: grassetto, corsivo, testo normale, sezione, sottosezione, citazione, elenchi, nota a piè di pagina, separatore di scena, immagine e titolo del capitolo. Barrato ed evidenziato restano nel motore (regola 6) ma non hanno uno stile nei formati del libro, quindi non hanno un comando. Ogni comando mette o toglie la sua formattazione ed è un solo passo di annullamento.
+
+**Test.** `tests/test_rusca_markdown.py` controlla che le copie del modulo siano identiche, che la configurazione superi tutti i 652 esempi ufficiali di CommonMark 0.30 (`tests/data/commonmark-0.30-spec.json`) e che i link automatici cambino solo i 4 esempi previsti, che `parse_source()` dia gli stessi token di `parser()` su tutti gli esempi, le posizioni nel sorgente, la resa dei blocchi, le regole delle formule e dei link automatici e la validità del markup per Pango. `tests/test_ruscamark_markdown.py` controlla l’HTML, l’anteprima, il PDF (compresi i link cliccabili) e la resa live di RuscaMark, `tests/test_ruscatranslator_markdown.py` la divisione dei documenti di RuscaTranslator; senza GTK 4 e libadwaita si saltano. La suite di RuscaWriter (`tools/ruscawriter/tests/test_ruscawriter.py`) controlla i blocchi del libro, la regola dell’a capo, la regola dei titoli (formato per formato, compreso il ritorno dell’export Markdown reimportato), i comandi di formattazione e la coerenza fra anteprima, PDF, EPUB, ODT, DOCX, HTML e Markdown; `tools/ruscawriter/tests/test_format_gui.py` prova il menu «Formato», le scorciatoie, l’annullamento e il cambio di nome nella finestra vera. La cartella `tests/` sta nella radice del repository, non in `tools/`, che contiene solo programmi da impacchettare. I test si eseguono dalla radice del repository dopo ogni modifica del modulo:
 
 ```bash
 python3 -m unittest tests/test_rusca_markdown.py tests/test_ruscamark_markdown.py tests/test_ruscatranslator_markdown.py
@@ -405,6 +413,8 @@ Regole:
 | Ctrl+F | Cerca (dove applicabile) |
 | Ctrl+Z / Ctrl+Shift+Z | Annulla / Ripeti (dove applicabile) |
 | Ctrl++ / Ctrl+− / Ctrl+0 | Testo più grande / più piccolo / dimensione di sistema (nei tool che mostrano testi lunghi: conversazioni, documenti) |
+| Ctrl+B / Ctrl+I | Grassetto / corsivo (negli editor: RuscaMark, RuscaWriter) |
+| Ctrl+2 / Ctrl+3 | Sezione / sottosezione (RuscaWriter) |
 
 Tutte le funzioni devono essere raggiungibili da tastiera, con ordine di tabulazione logico e focus sempre visibile.
 
@@ -1229,9 +1239,10 @@ Il controllo ortografico, se presente, usa solo dizionari locali (incluso `en_GB
 Scrittura e impaginazione di libri.
 
 1. Aprire RuscaWriter e scegliere «Crea nuovo» o «Apri esistente» (i progetti sono file `.rwr`).
-2. Aggiungere i capitoli con **+** e scrivere in Markdown; a destra le note di ogni capitolo.
-3. Impostare formato e margini dal menu principale → Impostazione pagina.
-4. Esportare dal menu principale → Esporta: PDF, EPUB, AZW3, ODT, DOCX, HTML, Markdown o testo.
+2. Aggiungere i capitoli con **+** e scrivere; il titolo del capitolo è il suo nome nella colonna dei capitoli (F2 per cambiarlo). A destra le note di ogni capitolo.
+3. Formattare con il pulsante **Formato** (o Ctrl+B, Ctrl+I, Ctrl+2 per una sezione, Ctrl+3 per una sottosezione): RuscaWriter scrive il Markdown al posto tuo.
+4. Impostare formato e margini dal menu principale → Impostazione pagina.
+5. Esportare dal menu principale → Esporta: PDF, EPUB, AZW3, ODT, DOCX, HTML, Markdown o testo. In ogni formato il capitolo, le sezioni e le sottosezioni hanno gli stili di titolo veri.
 
 Controllo ortografico e sillabazione usano solo dizionari locali (incluso l’inglese britannico tramite `hunspell-en-gb` e `hyphen-en-gb`). Il testo non viene mai inviato online.
 
@@ -1431,9 +1442,10 @@ Spell checking, if present, uses only local dictionaries (including `en_GB` thro
 Writing and typesetting books.
 
 1. Open RuscaWriter and choose "Create new" or "Open existing" (projects are `.rwr` files).
-2. Add chapters with **+** and write in Markdown; each chapter's notes are on the right.
-3. Set format and margins from the main menu → Page setup.
-4. Export from the main menu → Export: PDF, EPUB, AZW3, ODT, DOCX, HTML, Markdown or text.
+2. Add chapters with **+** and write; a chapter's title is its name in the chapter column (F2 to change it). Each chapter's notes are on the right.
+3. Format with the **Format** button (or Ctrl+B, Ctrl+I, Ctrl+2 for a section, Ctrl+3 for a subsection): RuscaWriter writes the Markdown for you.
+4. Set format and margins from the main menu → Page setup.
+5. Export from the main menu → Export: PDF, EPUB, AZW3, ODT, DOCX, HTML, Markdown or text. In every format chapters, sections and subsections use real heading styles.
 
 Spell checking and hyphenation use only local dictionaries (including British English through `hunspell-en-gb` and `hyphen-en-gb`). Text is never sent online.
 

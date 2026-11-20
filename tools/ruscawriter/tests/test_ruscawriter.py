@@ -1971,6 +1971,288 @@ def test_pdf_tipografico():
           all(x in deb for x in typeset.DEPENDENCIES.split()))
 
 
+def _progetto_titoli():
+    """Un capitolo per ogni modo di avere un titolo (specifiche, 1.2, regola
+    10): «# …» scritto, solo il nome nell'indice, riga in maiuscolo, «## …»
+    dei progetti di prima, nome nell'indice diverso dal titolo scritto."""
+    p = Project()
+    p._lang = "it"
+    p.title = "Libro"
+    p.chapters = [
+        Chapter(0, "LIBRO", "", is_cover=True),
+        Chapter(1, "# Alfa\n\nTesto alfa.\n\n## Sezione alfa\n\nAncora.\n\n"
+                   "### Sotto alfa\n\nFine.", ""),
+        Chapter(2, "Testo beta.\n\n# Interno beta\n\nFine.", "", custom_title="Beta"),
+        Chapter(3, "GAMMA\nTesto gamma.", ""),
+        Chapter(4, "## Delta\n\nTesto delta.", ""),
+        Chapter(5, "# Scritto\n\nTesto epsilon.", "", custom_title="Epsilon"),
+    ]
+    return p
+
+
+def test_titoli_dei_capitoli():
+    print("titoli dei capitoli: una regola sola, in ogni formato")
+    from ruscawriter.model import (leading_title, chapter_blocks, chapter_body,
+                                   relevel_headings, split_markdown_chapters,
+                                   rename_written_title, md_escape_inline)
+    from ruscawriter import typeset as pw_typeset
+
+    # --- il titolo scritto in testa al capitolo --------------------------
+    check("«# Titolo» è il titolo", leading_title("# Alfa\n\ntesto")[1] == "Alfa")
+    check("anche dopo righe vuote", leading_title("\n\n# Alfa")[1] == "Alfa")
+    check("anche sottolineato (===)", leading_title("Alfa\n====\n\nx")[1] == "Alfa")
+    check("senza marcatori nel testo", leading_title("# Il *giardino*")[1] == "Il giardino")
+    check("«#etichetta» non è un titolo (CommonMark)",
+          leading_title("#etichetta\n\ntesto") is None
+          and Chapter(3, "#etichetta").title_with_fallback() == "Capitolo 3")
+    check("un «#» dentro un blocco di codice non è un titolo",
+          leading_title("```\n# no\n```") is None)
+    check("una riga in maiuscolo fa da titolo", leading_title("GAMMA\nTesto")[1] == "GAMMA")
+    check("solo il primo blocco conta", leading_title("testo\n\n# Dopo") is None)
+
+    # --- i blocchi del capitolo ------------------------------------------
+    b = chapter_blocks("Alfa", "# Alfa\n\n## Sez\n\n# Interno\n\ntesto")
+    check("il titolo del capitolo apre i blocchi, livello 1",
+          b[0][0] == "heading" and b[0][1] == 1 and b[0][2] == [("Alfa", "regular")])
+    check("il titolo non si ripete",
+          [x for x in b if x[0] == "heading" and x[2][0][0] == "Alfa"] == [b[0]])
+    check("nel testo «#» vale «##»: un capitolo non contiene capitoli",
+          [x[1] for x in b[1:] if x[0] == "heading"] == [2, 2])
+    check("il corsivo del titolo resta",
+          chapter_blocks("Il giardino", "# Il *giardino*")[0][2]
+          == [("Il ", "regular"), ("giardino", "italic")])
+    b = chapter_blocks("Epsilon", "# Scritto\n\ntesto")
+    check("nome nell'indice diverso: il titolo scritto resta, come sezione",
+          b[0][2] == [("Epsilon", "regular")] and b[1] == ("heading", 2, [("Scritto", "regular")]))
+    b = chapter_blocks("GAMMA", "GAMMA\nTesto gamma.")
+    check("la riga in maiuscolo diventa il titolo, senza ripetersi",
+          b[0][1] == 1 and b[1] == ("p", [[("Testo gamma.", "regular")]]))
+    check("i titoli dentro citazioni ed elenchi scendono anche loro",
+          chapter_blocks("T", "> # dentro")[1][1][0][1] == 2)
+    check("senza titolo restano solo i blocchi", chapter_blocks("", "testo")[0][0] == "p")
+    check("chapter_body toglie solo le righe del titolo",
+          chapter_body("Alfa", "# Alfa\n\nuno\n\n# Alfa") == "uno\n\n# Alfa")
+
+    # --- livelli nel sorgente --------------------------------------------
+    src = "# A\n\n> ## B\n\n```\n# no\n```\n\nC\n===\n\nD\n---\n\n- ### E"
+    out = relevel_headings(src, lambda lvl: lvl + 1)
+    check("i livelli scendono, il codice no",
+          out == "## A\n\n> ### B\n\n```\n# no\n```\n\nC\n---\n\n### D\n\n- #### E")
+    check("e risalgono uguali", relevel_headings(
+        "## A\n\n> ### B\n\n```\n# no\n```", lambda lvl: lvl - 1)
+        == "# A\n\n> ## B\n\n```\n# no\n```")
+    check("mai oltre i livelli 1-6",
+          relevel_headings("###### x\n\n# y", lambda lvl: lvl + 3) == "###### x\n\n#### y"
+          and relevel_headings("# x", lambda lvl: 0) == "# x")
+
+    # --- importazione: dove si taglia ------------------------------------
+    t, pre, parts = split_markdown_chapters("# Uno\n\nA.\n\n# Due\n\nB.")
+    check("si taglia ai «#»", t is None and parts == ["# Uno\n\nA.", "# Due\n\nB."])
+    t, pre, parts = split_markdown_chapters(
+        "# Libro\n\n*Autore*\n\n---\n\n## Uno\n\nA.\n\n### Sez\n\n## Due\n\nB.")
+    check("un «#» e più «##»: il «#» è il libro, i «##» i capitoli",
+          t == "Libro" and parts == ["# Uno\n\nA.\n\n## Sez", "# Due\n\nB."]
+          and pre == "*Autore*\n\n---")
+    _t, _p, parts = split_markdown_chapters("# Uno\n\n```\n# non tagliare\n```\n\n# Due")
+    check("mai dentro un blocco di codice", len(parts) == 2 and "# non tagliare" in parts[0])
+    t, _p, parts = split_markdown_chapters("# Uno\n\n## Sezione\n\ntesto")
+    check("anche con un «##» solo il «#» resta il titolo del libro",
+          t == "Uno" and parts == ["# Sezione\n\ntesto"])
+    check("senza titoli nessun capitolo", split_markdown_chapters("testo") == (None, "testo", []))
+
+    # --- rinominare ------------------------------------------------------
+    check("rinominare riscrive il titolo scritto",
+          rename_written_title("# Vecchio\n\ntesto", "Nuovo") == "# Nuovo\n\ntesto")
+    strano = "Uno *due* [tre] #4 & =x= $5 #"
+    check("un titolo con segni Markdown resta testo",
+          leading_title(rename_written_title("# V", strano))[1] == strano
+          and leading_title("# " + md_escape_inline("Fine #"))[1] == "Fine #")
+    check("senza titolo scritto non si tocca nulla", rename_written_title("testo", "X") is None)
+
+    # --- ogni formato: lo stesso titolo, una volta ----------------------
+    p = _progetto_titoli()
+    titoli = ["Alfa", "Beta", "GAMMA", "Delta", "Epsilon"]
+    check("l'indice usa la regola", [c.title for c in p.chapters[1:]] == titoli)
+    d = tempfile.mkdtemp()
+
+    txt = os.path.join(d, "l.txt")
+    p.export_txt(txt)
+    s = open(txt, encoding="utf-8").read()
+    check("TXT: ogni capitolo comincia con il suo titolo, una volta",
+          all(s.count(f"# {x}\n") == 1 for x in titoli)
+          and s.count("GAMMA") == 1 and "# Scritto" in s)
+
+    md = os.path.join(d, "l.md")
+    p.export_markdown(md)
+    s = open(md, encoding="utf-8").read()
+    check("Markdown: il libro «#», i capitoli «##», una volta",
+          s.startswith("# ") and all(s.count(f"## {x}\n") == 1 for x in titoli))
+    check("Markdown: le sezioni scendono a «###» e «####»",
+          "### Sezione alfa" in s and "#### Sotto alfa" in s
+          and "### Interno beta" in s and "### Scritto" in s)
+    q = Project()
+    q.import_text_file(md)
+    check("Markdown: reimportato dà gli stessi capitoli",
+          [c.title for c in q.chapters if not c.is_cover] == titoli)
+    check("Markdown: e le stesse sezioni",
+          "## Sezione alfa" in q.chapters[1].text and "### Sotto alfa" in q.chapters[1].text)
+    check("Markdown: autore e data tornano in copertina, non in un capitolo",
+          q.chapters[0].is_cover and len(q.chapters) == 6)
+
+    html = os.path.join(d, "l.html")
+    p.export_html(html)
+    s = open(html, encoding="utf-8").read()
+    check("HTML file unico: capitoli h2, una volta ciascuno",
+          all(s.count(f"<h2>{x}</h2>") == 1 for x in titoli))
+    check("HTML file unico: sezioni h3 e h4",
+          "<h3>Sezione alfa</h3>" in s and "<h4>Sotto alfa</h4>" in s
+          and "<h3>Scritto</h3>" in s)
+    folder = p.export_html(os.path.join(d, "sito"), multifile=True)
+    pagine = [open(os.path.join(folder, f"cap{n:02d}.html"), encoding="utf-8").read()
+              for n in range(1, 6)]
+    check("HTML una pagina per capitolo: il capitolo è l'h1, una volta",
+          all(pg.count("<h1>") == 1 and f"<h1>{x}</h1>" in pg
+              for pg, x in zip(pagine, titoli)))
+
+    epub = os.path.join(d, "l.epub")
+    p.export_epub(epub)
+    z = zipfile.ZipFile(epub)
+    cap = [z.read(f"OEBPS/chap{n:02d}.xhtml").decode() for n in range(1, 6)]
+    check("EPUB: ogni capitolo ha il suo h1, anche senza «#» scritto",
+          all(c.count("<h1>") == 1 and f"<h1>{x}</h1>" in c for c, x in zip(cap, titoli)))
+    check("EPUB: le sezioni sono h2 e h3",
+          "<h2>Sezione alfa</h2>" in cap[0] and "<h3>Sotto alfa</h3>" in cap[0])
+
+    odt = os.path.join(d, "l.odt")
+    p.export_odt(odt)
+    z = zipfile.ZipFile(odt)
+    c = z.read("content.xml").decode()
+    st = z.read("styles.xml").decode()
+    check("ODT: un Titolo 1 per capitolo",
+          c.count('text:style-name="Heading_20_1"') == 5
+          and all(c.count(f">{x}</text:h>") == 1 for x in titoli))
+    check("ODT: sezioni Titolo 2 e 3",
+          'text:outline-level="2">Sezione alfa<' in c
+          and 'text:outline-level="3">Sotto alfa<' in c)
+    check("ODT: il capitolo comincia su una pagina nuova",
+          'fo:break-before="page"' in st.split('Heading_20_1')[1].split("</style:style>")[0])
+
+    docx = os.path.join(d, "l.docx")
+    p.export_docx(docx)
+    z = zipfile.ZipFile(docx)
+    doc = z.read("word/document.xml").decode()
+    check("DOCX: un Titolo 1 per capitolo, con lo stile vero di Word",
+          doc.count('<w:pStyle w:val="Heading1"/>') == 5
+          and all(doc.count(f">{x}</w:t>") == 1 for x in titoli))
+    check("DOCX: sezioni Titolo 2 e 3",
+          doc.count('<w:pStyle w:val="Heading2"/>') == 3
+          and doc.count('<w:pStyle w:val="Heading3"/>') == 1)
+    names = z.namelist()
+    ok = "word/styles.xml" in names
+    if ok:
+        stx = z.read("word/styles.xml").decode()
+        minidom.parseString(stx)
+        rels = z.read("word/_rels/document.xml.rels").decode()
+        ctypes = z.read("[Content_Types].xml").decode()
+        ok = ('w:styleId="Heading1"' in stx and '<w:outlineLvl w:val="0"/>' in stx
+              and '<w:pageBreakBefore/>' in stx and 'w:styleId="Quote"' in stx
+              and 'Target="styles.xml"' in rels and "/word/styles.xml" in ctypes)
+    check("DOCX: styles.xml con i titoli di Word, la citazione e il salto pagina", ok)
+
+    pdf = os.path.join(d, "l.pdf")
+    p.export_pdf(pdf, font_size=12)
+    data = open(pdf, "rb").read()
+    # ogni titolo: voce dell'indice, segnalibro, titolo in pagina
+    conti = {x: data.count(x.encode()) for x in titoli}
+    check("PDF: ogni titolo di capitolo compare lo stesso numero di volte",
+          len(set(conti.values())) == 1 and conti["Alfa"] >= 2)
+    check("PDF: il titolo scritto diverso dal nome resta (come sezione)",
+          data.count(b"Scritto") == 1)
+
+    tex = pw_typeset.chapter_tex("Alfa", p.chapters[1].text, None, {}, 300, 500)
+    check("LaTeX: \\chapter una volta, sezioni \\section e \\subsection",
+          tex.count(r"\chapter{Alfa}") == 1 and "Alfa}" not in tex.split(r"\chapter{Alfa}")[1]
+          and r"\section*{Sezione alfa}" in tex and r"\subsection*{Sotto alfa}" in tex)
+    tex = pw_typeset.chapter_tex("Beta", p.chapters[2].text, None, {}, 300, 500)
+    check("LaTeX: un «#» nel testo è una \\section", r"\section*{Interno beta}" in tex)
+
+
+def test_comandi_di_formattazione():
+    print("comandi di formattazione (menu Formato, Ctrl+B, Ctrl+I, ...)")
+    from ruscawriter.model import (fmt_toggle_inline as inl, fmt_set_block as blk,
+                                   fmt_insert_footnote, fmt_insert_break, book_blocks)
+
+    def sel(r):
+        t, a, b = r
+        return t, t[a:b]
+
+    t = "una parola qui"
+    check("grassetto sulla selezione", sel(inl(t, 4, 10, "bold")) == ("una **parola** qui", "parola"))
+    check("e via di nuovo", inl("una **parola** qui", 6, 12, "bold")[0] == t)
+    check("anche selezionando i segni", inl("una **parola** qui", 4, 14, "bold")[0] == t)
+    check("corsivo dentro il grassetto",
+          inl("una **parola** qui", 6, 12, "italic")[0] == "una ***parola*** qui")
+    check("e via il corsivo, resta il grassetto",
+          inl("una ***parola*** qui", 7, 13, "italic")[0] == "una **parola** qui")
+    check("via il grassetto, resta il corsivo",
+          inl("una ***parola*** qui", 7, 13, "bold")[0] == "una *parola* qui")
+    r = inl(t, 6, 6, "italic")
+    check("senza selezione: la parola sotto il cursore, il cursore non salta",
+          r[0] == "una *parola* qui" and r[1] == r[2] == 7)
+    r = inl("una  qui", 4, 4, "bold")
+    check("fuori da una parola: i segni, e il cursore in mezzo",
+          r == ("una **** qui", 6, 6))
+    check("gli spazi restano fuori dai segni", inl("ciao ", 0, 5, "bold")[0] == "**ciao** ")
+    r = inl("## Titolo\n- voce uno\n\nfine", 0, 26, "bold")[0]
+    check("su più righe: riga per riga, titoli ed elenchi restano tali",
+          r == "## **Titolo**\n- **voce uno**\n\n**fine**")
+    check("il risultato è davvero grassetto per il motore",
+          book_blocks(r)[0] == ("heading", 2, [("Titolo", "bold")]))
+    check("una selezione oltre il testo non rompe nulla",
+          inl("abc", -5, 99, "bold")[0] == "**abc**")
+    check("lettere accentate e apostrofi: la parola intera",
+          inl("perché sì", 3, 3, "bold")[0] == "**perché** sì")
+
+    check("elenco puntato", blk("uno\ndue\n\ntre", 0, 7, "bullet")[0] == "- uno\n- due\n\ntre")
+    check("di nuovo: torna testo", blk("- uno\n- due", 0, 9, "bullet")[0] == "uno\ndue")
+    check("elenco numerato da 1, anche da altri blocchi",
+          blk("- uno\n- [ ] due\n> tre", 0, 20, "number")[0] == "1. uno\n2. due\n3. tre")
+    check("sezione e sottosezione sulla riga del cursore",
+          blk("testo\nriga\naltro", 7, 7, "h2")[0] == "testo\n## riga\naltro"
+          and blk("testo\n## riga", 0, 0, "h3")[0] == "### testo\n## riga")
+    check("testo normale toglie il segno", blk("> citata", 0, 0, "p")[0] == "citata")
+    check("un capitolo «#» diventa sezione", blk("# Capitolo", 0, 0, "h2")[0] == "## Capitolo")
+    check("righe vuote, immagini e filetti non si toccano",
+          blk("a\n\n![x](i.png)\n* * *", 0, 30, "quote")[0] == "> a\n\n![x](i.png)\n* * *")
+    r = blk("a\nb\nc", 2, 4, "quote")
+    check("la selezione copre le righe cambiate", sel(r) == ("a\n> b\nc", "> b"))
+
+    r = fmt_insert_footnote("Testo[^1] qui.\n\n[^1]: nota", 14)
+    check("nota: primo numero libero, definizione in fondo, cursore lì",
+          r[0] == "Testo[^1] qui.[^2]\n\n[^1]: nota\n\n[^2]: " and r[1] == len(r[0]))
+    check("e il motore la vede come nota",
+          book_blocks(r[0] + "seconda")[-1] == ("p", [[("[2] seconda", "regular")]]))
+    r = fmt_insert_break("uno\ndue\n\ntre", 1)
+    check("separatore di scena dopo il blocco, su una riga sua",
+          r[0] == "uno\n\n* * *\n\ndue\n\ntre" and book_blocks(r[0])[1] == ("rule",))
+    check("anche in un capitolo vuoto", fmt_insert_break("", 0)[0] == "* * *\n\n")
+
+    # le regole delle specifiche: i comandi lavorano sul sorgente nell'editor
+    with open(os.path.join(ROOT, "src", "ruscawriter", "editor.py"), encoding="utf-8") as f:
+        src = f.read()
+    check("l'editor usa le funzioni del modello, una sola implementazione",
+          all(n in src for n in ("fmt_toggle_inline", "fmt_set_block",
+                                 "fmt_insert_footnote", "fmt_insert_break")))
+    check("un comando è un solo passo di annullamento",
+          "buf.begin_user_action()" in src.split("def _replace_text")[1].split("def ")[0])
+    for code in ("it", "en", "de", "ja", "ar"):
+        lang = pw_i18n.load_language(code)
+        keys = ("menu_format", "fmt_bold", "fmt_italic", "fmt_paragraph", "fmt_section",
+                "fmt_subsection", "fmt_quote", "fmt_bullets", "fmt_numbers",
+                "fmt_footnote", "fmt_break", "fmt_chapter_title")
+        check(f"menu Formato tradotto: {code}", all(k in lang for k in keys))
+
+
 def main():
     for fn in (test_save_load_roundtrip, test_autosave_non_mutating,
                test_chapter_title_priority, test_export_txt,
@@ -2000,7 +2282,8 @@ def main():
                test_export_html, test_azw3_logic,
                test_epub_cover_png, test_simple_png, test_import_text,
                test_attached_images, test_formule_tabelle_immagini,
-               test_pdf_tipografico):
+               test_pdf_tipografico,
+               test_titoli_dei_capitoli, test_comandi_di_formattazione):
         fn()
     print("\n" + "=" * 50)
     print(f"RISULTATO: {PASSED} superati, {FAILED} falliti")

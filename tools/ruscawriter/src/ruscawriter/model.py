@@ -1375,6 +1375,489 @@ def block_images(blocks):
                 yield from block_images(sub)
 
 
+# ---------------------------------------------------------------------------
+# Titoli dei capitoli / chapter titles
+# ---------------------------------------------------------------------------
+# EN — One rule for the chapter list, the preview and every export (specs,
+#      section 1.2, rule 10):
+#      - a chapter's title is its name in the chapter list;
+#      - if the text opens with a heading («# …»), that heading IS the
+#        chapter title and is not repeated in the book;
+#      - every other heading of the text is a section («##») or a
+#        subsection («###»): a chapter holds no chapters, so a «#» further
+#        down counts as «##».
+#      Each format then uses its own real heading styles: Heading 1-3 in
+#      ODT/DOCX, h1-h3 in EPUB, \chapter/\section/\subsection in LaTeX.
+# IT — Una regola sola per l'indice, l'anteprima e tutti gli export
+#      (specifiche, sezione 1.2, regola 10):
+#      - il titolo di un capitolo è il suo nome nell'indice;
+#      - se il testo comincia con un titolo («# …»), quello È il titolo del
+#        capitolo e nel libro non si ripete;
+#      - ogni altro titolo del testo è una sezione («##») o una sottosezione
+#        («###»): un capitolo non contiene capitoli, quindi un «#» più avanti
+#        vale come «##».
+#      Ogni formato usa poi i suoi stili di titolo veri: Titolo 1-3 in
+#      ODT/DOCX, h1-h3 in EPUB, \chapter/\section/\subsection in LaTeX.
+CHAPTER_LEVEL = 1
+SECTION_LEVEL = 2
+MAX_HEADING_LEVEL = 6
+
+
+def leading_title(text):
+    """Il titolo che un capitolo porta scritto in testa, o None.
+
+    Restituisce (tipo, testo, prima, dopo, tratti):
+      tipo    "heading": un titolo Markdown. «# …» è la forma giusta; vale
+              anche un altro livello («## …»), come nei progetti di prima;
+              "caps": una prima riga tutta in maiuscolo, come nei testi
+              importati («CAPITOLO PRIMO»);
+      testo   il titolo in testo semplice, senza marcatori;
+      prima, dopo   le righe del sorgente che occupa (dopo esclusa);
+      tratti  il titolo come tratti (testo, stile), per chi lo impagina.
+
+    Il riconoscimento è quello del motore comune: «#etichetta» non è un
+    titolo, come vuole CommonMark. Si legge solo il primo blocco, perché
+    l'indice lo chiede a ogni tasto premuto."""
+    lines = (text or "").replace("\r\n", "\n").split("\n")
+    i = 0
+    while i < len(lines) and not lines[i].strip():
+        i += 1
+    j = i
+    while j < len(lines) and lines[j].strip():
+        j += 1
+    if i >= j:
+        return None
+    tokens = md_parser().parse("\n".join(lines[i:j]))
+    if not tokens:
+        return None
+    first = tokens[0]
+    blocks = _book_blocks(SyntaxTreeNode(tokens).children[:1])
+    if not blocks:
+        return None
+    if first.type == "heading_open" and first.map and blocks[0][0] == "heading":
+        runs = blocks[0][2]
+        plain = plain_runs(runs).strip()
+        if not plain:
+            return None
+        return ("heading", plain, i + first.map[0], i + first.map[1], runs)
+    if first.type == "paragraph_open" and blocks[0][0] == "p" and blocks[0][1]:
+        runs = blocks[0][1][0]
+        plain = plain_runs(runs).strip()
+        if plain and plain == plain.upper() and any(c.isalpha() for c in plain):
+            return ("caps", plain, i, i + 1, runs)
+    return None
+
+
+def chapter_title_lines(title, text):
+    """Il titolo scritto in testa al capitolo, se è proprio il titolo del
+    capitolo (vedi leading_title), altrimenti None. Lo è quando dice la
+    stessa cosa del nome nell'indice: senza un nome scelto dall'utente il
+    nome viene da lì, quindi coincide sempre. Se l'utente ha dato al
+    capitolo un altro nome, il titolo scritto resta nel testo come sezione:
+    nel libro non si perde nulla."""
+    lt = leading_title(text)
+    if lt is None or not (title or "").strip() or lt[1] != title.strip():
+        return None
+    return lt
+
+
+def chapter_body(title, text):
+    """Il testo del capitolo senza le righe del suo titolo, se le ha: quello
+    che nel libro viene dopo il titolo del capitolo."""
+    text = (text or "").replace("\r\n", "\n")
+    lt = chapter_title_lines(title, text)
+    if lt is None:
+        return text
+    lines = text.split("\n")
+    del lines[lt[2]:lt[3]]
+    return "\n".join(lines).lstrip("\n")
+
+
+def _demote(blocks, floor=SECTION_LEVEL):
+    """I titoli dei blocchi portati almeno al livello floor, anche dentro
+    citazioni ed elenchi: nel testo di un capitolo un «#» vale «##»."""
+    out = []
+    for b in blocks:
+        if b[0] == "heading" and b[1] < floor:
+            b = ("heading", floor, b[2])
+        elif b[0] == "quote":
+            b = ("quote", _demote(b[1], floor))
+        elif b[0] == "list":
+            b = (b[0], b[1], b[2], [(task, _demote(sub, floor)) for task, sub in b[3]])
+        out.append(b)
+    return out
+
+
+def chapter_blocks(title, text):
+    """Un capitolo come lo impagina il libro: per primo il titolo del
+    capitolo, ("heading", 1, tratti), poi i blocchi del testo (book_blocks),
+    dove ogni titolo è una sezione o una sottosezione (livello 2 o più).
+
+    È l'unico punto che decide come si presenta un capitolo: anteprima ed
+    export partono tutti da qui, quindi il titolo esce uguale ovunque, una
+    volta sola. Senza titolo (title vuoto) restano solo i blocchi del testo."""
+    text = (text or "").replace("\r\n", "\n")
+    lt = chapter_title_lines(title, text)
+    blocks = _demote(book_blocks(chapter_body(title, text)))
+    if (title or "").strip():
+        runs = list(lt[4]) if lt is not None else [(title.strip(), "regular")]
+        blocks.insert(0, ("heading", CHAPTER_LEVEL, _merge(runs)))
+    return blocks
+
+
+def relevel_headings(text, level_of):
+    """Il sorgente con i livelli dei titoli riscritti: level_of(livello)
+    dà il nuovo livello (ridotto fra 1 e 6). Cambiano solo i marcatori; il
+    resto del testo resta com'è, carattere per carattere. Un titolo
+    sottolineato (=== o ---) che va a un livello che non si può sottolineare
+    diventa un titolo con i «#».
+
+    Le posizioni dei titoli vengono dal motore comune (token.map): un «#»
+    dentro un blocco di codice non è un titolo e non si tocca."""
+    text = (text or "").replace("\r\n", "\n")
+    lines = text.split("\n")
+    edits = []
+    for tok in md_parser().parse(text):
+        if tok.type != "heading_open" or not tok.map:
+            continue
+        old = int(tok.tag[1])
+        new = max(1, min(MAX_HEADING_LEVEL, int(level_of(old))))
+        if new != old:
+            edits.append((tok.map[0], tok.map[1], tok.markup, old, new))
+    for a, b, markup, old, new in reversed(edits):
+        if markup.startswith("#"):
+            line = lines[a]
+            k = line.find("#" * old)
+            # il marcatore è la prima serie di «#» della riga: prima ci sono
+            # solo i segni dei contenitori (>, -, 1.) e gli spazi
+            if k < 0 or "#" in line[:k]:
+                continue
+            lines[a] = line[:k] + "#" * new + line[k + old:]
+        else:
+            under = lines[b - 1]
+            k = len(under) - len(under.lstrip(" \t>"))
+            body = under[k:]
+            if new in (1, 2):
+                ch = "=" if new == 1 else "-"
+                lines[b - 1] = under[:k] + body.replace(markup[0], ch)
+            else:
+                first = lines[a]
+                p = len(first) - len(first.lstrip(" \t>"))
+                words = " ".join(ln.lstrip(" \t>").strip() for ln in lines[a:b - 1])
+                lines[a:b] = [first[:p] + "#" * new + " " + words]
+    return "\n".join(lines)
+
+
+def split_markdown_chapters(text):
+    """Un documento Markdown diviso in capitoli, per l'importazione.
+
+    Restituisce (titolo_del_libro, premessa, capitoli): titolo_del_libro è
+    il testo del «#» che fa da titolo del libro (o None), premessa il testo
+    che viene prima del primo capitolo (o ""), capitoli la lista dei testi,
+    ognuno con il suo titolo «# …» in testa.
+
+    Si taglia ai titoli di primo livello che stanno fuori da citazioni,
+    elenchi e blocchi di codice (le posizioni le dà il motore comune). Se il
+    documento ha un solo «#» e dei «##» — è la forma dei file scritti
+    dall'export Markdown, e di molti libri in un file solo — il «#» è il
+    titolo del libro e si taglia ai «##», che nei capitoli diventano «#»
+    (e le loro sezioni «###» diventano «##»). Senza titoli: nessun capitolo,
+    e tutto il testo è la premessa."""
+    text = (text or "").replace("\r\n", "\n")
+    lines = text.split("\n")
+    heads = [(tok.map[0], tok.map[1], int(tok.tag[1]))
+             for tok in md_parser().parse(text)
+             if tok.type == "heading_open" and tok.level == 0 and tok.map]
+    h1 = [h for h in heads if h[2] == 1]
+    h2 = [h for h in heads if h[2] == 2]
+    if len(h1) >= 2 or (h1 and not h2):
+        cut, shift = 1, False
+    elif h2:
+        cut, shift = 2, True
+    else:
+        return None, text.strip("\n"), []
+    starts = [h[0] for h in heads if h[2] == cut]
+    pre = lines[:starts[0]]
+    book_title = None
+    if cut == 2 and h1 and h1[0][0] < starts[0]:
+        a, b, _lvl = h1[0]
+        lt = leading_title("\n".join(lines[a:b]))
+        book_title = lt[1] if lt is not None else None
+        del pre[a:b]
+    chapters = []
+    for s, e in zip(starts, starts[1:] + [len(lines)]):
+        chunk = "\n".join(lines[s:e]).strip("\n")
+        if shift:
+            chunk = relevel_headings(chunk, lambda lvl: max(1, lvl - 1))
+        chapters.append(chunk)
+    return book_title, "\n".join(pre).strip("\n"), chapters
+
+
+def _cover_extra_lines(preamble):
+    """Le righe di copertina che l'export Markdown scrive sotto il titolo del
+    libro (autore, data: righe tutte in corsivo, e filetti), come testo
+    semplice. [] se la premessa è vuota, None se contiene altro: allora è
+    testo dell'autore, e resta un capitolo."""
+    lines = []
+    for b in book_blocks(preamble):
+        if b[0] == "rule":
+            continue
+        if b[0] != "p":
+            return None
+        for line in b[1]:
+            if any(st not in ("italic", "bolditalic") for t, st in line if t.strip()):
+                return None
+            if plain_runs(line).strip():
+                lines.append(plain_runs(line).strip())
+    return lines
+
+
+# ---------------------------------------------------------------------------
+# Comandi di formattazione dell'editor / editor formatting commands
+# ---------------------------------------------------------------------------
+# EN — What the "Format" menu, the right-click menu and Ctrl+B/Ctrl+I do to
+#      the source. Pure functions on (text, start, end) — character offsets,
+#      as in Gtk.TextBuffer — that return (new_text, new_start, new_end):
+#      testable without GTK, and the editor applies the result as ONE undo
+#      step. They work on the source in the editor and do not interpret the
+#      document (specs, section 1.2, rule 1): what a line is comes from
+#      classify_md_line, i.e. from the shared engine.
+#      Only what the book can print is offered: bold, italic, sections,
+#      quotes, lists, footnotes, scene breaks. Strikethrough and highlight
+#      have no style in the book formats (see _runs), so there is no button
+#      that would do nothing.
+# IT — Cosa fanno al sorgente il menu «Formato», il menu del tasto destro e
+#      Ctrl+B/Ctrl+I. Funzioni pure su (testo, inizio, fine) — posizioni in
+#      caratteri, come in Gtk.TextBuffer — che restituiscono (nuovo_testo,
+#      nuovo_inizio, nuova_fine): si provano senza GTK, e l'editor applica il
+#      risultato come UN SOLO passo di annullamento. Lavorano sul sorgente
+#      nell'editor e non interpretano il documento (specifiche, sezione 1.2,
+#      regola 1): che cosa è una riga lo dice classify_md_line, cioè il
+#      motore comune.
+#      Si offre solo quello che il libro sa stampare: grassetto, corsivo,
+#      sezioni, citazioni, elenchi, note, separatori di scena. Barrato ed
+#      evidenziato non hanno uno stile nei formati del libro (vedi _runs),
+#      quindi nessun pulsante che non farebbe nulla.
+FMT_INLINE = {"bold": "**", "italic": "*"}
+FMT_BLOCKS = ("p", "h2", "h3", "quote", "bullet", "number")
+_TASK_BOXES = ("[ ] ", "[x] ", "[X] ")
+
+
+def _clamp(text, start, end):
+    """Inizio e fine dentro il testo, in ordine."""
+    n = len(text)
+    start, end = max(0, min(n, start)), max(0, min(n, end))
+    return min(start, end), max(start, end)
+
+
+def _line_spans(text, start, end):
+    """(inizio, fine) di ogni riga toccata dall'intervallo [start, end]. Una
+    selezione che finisce all'inizio di una riga non tocca quella riga."""
+    if end > start and end > 0 and text[end - 1] == "\n":
+        end -= 1
+    a = text.rfind("\n", 0, start) + 1
+    spans = []
+    while True:
+        b = text.find("\n", a)
+        b = len(text) if b < 0 else b
+        spans.append((a, b))
+        if b >= end or b >= len(text):
+            return spans
+        a = b + 1
+
+
+def block_prefix(line):
+    """(segno, contenuto, stile) di una riga: segno è l'inizio di blocco
+    («## », «> », «- », «1. », con i rientri e la casella di un'attività),
+    contenuto il resto, stile uno di FMT_BLOCKS (o "other" per righe vuote,
+    immagini e filetti, che i comandi di blocco lasciano stare)."""
+    kind, body, extra = classify_md_line(line)
+    if kind == "heading":
+        k = line.find(body) if body else -1
+        if k < 0:
+            return "", line, "other"
+        return line[:k], body, "h%d" % extra
+    if kind in ("bullet", "number", "quote"):
+        k = line.find(body) if body else len(line.rstrip())
+        if k < 0:
+            return "", line, "p"
+        if kind == "bullet":
+            for box in _TASK_BOXES:
+                if line.startswith(box, k):
+                    k += len(box)
+                    break
+        return line[:k], line[k:], kind
+    if kind == "text":
+        return "", line, "p"
+    return "", line, "other"
+
+
+def fmt_set_block(text, start, end, style):
+    """Le righe toccate dalla selezione diventano dello stile dato: "p"
+    (testo normale), "h2" (sezione), "h3" (sottosezione), "quote", "bullet"
+    o "number" (numerate da 1). Se lo sono già tutte, tornano testo normale:
+    lo stesso comando mette e toglie, come in un programma di videoscrittura.
+    Il contenuto delle righe non cambia; la selezione copre le righe."""
+    if style not in FMT_BLOCKS:
+        raise ValueError(style)
+    spans = _line_spans(text, *_clamp(text, start, end))
+    parts = [block_prefix(text[a:b]) for a, b in spans]
+    real = [p for p in parts if p[2] != "other" and p[1].strip()]
+    target = "p" if real and all(p[2] == style for p in real) else style
+    out, n = [], 0
+    for (a, b), (prefix, content, cur) in zip(spans, parts):
+        if cur == "other" or not content.strip():
+            out.append(text[a:b])
+            continue
+        content = content.strip()
+        n += 1
+        mark = {"p": "", "h2": "## ", "h3": "### ", "quote": "> ",
+                "bullet": "- ", "number": f"{n}. "}[target]
+        out.append(mark + content)
+    first, last = spans[0][0], spans[-1][1]
+    new = text[:first] + "\n".join(out) + text[last:]
+    return new, first, first + len("\n".join(out))
+
+
+def _star_run(text, i, step):
+    """Quanti «*» di fila partendo da i nella direzione step (-1, +1)."""
+    n = 0
+    j = i if step > 0 else i - 1
+    while 0 <= j < len(text) and text[j] == "*":
+        n += 1
+        j += step
+    return n
+
+
+def fmt_toggle_inline(text, start, end, style):
+    """Grassetto o corsivo (style "bold" o "italic") sulla selezione: lo
+    mette o, se c'è già, lo toglie. Senza selezione vale per la parola sotto
+    il cursore; fuori da una parola inserisce la coppia di segni e mette il
+    cursore in mezzo, per scrivere subito in grassetto.
+
+    Una selezione su più righe si formatta riga per riga (in Markdown il
+    grassetto non attraversa i blocchi), saltando i segni di blocco
+    («## », «- », «> »): il titolo resta un titolo. Gli spazi agli estremi
+    restano fuori dai segni, perché «** parola**» non è grassetto."""
+    mark = FMT_INLINE[style]
+    size = len(mark)
+    start, end = _clamp(text, start, end)
+    caret = None
+    if start == end:
+        a = start
+        while a > 0 and text[a - 1].isalnum():
+            a -= 1
+        b = end
+        while b < len(text) and text[b].isalnum():
+            b += 1
+        if a == b:
+            new = text[:start] + mark + mark + text[start:]
+            return new, start + size, start + size
+        caret, start, end = start, a, b
+    segs = []
+    for a, b in _line_spans(text, start, end):
+        prefix, _content, kind = block_prefix(text[a:b])
+        s = max(start, a + (len(prefix) if kind != "other" else 0))
+        e = min(end, b)
+        while s < e and text[s].isspace():
+            s += 1
+        while e > s and text[e - 1].isspace():
+            e -= 1
+        # i segni agli estremi della selezione («**parola**» selezionata per
+        # intero) contano come segni, non come testo; solo se sono in pari e
+        # dentro non ce ne sono altri, altrimenti la selezione resta com'è
+        lead = len(text[s:e]) - len(text[s:e].lstrip("*"))
+        trail = len(text[s:e]) - len(text[s:e].rstrip("*"))
+        if lead and lead == trail and "*" not in text[s + lead:e - trail]:
+            s, e = s + lead, e - trail
+        if s < e:
+            segs.append((s, e))
+    if not segs:
+        return text, start, end
+
+    def active(s, e):
+        n = min(_star_run(text, s, -1), _star_run(text, e, +1))
+        return n % 2 == 1 if style == "italic" else n >= 2
+
+    remove = all(active(s, e) for s, e in segs)
+    edits = []                         # (posizione, quanti togliere, cosa mettere)
+    for s, e in segs:
+        if remove:
+            edits += [(s - size, size, ""), (e, size, "")]
+        elif not active(s, e):
+            edits += [(s, 0, mark), (e, 0, mark)]
+    new = text
+    for pos, cut, ins in sorted(edits, reverse=True):
+        new = new[:pos] + ins + new[pos + cut:]
+
+    def moved(p, after):
+        d = 0
+        for pos, cut, ins in edits:
+            if pos < p or (after and pos == p and ins):
+                d += len(ins) - min(cut, max(0, p - pos))
+        return p + d
+
+    if caret is not None:
+        c = moved(caret, True)
+        return new, c, c
+    return new, moved(segs[0][0], True), moved(segs[-1][1], False)
+
+
+def fmt_insert_footnote(text, pos):
+    """Una nota a piè di pagina: il richiamo «[^n]» al cursore (n è il primo
+    numero libero) e la riga «[^n]: » in fondo al capitolo, con il cursore
+    lì, pronto per scrivere la nota. Nel libro le note vanno in fondo al
+    capitolo, numerate."""
+    pos = _clamp(text, pos, pos)[0]
+    used = {int(m) for m in re.findall(r"\[\^(\d+)\]", text)}
+    n = 1
+    while n in used:
+        n += 1
+    ref = f"[^{n}]"
+    body = text[:pos] + ref + text[pos:]
+    tail = body.rstrip("\n")
+    new = tail + ("\n\n" if tail else "") + f"[^{n}]: "
+    return new, len(new), len(new)
+
+
+def fmt_insert_break(text, pos):
+    """Un separatore di scena («* * *», nel libro un filetto o tre
+    asterischi centrati) fra il blocco del cursore e il successivo, con una
+    riga vuota prima e dopo; il cursore va sotto il separatore."""
+    pos = _clamp(text, pos, pos)[0]
+    end = text.find("\n", pos)
+    end = len(text) if end < 0 else end
+    before, after = text[:end].rstrip("\n"), text[end:].lstrip("\n")
+    head = before + ("\n\n" if before else "") + "* * *\n\n"
+    return head + after, len(head), len(head)
+
+
+def md_escape_inline(text):
+    """Un testo semplice scritto in Markdown in modo che resti quello: i
+    segni che il motore leggerebbe come formattazione prendono la barra
+    rovesciata. Serve quando il programma scrive nel sorgente un testo che
+    l'utente ha digitato in un campo (il titolo di un capitolo)."""
+    out = "".join("\\" + c if c in "\\`*_[]<>~=$&^|" else c for c in text)
+    # un «#» in fondo chiuderebbe il titolo e sparirebbe
+    if out.endswith("#"):
+        k = len(out) - len(out.rstrip("#"))
+        out = out[:-k] + "\\#" * k
+    return out
+
+
+def rename_written_title(text, new_title):
+    """Il testo con il titolo scritto in testa al capitolo («# …», o la riga
+    in maiuscolo) sostituito da «# nuovo titolo», o None se il capitolo non
+    ha un titolo scritto. Così rinominare un capitolo cambia anche il titolo
+    che si vede nel testo: il titolo sta in un posto solo."""
+    lt = leading_title(text)
+    if lt is None or not (new_title or "").strip():
+        return None
+    lines = (text or "").replace("\r\n", "\n").split("\n")
+    lines[lt[2]:lt[3]] = ["# " + md_escape_inline(new_title.strip())]
+    return "\n".join(lines)
+
+
 _RE_QUOTE_PREFIX = re.compile(r"^[ \t]*(?:>[ \t]?)+")
 
 
@@ -2799,13 +3282,11 @@ def write_pdf(path, chapters, title="",
         # Il capitolo arriva come paragrafi separati da righe vuote; il
         # motore lo legge tutto insieme (book_blocks) e dopo ogni blocco
         # resta mezza interlinea, come fra i paragrafi di prima.
-        blocks = book_blocks("\n\n".join(paragraphs))
-        # Un capitolo che non comincia con un titolo («# …») riceve quello
-        # dell'indice: senza, la sua prima pagina non direbbe che capitolo è
-        # (la testatina lì non c'è).
-        if ci < len(chapter_titles) and chapter_titles[ci] \
-                and not (blocks and blocks[0][0] == "heading"):
-            blocks.insert(0, ("heading", 1, [(chapter_titles[ci], "bold")]))
+        # Il titolo del capitolo apre la sua prima pagina, una volta sola,
+        # come in ogni altro export (chapter_blocks): senza, la pagina non
+        # direbbe che capitolo è (la testatina lì non c'è).
+        ctitle = chapter_titles[ci] if ci < len(chapter_titles or []) else ""
+        blocks = chapter_blocks(ctitle, "\n\n".join(paragraphs))
         for block in blocks:
             blocks_out([block])
             y -= leading * 0.5
@@ -3929,26 +4410,18 @@ class Chapter:
 
     def title_with_fallback(self, fallback_template="Capitolo {n}", cover_label="Copertina"):
         """Titolo del capitolo. Priorita': titolo personalizzato dell'utente,
-        poi intestazione markdown (# Titolo), poi prima riga tutta in MAIUSCOLO;
-        altrimenti il fallback. La copertina mostra sempre l'etichetta dedicata."""
+        poi il titolo scritto in testa al testo («# Titolo», o una prima riga
+        tutta in MAIUSCOLO: vedi leading_title); altrimenti il fallback. La
+        copertina mostra sempre l'etichetta dedicata. Gli export usano questo
+        titolo per il capitolo e non ripetono la riga da cui viene (vedi
+        chapter_blocks)."""
         if self.is_cover:
             return cover_label
         if self.custom_title.strip():
             return self.custom_title.strip()
-        for line in self.text.splitlines():
-            stripped = line.strip()
-            if not stripped:
-                continue
-            # intestazione markdown: # Titolo, ## Titolo, ...
-            if stripped.startswith("#"):
-                heading = stripped.lstrip("#").strip()
-                if heading:
-                    return heading
-            # prima riga interamente maiuscola
-            if stripped == stripped.upper() and any(c.isalpha() for c in stripped):
-                return stripped
-            # se la prima riga non vuota non e' un titolo, fermati comunque
-            break
+        lt = leading_title(self.text)
+        if lt is not None:
+            return lt[1]
         return fallback_template.format(n=self.index)
 
     @property
@@ -4178,23 +4651,28 @@ class Project:
         # suddivisione in capitoli
         chunks = []   # lista di (titolo_opzionale, testo)
         if is_md:
-            # taglia ad ogni intestazione di livello 1 o 2 mantenendola nel testo
-            lines = raw.split("\n")
-            current = []
-            current_title = ""
-            def flush():
-                if current and any(l.strip() for l in current):
-                    chunks.append((current_title, "\n".join(current).strip("\n")))
-            for line in lines:
-                m = re.match(r"^(#{1,2})\s+(.*)$", line.strip())
-                if m:
-                    # nuova sezione: salva la precedente e inizia
-                    flush()
-                    current = [line]
-                    current_title = m.group(2).strip()
-                else:
-                    current.append(line)
-            flush()
+            # EN: cut at the chapter headings found by the shared engine
+            #     (never inside code blocks); with one «#» and several «##»
+            #     the «#» is the book title (split_markdown_chapters).
+            # IT: taglia ai titoli di capitolo trovati dal motore comune (mai
+            #     dentro i blocchi di codice); con un «#» e più «##» il «#» è
+            #     il titolo del libro (split_markdown_chapters).
+            book_title, preamble, parts = split_markdown_chapters(raw)
+            if book_title:
+                cover.text = self._make_cover_text(book_title)
+                # quello che sta fra il titolo del libro e il primo capitolo:
+                # le righe in corsivo e i filetti che scrive l'export Markdown
+                # (autore, data) vanno in copertina; un testo vero resta un
+                # capitolo, perché non si perde nulla
+                extra = _cover_extra_lines(preamble)
+                if extra is not None:
+                    if extra:
+                        cover.text += "\n\n" + "\n".join(extra)
+                    preamble = ""
+            if parts:
+                if preamble.strip():
+                    chunks.append(("", preamble))
+                chunks.extend(("", part) for part in parts)
         if not chunks:
             # TXT, o MD senza intestazioni: prova a spezzare su separatori tipici
             # (righe con soli '***', '---' o '* * *'); altrimenti capitolo unico
@@ -4431,10 +4909,14 @@ class Project:
                 sep()
                 out.write("\n".join(front))
                 out.write("\n")
-            for ch in self.chapters:
-                if ch.is_cover:
-                    continue
+            for ch_title, text in self._ordered_chapters():
                 sep()
+                # EN: every chapter opens with its title, written once (the
+                #     same rule as the other exports: chapter_body).
+                # IT: ogni capitolo comincia con il suo titolo, scritto una
+                #     volta sola (la stessa regola degli altri export:
+                #     chapter_body).
+                out.write(f"# {ch_title}\n\n")
                 # EN: plain text cannot embed pictures: each attached image
                 #     becomes a bracketed line with its caption (or name).
                 # IT: il testo semplice non incorpora figure: ogni immagine
@@ -4443,8 +4925,9 @@ class Project:
                 body = "\n".join(
                     f"[{(m.group('alt') or m.group('src')).strip()}]"
                     if (m := _IMG_LINE_RE.match(ln.strip())) else ln
-                    for ln in _tables_to_text(render_math(ch.text)).split("\n"))
-                out.write(body.rstrip("\n"))
+                    for ln in _tables_to_text(render_math(
+                        chapter_body(ch_title, text))).split("\n"))
+                out.write(body.strip("\n"))
                 out.write("\n")
             colo = self._colophon_paragraphs()
             if colo:
@@ -4512,7 +4995,7 @@ class Project:
                 continue
             n += 1
             title = ch.title_with_fallback(
-                fallback_template="Capitolo {n}".replace("{n}", str(n)))
+                fallback_template=self.t_chapter_label().replace("{n}", str(n)))
             out.append((title, ch.text))
         return out
 
@@ -4602,12 +5085,13 @@ class Project:
     def export_markdown(self, path):
         """EN: Export the whole project to a single Markdown file. Title as
         H1, cover as the opening block, each chapter with its own H2 heading
-        (unless the text already starts with one). Attached images are copied
+        written once, its sections one level down. Attached images are copied
         to a sibling '<name>_img/' folder and the ![..](..) references are
         rewritten to point there, so the exported file works anywhere.
         IT: Esporta tutto il progetto in un unico file Markdown. Titolo come
         H1, copertina come blocco iniziale, ogni capitolo con la propria
-        intestazione H2 (se il testo non ne ha già una). Le immagini allegate
+        intestazione H2 scritta una volta, le sue sezioni un livello sotto.
+        Le immagini allegate
         vengono copiate in una cartella affiancata '<nome>_img/' e i
         riferimenti ![..](..) riscritti verso di essa, così il file esportato
         funziona ovunque."""
@@ -4641,27 +5125,36 @@ class Project:
             for extra in cover_lines[1:]:
                 out.write(f"*{extra}*\n\n")
             out.write("---\n\n")
-            # frontespizio (dopo la copertina), se presente
+            # frontespizio (dopo la copertina), se presente. Il suo titolo è
+            # in grassetto, non un «##»: nel file i «##» sono i capitoli, e
+            # chi lo reimporta li usa come punti di taglio.
             front = self._front_paragraphs()
             if front:
                 for j, ln in enumerate(front):
                     if j == 0:
-                        out.write(f"## {ln}\n\n")
+                        out.write(f"**{ln}**\n\n")
                     else:
                         out.write(f"*{ln}*\n\n")
                 out.write("---\n\n")
             for ch_title, text in self._ordered_chapters():
+                # EN: one file, one outline: the book is the «#», every
+                #     chapter a «##» with its title written once, and the
+                #     chapter's sections move one level down («##» -> «###»).
+                #     Re-importing the file undoes exactly this
+                #     (split_markdown_chapters).
+                # IT: un file, una struttura sola: il libro è il «#», ogni
+                #     capitolo un «##» con il suo titolo scritto una volta, e
+                #     le sezioni del capitolo scendono di un livello («##» ->
+                #     «###»). Reimportare il file fa esattamente il contrario
+                #     (split_markdown_chapters).
+                body = chapter_body(ch_title, text).rstrip("\n")
+                body = relevel_headings(body, lambda lvl: max(SECTION_LEVEL, lvl) + 1)
                 # ogni a capo di RuscaWriter è un paragrafo anche per CommonMark
-                body = rewrite_refs(commonmark_paragraphs(text.rstrip("\n")))
-                # EN: if the text already opens with a Markdown heading we do
-                #     not add a duplicate title.
-                # IT: se il testo inizia già con un'intestazione markdown, non
-                #     aggiungiamo un titolo doppio.
-                first = body.lstrip().split("\n", 1)[0] if body else ""
-                if not first.startswith("#"):
-                    out.write(f"## {ch_title}\n\n")
-                out.write(body)
-                out.write("\n\n")
+                body = rewrite_refs(commonmark_paragraphs(body))
+                out.write(f"## {ch_title}\n\n")
+                if body.strip():
+                    out.write(body)
+                    out.write("\n\n")
             # colophon in fondo, se presente
             colo = self._colophon_paragraphs()
             if colo:
@@ -4717,7 +5210,7 @@ class Project:
                 f'<table:table-header-rows>{row(header, "RwCellHead", "H")}'
                 f'</table:table-header-rows>{body_rows}</table:table>')
 
-    def _doc_blocks(self, text):
+    def _doc_blocks(self, text, blocks=None):
         """EN: Turn a chapter's Markdown into a list of (kind, content)
         blocks shared by the ODT and DOCX exports, from book_blocks. Kinds:
         h1/h2/h3, bullet, quote, p, rule, image (content = (caption,
@@ -4728,7 +5221,9 @@ class Project:
         book_blocks. Tipi: h1/h2/h3, bullet, quote, p, rule, image
         (contenuto = (didascalia, nome_interno)) e table (contenuto =
         (allineamenti, intestazione, righe)). La formattazione inline viene
-        rimossa (testo piano) per restare semplice e robusta."""
+        rimossa (testo piano) per restare semplice e robusta.
+        blocks: i blocchi già pronti (per esempio quelli di chapter_blocks,
+        con il titolo del capitolo in testa) al posto di quelli di text."""
         out = []
 
         def walk(blocks, quote=False):
@@ -4766,10 +5261,10 @@ class Project:
                     out.extend((para, ln) for ln in b[2].split("\n"))
                 elif kind == "math":
                     out.append((para, b[1]))
-        walk(book_blocks(text))
+        walk(book_blocks(text) if blocks is None else blocks)
         return out
 
-    def _blocks_to_html(self, text, image_html=None):
+    def _blocks_to_html(self, text, image_html=None, blocks=None, shift=0):
         """EN: Convert a chapter's Markdown to HTML (list of strings),
         recognizing headings, lists, quotes, attached images and inline
         formatting (bold, italic, code). Used by the HTML and EPUB exports.
@@ -4782,7 +5277,10 @@ class Project:
         export HTML ed EPUB. image_html(didascalia, nome) restituisce il
         markup per un'immagine allegata (o None per ometterla); il default
         emette un <figure> il cui <img> incorpora i byte come data URI
-        base64 (file unico autosufficiente)."""
+        base64 (file unico autosufficiente).
+        blocks: i blocchi già pronti (chapter_blocks) al posto di quelli di
+        text; shift: quanti livelli scendono i titoli (1 nell'HTML a file
+        unico, dove il titolo del libro è l'h1 e i capitoli sono h2)."""
         from xml.sax.saxutils import escape as esc
 
         def default_image_html(alt, name):
@@ -4829,7 +5327,8 @@ class Project:
             for b in blocks:
                 kind = b[0]
                 if kind == "heading":
-                    out.append(f"<h{b[1]}>{inline(b[2])}</h{b[1]}>")
+                    lvl = min(MAX_HEADING_LEVEL, b[1] + shift)
+                    out.append(f"<h{lvl}>{inline(b[2])}</h{lvl}>")
                 elif kind == "p":
                     out.append(lines_html(b[1]) if tight else f"<p>{lines_html(b[1])}</p>")
                 elif kind == "list":
@@ -4858,7 +5357,7 @@ class Project:
                     out.append(f'<p class="math">{esc(b[1])}</p>')
             return out
 
-        return blocks_html(book_blocks(text))
+        return blocks_html(book_blocks(text) if blocks is None else blocks)
 
     # foglio di stile condiviso dalle pagine HTML esportate
     _HTML_CSS = (
@@ -4982,11 +5481,10 @@ class Project:
             # capitoli
             for n, (ct, text) in enumerate(chapters, 1):
                 parts.append(f'<section id="cap{n}">')
-                blocks = self._blocks_to_html(text)
-                starts_h = bool(blocks) and blocks[0].startswith("<h")
-                if not starts_h:
-                    parts.append(f"<h2>{esc(ct)}</h2>")
-                parts.extend(blocks)
+                # il capitolo è un h2 (l'h1 è il titolo del libro), le sue
+                # sezioni h3: la stessa struttura dell'export Markdown
+                parts.extend(self._blocks_to_html(
+                    None, blocks=chapter_blocks(ct, text), shift=1))
                 parts.append('</section>')
             colo = colophon_html()
             if colo:
@@ -5029,12 +5527,8 @@ class Project:
 
         # un file per capitolo, con navigazione avanti/indietro
         for i, (fn, (ct, text)) in enumerate(zip(filenames, chapters)):
-            body = []
-            blocks = self._blocks_to_html(text)
-            starts_h = bool(blocks) and blocks[0].startswith("<h")
-            if not starts_h:
-                body.append(f"<h2>{esc(ct)}</h2>")
-            body.extend(blocks)
+            # una pagina per capitolo: il capitolo è il suo h1
+            body = list(self._blocks_to_html(None, blocks=chapter_blocks(ct, text)))
             # barra di navigazione tra capitoli
             nav = ['<div class="chapter-nav">']
             if i > 0:
@@ -5133,12 +5627,8 @@ class Project:
             style = "Title" if j == 0 else "Author"
             body.append(f'<text:p text:style-name="{style}">{escape(ln)}</text:p>')
         for ch_title, text in self._ordered_chapters():
-            body_blocks = self._doc_blocks(text)
-            # se il capitolo inizia gia' con un'intestazione, non duplicare
-            starts_with_heading = bool(body_blocks) and body_blocks[0][0].startswith("h")
-            if not starts_with_heading:
-                body.append(f'<text:h text:style-name="Heading_20_1" '
-                            f'text:outline-level="1">{escape(ch_title)}</text:h>')
+            # il titolo del capitolo è il primo blocco (Titolo 1), una volta
+            body_blocks = self._doc_blocks(None, chapter_blocks(ch_title, text))
             for kind, content in body_blocks:
                 if kind == "image":
                     # EN: attached image as a centered frame + italic caption.
@@ -5257,6 +5747,9 @@ class Project:
             '<style:style style:name="Standard" style:family="paragraph"/>\n'
             '<style:style style:name="Heading_20_1" style:family="paragraph" '
             'style:display-name="Heading 1">'
+            # il capitolo comincia su una pagina nuova, come nel PDF
+            '<style:paragraph-properties fo:break-before="page" '
+            'fo:keep-with-next="always"/>'
             '<style:text-properties fo:font-size="18pt" fo:font-weight="bold" '
             'fo:color="#5C2A55"/></style:style>\n'
             '<style:style style:name="Heading_20_2" style:family="paragraph" '
@@ -5297,6 +5790,42 @@ class Project:
             z.writestr("META-INF/manifest.xml", manifest, zipfile.ZIP_DEFLATED)
             for (ipath, _m, idata) in img_entries:
                 z.writestr(ipath, idata, zipfile.ZIP_STORED)
+
+    # EN: the styles of the DOCX export. The headings are Word's built-in
+    #     ones (styleId Heading1..3, name "heading 1".., outline level), so
+    #     Word and LibreOffice show them in the navigation pane and build
+    #     the table of contents from them; a chapter (Heading 1) starts on a
+    #     new page, as in the PDF.
+    # IT: gli stili dell'export DOCX. I titoli sono quelli predefiniti di
+    #     Word (styleId Heading1..3, nome "heading 1".., livello di
+    #     struttura), così Word e LibreOffice li mostrano nel riquadro di
+    #     spostamento e ci costruiscono l'indice; un capitolo (Titolo 1)
+    #     comincia su una pagina nuova, come nel PDF.
+    _DOCX_STYLES = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+        '<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        '<w:style w:type="paragraph" w:default="1" w:styleId="Normal">'
+        '<w:name w:val="Normal"/><w:qFormat/>'
+        '<w:pPr><w:spacing w:after="120"/></w:pPr></w:style>'
+        + "".join(
+            f'<w:style w:type="paragraph" w:styleId="Heading{lvl}">'
+            f'<w:name w:val="heading {lvl}"/><w:basedOn w:val="Normal"/>'
+            '<w:next w:val="Normal"/><w:uiPriority w:val="9"/><w:qFormat/>'
+            '<w:pPr><w:keepNext/><w:keepLines/>'
+            + ('<w:pageBreakBefore/>' if lvl == 1 else '')
+            + f'<w:spacing w:before="{before}" w:after="{after}"/>'
+            f'<w:outlineLvl w:val="{lvl - 1}"/></w:pPr>'
+            f'<w:rPr><w:b/>{color}<w:sz w:val="{size}"/><w:szCs w:val="{size}"/></w:rPr>'
+            '</w:style>'
+            for lvl, size, before, after, color in (
+                (1, 36, 480, 240, '<w:color w:val="5C2A55"/>'),
+                (2, 30, 360, 120, ''),
+                (3, 26, 240, 120, '')))
+        + '<w:style w:type="paragraph" w:styleId="Quote">'
+        '<w:name w:val="Quote"/><w:basedOn w:val="Normal"/><w:qFormat/>'
+        '<w:pPr><w:ind w:left="720" w:right="720"/></w:pPr>'
+        '<w:rPr><w:i/><w:color w:val="444444"/></w:rPr></w:style>'
+        '</w:styles>')
 
     def export_docx(self, path, page_size=None, margins=None):
         """Esporta in Word (.docx) usando solo la libreria standard.
@@ -5453,10 +5982,8 @@ class Project:
             paras.append(para(""))
         # capitoli
         for ch_title, text in self._ordered_chapters():
-            body_blocks = self._doc_blocks(text)
-            starts_with_heading = bool(body_blocks) and body_blocks[0][0].startswith("h")
-            if not starts_with_heading:
-                paras.append(para(ch_title, bold=True, size=18, color="5C2A55"))
+            # il titolo del capitolo è il primo blocco (Titolo 1), una volta
+            body_blocks = self._doc_blocks(None, chapter_blocks(ch_title, text))
             for kind, content in body_blocks:
                 if kind == "image":
                     # EN: attached image + optional italic caption below.
@@ -5477,12 +6004,10 @@ class Project:
                 if kind == "rule":
                     paras.append(para("*   *   *", align="center"))
                     continue
-                if kind == "h1":
-                    paras.append(para(content, bold=True, size=18, color="5C2A55"))
-                elif kind == "h2":
-                    paras.append(para(content, bold=True, size=15))
-                elif kind == "h3":
-                    paras.append(para(content, bold=True, size=13))
+                if kind in ("h1", "h2", "h3"):
+                    # stili di titolo veri: Word li mostra nel riquadro di
+                    # spostamento e li usa per l'indice automatico
+                    paras.append(para(content, style="Heading" + kind[1]))
                 elif kind == "bullet":
                     paras.append(para("• " + content))
                 elif kind == "quote":
@@ -5556,6 +6081,9 @@ class Project:
             '<Override PartName="/word/document.xml" '
             'ContentType="application/vnd.openxmlformats-officedocument.'
             'wordprocessingml.document.main+xml"/>'
+            '<Override PartName="/word/styles.xml" '
+            'ContentType="application/vnd.openxmlformats-officedocument.'
+            'wordprocessingml.styles+xml"/>'
             + ('<Override PartName="/word/settings.xml" '
                'ContentType="application/vnd.openxmlformats-officedocument.'
                'wordprocessingml.settings+xml"/>' if settings_xml else '') +
@@ -5570,32 +6098,36 @@ class Project:
             'relationships/officeDocument" Target="word/document.xml"/>'
             '</Relationships>')
 
-        # EN: document relationships: one entry per embedded picture.
-        # IT: relazioni del documento: una voce per ogni immagine incorporata.
-        doc_rels = None
-        if media or settings_xml:
-            rel_items = "".join(
-                f'<Relationship Id="{rid}" '
-                'Type="http://schemas.openxmlformats.org/officeDocument/2006/'
-                f'relationships/image" Target="media/{fname}"/>'
-                for (rid, fname, _b) in media)
-            if settings_xml:
-                rel_items += (
-                    '<Relationship Id="rIdSettings" '
-                    'Type="http://schemas.openxmlformats.org/officeDocument/'
-                    '2006/relationships/settings" Target="settings.xml"/>')
-            doc_rels = (
-                '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
-                '<Relationships '
-                'xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
-                + rel_items + '</Relationships>')
+        # EN: document relationships: the styles, one entry per embedded
+        #     picture, and the settings when there are any.
+        # IT: relazioni del documento: gli stili, una voce per ogni immagine
+        #     incorporata, e le impostazioni quando ci sono.
+        rel_items = (
+            '<Relationship Id="rIdStyles" '
+            'Type="http://schemas.openxmlformats.org/officeDocument/2006/'
+            'relationships/styles" Target="styles.xml"/>')
+        rel_items += "".join(
+            f'<Relationship Id="{rid}" '
+            'Type="http://schemas.openxmlformats.org/officeDocument/2006/'
+            f'relationships/image" Target="media/{fname}"/>'
+            for (rid, fname, _b) in media)
+        if settings_xml:
+            rel_items += (
+                '<Relationship Id="rIdSettings" '
+                'Type="http://schemas.openxmlformats.org/officeDocument/'
+                '2006/relationships/settings" Target="settings.xml"/>')
+        doc_rels = (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+            '<Relationships '
+            'xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            + rel_items + '</Relationships>')
 
         with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
             z.writestr("[Content_Types].xml", content_types)
             z.writestr("_rels/.rels", rels)
             z.writestr("word/document.xml", document)
-            if doc_rels:
-                z.writestr("word/_rels/document.xml.rels", doc_rels)
+            z.writestr("word/styles.xml", self._DOCX_STYLES)
+            z.writestr("word/_rels/document.xml.rels", doc_rels)
             if settings_xml:
                 z.writestr("word/settings.xml", settings_xml)
             if media:
@@ -5648,7 +6180,7 @@ class Project:
                 n += 1
                 chapters_paragraphs.append(paras)
                 chapter_titles.append(ch.title_with_fallback(
-                    fallback_template="Capitolo {n}".replace("{n}", str(n))))
+                    fallback_template=self.t_chapter_label().replace("{n}", str(n))))
         leading = int(round(font_size * 1.45))
         cover_img = None
         if self.cover_image:
@@ -5937,11 +6469,13 @@ class Project:
                     f'<img src="images/{name}" alt="{esc(alt)}" '
                     f'style="max-width:100%;"/></div>{cap}')
 
-        def md_to_html(text):
-            """EN: chapter Markdown -> XHTML body, via the shared converter.
+        def md_to_html(title, text):
+            """EN: chapter Markdown -> XHTML body, via the shared converter,
+            the chapter title first (h1), once.
             IT: markdown del capitolo -> corpo XHTML, tramite il convertitore
-            condiviso."""
-            out = self._blocks_to_html(text, image_html=epub_image_html)
+            condiviso, con in testa il titolo del capitolo (h1), una volta."""
+            out = self._blocks_to_html(None, image_html=epub_image_html,
+                                       blocks=chapter_blocks(title, text))
             return "\n".join(out) if out else "<p></p>"
 
         XHTML = ('<?xml version="1.0" encoding="utf-8"?>\n'
@@ -6056,10 +6590,10 @@ class Project:
                 continue
             n += 1
             ch_title = ch.title_with_fallback(
-                fallback_template="Capitolo {n}".replace("{n}", str(n)))
+                fallback_template=self.t_chapter_label().replace("{n}", str(n)))
             fname = f"chap{n:02d}.xhtml"
             sections.append((f"chap{n:02d}", fname, ch_title,
-                             md_to_html(ch.text), True))
+                             md_to_html(ch_title, ch.text), True))
             chap_entries.append((fname, ch_title))
 
         # colophon (ultima sezione), se presente
@@ -6167,6 +6701,11 @@ class Project:
     def t_index_label(self):
         """Etichetta 'Indice' nella lingua del progetto (fallback IT/EN)."""
         return "Indice" if getattr(self, "_lang", "it") == "it" else "Contents"
+
+    def t_chapter_label(self):
+        """Titolo di ripiego di un capitolo senza nome, nella lingua del
+        progetto (fallback IT/EN), con il segnaposto {n}."""
+        return "Capitolo {n}" if getattr(self, "_lang", "it") == "it" else "Chapter {n}"
 
     @staticmethod
     def _find_calibre_converter():

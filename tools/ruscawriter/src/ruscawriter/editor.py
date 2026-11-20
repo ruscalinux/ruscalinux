@@ -166,8 +166,10 @@ from .model import (
 # evidenziazione devono mostrare cio' che gli export produrranno.
 # EN/IT: picture boxes for the preview / riquadri delle immagini nell'anteprima
 from . import rusca_liveblocks
-from .model import (classify_md_line, book_blocks, highlight_spans, list_lines,
-                    plain_runs, wrapped_runs, unwrap_hard_breaks)
+from .model import (book_blocks, chapter_blocks, highlight_spans,
+                    list_lines, plain_runs, wrapped_runs, unwrap_hard_breaks,
+                    fmt_toggle_inline, fmt_set_block, fmt_insert_footnote,
+                    fmt_insert_break, leading_title, rename_written_title)
 from .i18n import apply_toolkit_language
 from .i18n import (Translator, LANGUAGES, LOCALE_ALIASES, available_languages,
                    spell_locale_for,
@@ -1584,6 +1586,10 @@ class RuscaWriterWindow(Adw.ApplicationWindow):
         self._set_font_size(self.font_size - 1)
         return True
 
+    def on_font_reset(self, *_):
+        self._set_font_size(DEFAULT_FONT_SIZE)
+        return True
+
     def _apply_layout(self, _retries=0):
         # La visibilita' dei pannelli va impostata SEMPRE, anche se la larghezza
         # non e' ancora nota (durante le transizioni fullscreen puo' essere <=1):
@@ -1900,7 +1906,8 @@ class RuscaWriterWindow(Adw.ApplicationWindow):
             ("new",          self.on_new,            ["<Control>n"]),
             ("open",         self.on_open,           ["<Control>o"]),
             ("save",         self.on_save,           ["<Control>s"]),
-            ("import_chapters", self.on_import_chapters, ["<Control>i"]),
+            # EN/IT: Ctrl+I is italic, as in every word processor
+            ("import_chapters", self.on_import_chapters, ["<Control><Shift>o"]),
             ("sections",     self.on_edit_sections,  []),
             ("export_txt",   self.on_export,         []),
             ("export_md",    self.on_export_markdown, []),
@@ -1937,6 +1944,9 @@ class RuscaWriterWindow(Adw.ApplicationWindow):
              ["<Control>plus", "<Control>equal", "<Control>KP_Add"]),
             ("font_dec",     self.on_font_decrease,
              ["<Control>minus", "<Control>KP_Subtract"]),
+            # EN/IT: back to the default size (specs, 3.9) / di nuovo la
+            # dimensione predefinita (specifiche, 3.9)
+            ("font_reset",   self.on_font_reset, ["<Control>0", "<Control>KP_0"]),
             ("preview",      self.on_toggle_preview, ["<Control>e"]),
             ("preview_all",  self.on_toggle_preview_whole, ["<Control><Shift>e"]),
             ("goal",         self.on_set_goal,       []),
@@ -1944,6 +1954,9 @@ class RuscaWriterWindow(Adw.ApplicationWindow):
             ("shortcuts",    self.show_shortcuts,    ["<Control>question"]),
             ("md_help",      self.on_md_help,        ["<Shift>F1"]),
         ]
+        handlers = self._format_handlers()
+        simple += [(name, handlers[name], accels)
+                   for name, _key, accels in self.FORMAT_ACTIONS]
         self._switch_actions = {}
         for name, handler, accels in simple:
             act = Gio.SimpleAction.new(name, None)
@@ -2059,6 +2072,7 @@ class RuscaWriterWindow(Adw.ApplicationWindow):
         c3.append(self.t("mi_insert_image"), "win.insert_image")
         m_chapter.append_section(None, c3)
         book.append_submenu(self.t("menu_edit"), m_chapter)
+        book.append_submenu(self._t_or("menu_format", "Formato"), self._build_format_menu())
         book.append(self.t("mi_sections"), "win.sections")
         book.append(self._t_or("mi_page_setup", "Impostazione pagina\u2026"), "win.page_setup")
         book.append(self.t("mi_goal"), "win.goal")
@@ -2092,6 +2106,7 @@ class RuscaWriterWindow(Adw.ApplicationWindow):
         v3 = Gio.Menu()
         v3.append(self.t("mi_font_inc"), "win.font_inc")
         v3.append(self.t("mi_font_dec"), "win.font_dec")
+        v3.append(self._t_or("mi_font_reset", "Dimensione predefinita"), "win.font_reset")
         v3.append(self._t_or("mi_font", "Caratteri…"), "win.choose_font")
         m_view.append_section(None, v3)
         widths = Gio.Menu()
@@ -2133,6 +2148,14 @@ class RuscaWriterWindow(Adw.ApplicationWindow):
         if getattr(self, "menu_button", None) is not None:
             self.menu_button.set_menu_model(self._build_menu_model())
             self.menu_button.set_tooltip_text(self.t("main_menu"))
+        if getattr(self, "format_button", None) is not None:
+            self.format_button.set_menu_model(self._build_format_menu())
+            self._sync_format_button()
+
+    def _sync_format_button(self):
+        tip = self._t_or("menu_format", "Formato")
+        self.format_button.set_tooltip_text(tip)
+        self.format_button.update_property([Gtk.AccessibleProperty.LABEL], [tip])
 
     # ---- interfaccia --------------------------------------------------------
     def _build_ui(self):
@@ -2172,6 +2195,13 @@ class RuscaWriterWindow(Adw.ApplicationWindow):
                 header.pack_start(b)
             else:
                 header.pack_end(b)
+
+        # EN: "Format" button, right after "+": one icon, the whole menu.
+        # IT: pulsante «Formato», subito dopo «+»: un'icona, tutto il menu.
+        self.format_button = Gtk.MenuButton(icon_name="format-text-rich-symbolic",
+                                            menu_model=self._build_format_menu())
+        self._sync_format_button()
+        header.pack_start(self.format_button)
 
         # Dimensione del testo e lingua del correttore: nella barra in basso.
         adj = Gtk.Adjustment(value=self.font_size, lower=MIN_FONT_SIZE,
@@ -2604,6 +2634,7 @@ class RuscaWriterWindow(Adw.ApplicationWindow):
         self.text_view.set_cursor_visible(enabled)
         self.note_view.set_editable(enabled)
         self.note_view.set_cursor_visible(enabled)
+        self._update_format_actions()
 
     def _select_row(self, row):
         if 0 <= row < self.list_store.get_n_items():
@@ -2690,6 +2721,7 @@ class RuscaWriterWindow(Adw.ApplicationWindow):
         self._loading = False
         self._highlight_markdown()
         self._update_wordcount()
+        self._update_format_actions()
         if getattr(self, "_preview_mode", False):
             self._render_preview()
 
@@ -3260,6 +3292,123 @@ class RuscaWriterWindow(Adw.ApplicationWindow):
                                ["*.png", "*.jpg", "*.jpeg", "*.webp"],
                                self.t("filter_image"), on_path)
 
+    # ---- formattazione / formatting ------------------------------------------
+    # EN: the "Format" button, the right-click menu, the main menu and the
+    #     keyboard all run these few actions; the edits themselves are the
+    #     pure functions fmt_* of model.py.
+    # IT: il pulsante «Formato», il menu del tasto destro, il menu principale
+    #     e la tastiera usano tutti queste poche azioni; le modifiche vere sono
+    #     le funzioni pure fmt_* di model.py.
+    FORMAT_ACTIONS = (
+        # (azione, chiave della voce, tasti)
+        ("fmt_bold", "fmt_bold", ["<Control>b"]),
+        ("fmt_italic", "fmt_italic", ["<Control>i"]),
+        # niente Ctrl+0: per le specifiche (3.9) è la dimensione del testo;
+        # e premere di nuovo Ctrl+2 o Ctrl+3 torna già testo normale
+        ("fmt_paragraph", "fmt_paragraph", []),
+        ("fmt_section", "fmt_section", ["<Control>2"]),
+        ("fmt_subsection", "fmt_subsection", ["<Control>3"]),
+        ("fmt_quote", "fmt_quote", []),
+        ("fmt_bullets", "fmt_bullets", []),
+        ("fmt_numbers", "fmt_numbers", []),
+        ("fmt_footnote", "fmt_footnote", ["<Control><Alt>f"]),
+        ("fmt_break", "fmt_break", []),
+    )
+
+    def _format_handlers(self):
+        return {
+            "fmt_bold": lambda: self._format_with(fmt_toggle_inline, "bold"),
+            "fmt_italic": lambda: self._format_with(fmt_toggle_inline, "italic"),
+            "fmt_paragraph": lambda: self._format_with(fmt_set_block, "p"),
+            "fmt_section": lambda: self._format_with(fmt_set_block, "h2"),
+            "fmt_subsection": lambda: self._format_with(fmt_set_block, "h3"),
+            "fmt_quote": lambda: self._format_with(fmt_set_block, "quote"),
+            "fmt_bullets": lambda: self._format_with(fmt_set_block, "bullet"),
+            "fmt_numbers": lambda: self._format_with(fmt_set_block, "number"),
+            "fmt_footnote": lambda: self._format_with(
+                lambda t, a, b: fmt_insert_footnote(t, b)),
+            "fmt_break": lambda: self._format_with(
+                lambda t, a, b: fmt_insert_break(t, b)),
+        }
+
+    def _can_format(self):
+        """Si formatta il testo che si sta scrivendo: c'è un capitolo aperto,
+        si può scrivere, e non si guarda l'anteprima."""
+        return (self.current is not None
+                and not getattr(self, "_preview_mode", False)
+                and getattr(self, "text_view", None) is not None
+                and self.text_view.get_editable())
+
+    def _update_format_actions(self):
+        """Le voci di formattazione sono attive solo quando servono: in
+        anteprima o senza capitoli appaiono spente, nel menu e sul pulsante."""
+        on = self._can_format()
+        for name, _key, _accels in self.FORMAT_ACTIONS:
+            act = self.lookup_action(name)
+            if act is not None:
+                act.set_enabled(on)
+
+    def _format_with(self, fn, *args):
+        """Applica una funzione fmt_* al testo del capitolo: legge testo e
+        selezione, sostituisce solo il tratto che cambia (così segnalibri,
+        evidenziazione e correttore non ripartono da zero) come UN SOLO passo
+        di annullamento (Ctrl+Z), poi riseleziona il risultato."""
+        if not self._can_format():
+            return
+        buf = self.text_buffer
+        old = buf.get_text(buf.get_start_iter(), buf.get_end_iter(), True)
+        if buf.get_has_selection():
+            a, b = (it.get_offset() for it in buf.get_selection_bounds())
+        else:
+            a = b = buf.get_iter_at_mark(buf.get_insert()).get_offset()
+        new, s, e = fn(old, a, b, *args)
+        self._replace_text(old, new)
+        buf.select_range(buf.get_iter_at_offset(s), buf.get_iter_at_offset(e))
+        self.text_view.scroll_mark_onscreen(buf.get_insert())
+        self.text_view.grab_focus()
+
+    def _replace_text(self, old, new):
+        """Porta il buffer del capitolo da old a new cambiando solo il tratto
+        diverso, come UN SOLO passo di annullamento."""
+        if new == old:
+            return
+        buf = self.text_buffer
+        p = 0
+        limit = min(len(old), len(new))
+        while p < limit and old[p] == new[p]:
+            p += 1
+        q = 0
+        while q < limit - p and old[-1 - q] == new[-1 - q]:
+            q += 1
+        self._autocap_busy = True
+        buf.begin_user_action()
+        try:
+            buf.delete(buf.get_iter_at_offset(p), buf.get_iter_at_offset(len(old) - q))
+            buf.insert(buf.get_iter_at_offset(p), new[p:len(new) - q])
+        finally:
+            buf.end_user_action()
+            self._autocap_busy = False
+
+    def _build_format_menu(self):
+        """Il menu «Formato»: lo stesso nel pulsante della barra, nel menu
+        principale e (in breve) nel tasto destro. Solo ciò che il libro sa
+        stampare; il titolo del capitolo è il suo nome (Rinomina, F2)."""
+        menu = Gio.Menu()
+        for keys in (("fmt_bold", "fmt_italic"),
+                     ("fmt_paragraph", "fmt_section", "fmt_subsection"),
+                     ("fmt_quote", "fmt_bullets", "fmt_numbers"),
+                     ("fmt_footnote", "fmt_break")):
+            section = Gio.Menu()
+            for key in keys:
+                section.append(self._t_or(key, key), "win." + key)
+            menu.append_section(None, section)
+        last = Gio.Menu()
+        last.append(self.t("mi_insert_image"), "win.insert_image")
+        last.append(self._t_or("fmt_chapter_title", "Titolo del capitolo…"),
+                    "win.rename")
+        menu.append_section(None, last)
+        return menu
+
     def _move(self, direction):
         row = self._current_index()
         if row < 0:
@@ -3279,15 +3428,39 @@ class RuscaWriterWindow(Adw.ApplicationWindow):
             self._error(self.t("rename_cover"))
             return
 
+        # EN: when the title is written at the top of the text (and is the
+        #     chapter's title), renaming rewrites it there: the title lives
+        #     in one place only, and the page shows the new name at once.
+        # IT: quando il titolo è scritto in testa al testo (ed è il titolo
+        #     del capitolo), rinominare lo riscrive lì: il titolo sta in un
+        #     posto solo, e la pagina mostra subito il nome nuovo.
+        written = leading_title(ch.text)
+        if written is not None and ch.custom_title.strip() not in ("", written[1]):
+            written = None
+
         def on_ok(new_title):
-            ch.custom_title = (new_title or "").strip()
+            new_title = (new_title or "").strip()
+            rewritten = rename_written_title(ch.text, new_title) if written else None
+            if rewritten is not None:
+                ch.custom_title = ""
+                if self.current is ch:
+                    buf = self.text_buffer
+                    self._replace_text(
+                        buf.get_text(buf.get_start_iter(), buf.get_end_iter(), True),
+                        rewritten)
+                    if getattr(self, "_preview_mode", False):
+                        self._render_preview()
+                else:
+                    ch.text = rewritten
+            else:
+                ch.custom_title = new_title
             self._refresh_chapter_list(row)
             if self.current is ch:
                 self.center_title.set_text(self._chapter_title(ch))
             self._mark_dirty()
 
         self._ask_text(self.t("rename_title"), self.t("rename_prompt"),
-                       ch.custom_title, on_ok)
+                       written[1] if written else ch.custom_title, on_ok)
 
     def on_set_goal(self, *_):
         def on_ok(val):
@@ -4240,6 +4413,12 @@ class RuscaWriterWindow(Adw.ApplicationWindow):
         section = Gio.Menu()
         section.append(self.t("mi_lookup"), "win.lookup")
         menu.append_section(None, section)
+        # EN/IT: the most used formatting at hand, the rest in a submenu
+        fmt = Gio.Menu()
+        fmt.append(self._t_or("fmt_bold", "Grassetto"), "win.fmt_bold")
+        fmt.append(self._t_or("fmt_italic", "Corsivo"), "win.fmt_italic")
+        fmt.append_submenu(self._t_or("menu_format", "Formato"), self._build_format_menu())
+        menu.append_section(None, fmt)
         if spell_menu is not None:
             menu.append_section(None, spell_menu)
         try:
@@ -4733,6 +4912,7 @@ class RuscaWriterWindow(Adw.ApplicationWindow):
             self._render_preview()
             self.center_stack.set_visible_child_name("preview")
         self._sync_preview_button()
+        self._update_format_actions()
 
     def _on_preview_button(self, button):
         if getattr(self, "_syncing_preview", False):
@@ -4770,14 +4950,15 @@ class RuscaWriterWindow(Adw.ApplicationWindow):
                     buf.insert(buf.get_end_iter(), "\n")
                     buf.insert_with_tags(buf.get_end_iter(),
                                          "* * *\n\n", self._pv_tags["sep"])
-                first = text.lstrip().split("\n", 1)[0] if text.strip() else ""
-                if classify_md_line(first)[0] != "heading":
-                    buf.insert_with_tags(buf.get_end_iter(),
-                                         ch_title + "\n", self._pv_tags["h1"])
-                self._render_markdown_into(text)
+                # la stessa regola degli export: il titolo una volta, in testa
+                self._render_markdown_into(None, chapter_blocks(ch_title, text))
+        elif self.current is None:
+            self._render_markdown_into("")
+        elif self.current.is_cover:
+            self._render_markdown_into(self.current.text)
         else:
-            text = self.current.text if self.current is not None else ""
-            self._render_markdown_into(text)
+            self._render_markdown_into(None, chapter_blocks(
+                self._chapter_title(self.current), self.current.text))
 
     def _preview_text_width(self):
         return max(200, self.preview_view.get_width()
@@ -4834,11 +5015,13 @@ class RuscaWriterWindow(Adw.ApplicationWindow):
         card.set_size_request(self._preview_text_width(), -1)
         return card
 
-    def _render_markdown_into(self, text):
+    def _render_markdown_into(self, text, blocks=None):
         """Riversa il Markdown nel buffer dell'anteprima, dai blocchi del
         libro (model.book_blocks): l'anteprima mostra esattamente ciò che
         finirà negli export. Formule in simboli Unicode, tabelle come griglia
-        vera, immagini come figure."""
+        vera, immagini come figure. blocks: i blocchi già pronti (quelli di
+        chapter_blocks, con il titolo del capitolo) al posto di quelli di
+        text."""
         buf = self.preview_buffer
         self._pv_width = self._preview_text_width()
         end = buf.get_end_iter
@@ -4903,7 +5086,7 @@ class RuscaWriterWindow(Adw.ApplicationWindow):
                     buf.insert_with_tags(end(), b[1] + "\n", self._pv_tags["sep"])
 
         # una riga vuota fra i blocchi, come nel testo
-        for i, block in enumerate(book_blocks(text)):
+        for i, block in enumerate(book_blocks(text) if blocks is None else blocks):
             if i:
                 buf.insert(end(), "\n")
             blocks_into([block])
@@ -5383,16 +5566,19 @@ class RuscaWriterWindow(Adw.ApplicationWindow):
         t = self.t
         groups = (
             (t("menu_file"), (("mi_new", "<Control>n"), ("mi_open", "<Control>o"),
-                              ("mi_save", "<Control>s"), ("mi_import_chapters", "<Control>i"),
+                              ("mi_save", "<Control>s"), ("mi_import_chapters", "<Control><Shift>o"),
                               ("mi_page_setup", "<Control><Shift>p"))),
             (t("menu_edit"), (("mi_add", "<Control><Shift>n"), ("mi_rename", "F2"),
                               ("mi_up", "<Control><Shift>Up"), ("mi_down", "<Control><Shift>Down"),
                               ("mi_insert_image", "<Control><Shift>i"), ("mi_find", "<Control>f"),
                               ("mi_lookup", "<Control>d"), ("mi_show_breaks", "<Control><Shift>b"))),
+            (self._t_or("menu_format", "Formato"),
+             tuple((key, accels[0]) for _n, key, accels in self.FORMAT_ACTIONS if accels)),
             (t("menu_view"), (("mi_preview", "<Control>e"), ("mi_preview_all", "<Control><Shift>e"),
                               ("mi_toggle_left", "<Control>l"), ("mi_toggle_right", "<Control>r"),
                               ("mi_fullscreen", "F11"), ("mi_font_inc", "<Control>plus"),
                               ("mi_font_dec", "<Control>minus"),
+                              ("mi_font_reset", "<Control>0"),
                               ("mi_appearance_dark", "<Control><Shift>d"),
                               ("mi_md_help", "<Shift>F1"), ("shortcuts", "<Control>question"),
                               ("main_menu", "F10"), ("sc_close", "<Control>w"),
@@ -5424,8 +5610,8 @@ class RuscaWriterWindow(Adw.ApplicationWindow):
         traducibile senza toccare il codice."""
         # ogni voce: (chiave_traduzione, esempio_sintassi, descrizione_fallback)
         rows = [
-            ("md_h1",     "# Titolo",          "Titolo di primo livello"),
-            ("md_h2",     "## Sottotitolo",    "Titoli minori (fino a ######)"),
+            ("md_h1",     "# Titolo",          "Titolo del capitolo, in cima al testo"),
+            ("md_h2",     "## Sezione",        "Sezione; ### per la sottosezione"),
             ("md_bold",   "**grassetto**",     "Testo in grassetto"),
             ("md_italic", "*corsivo*",         "Testo in corsivo"),
             ("md_both",   "***entrambi***",    "Grassetto e corsivo insieme"),
