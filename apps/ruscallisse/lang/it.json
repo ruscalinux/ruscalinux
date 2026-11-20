@@ -50,6 +50,7 @@
  "err_load": "Un modello non si è caricato",
  "err_no_vosk": "Manca il motore per ascoltare (libvosk)",
  "err_vosk_model": "Il modello per ascoltare non si carica",
+ "err_no_piper": "Manca il motore per parlare (ruscapiper-engine)",
  "err_no_engine": "Manca ruscallama-engine",
  "err_no_model": "Manca il modello per pensare",
  "err_start": "Il modello linguistico non parte",

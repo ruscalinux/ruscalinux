@@ -2,31 +2,29 @@
 # ---------------------------------------------------------------------------
 # RuscaLinux — costruisce il pacchetto ruscallisse (RuscaLLisse).
 #
-#   ./prova/prepara-motori.sh     # una volta: i motori precompilati di prova
 #   ./make-deb.sh
 #
 # VERSIONE DI PROVA. Le regole delle specifiche valgono tutte (un solo .deb
 # in build-deb/ con suffisso -ruscalinux e SHA256SUMS accanto, versione =
-# VERSION di release.conf), con una differenza dichiarata: invece di
-# dipendere da ruscavosk-engine e ruscapiper-engine, il pacchetto porta i
-# motori precompilati di prova/motori/ in /usr/lib/ruscallisse/prova/.
-# Per questo l'architettura è amd64 e la versione ha il suffisso ~prova.
+# VERSION di release.conf, Architecture: all); la versione ha il suffisso
+# ~prova finché RuscaLLisse non entra nella ISO. I motori sono i pacchetti
+# ruscavosk-engine, ruscallama-engine e ruscapiper-engine, compilati dal
+# sorgente.
 # ---------------------------------------------------------------------------
 set -euo pipefail
 cd "$(dirname "$0")"
 
 VER="1.99.3"
-PROVA="12"
+PROVA="13"
 PKG="ruscallisse"
 NAME="RuscaLLisse"
 APP_ID="org.ruscalinux.RuscaLLisse"
-ARCH="amd64"
+ARCH="all"
 DEBVER="${VER}~prova${PROVA}"
 MAINT="Nunzio Curcuruto <info@ruscalinux.org>"
 HOMEPAGE="https://www.ruscalinux.org/"
 LANGS="en $(cd lang && ls -1 -- *.json | sed 's/\.json$//' | grep -vx en | sort | tr '\n' ' ')"
 FILES="ruscallisse.py conversation.py entity.py face.py speech_text.py rusca_vosk.py rusca_piper.py rusca_engine.py rusca_markdown.py markdown_it_mark.py"
-MOTORI="prova/motori"
 
 die() { echo "ERRORE: $*" >&2; exit 1; }
 for l in en it; do [ -f "lang/$l.json" ] || die "manca lang/$l.json"; done
@@ -34,8 +32,6 @@ for f in $FILES style.css "$PKG.svg" "$PKG-symbolic.svg" pronunce.tsv entities/e
          docs/MANUAL_it.md docs/MANUAL_en.md; do
     [ -e "$f" ] || die "manca $f"
 done
-[ -f "$MOTORI/libvosk.so" ] && [ -d "$MOTORI/python/piper" ] \
-    || die "mancano i motori di prova: lancia prima ./prova/prepara-motori.sh"
 grep -q "^APP_VERSION = \"$VER\"" "$PKG.py" || die "APP_VERSION in $PKG.py diversa da $VER"
 if [ -f ../../release.conf ]; then
     grep -q "^VERSION=\"\?$VER\"\?" ../../release.conf || die "VER diversa da VERSION di release.conf"
@@ -53,7 +49,6 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"; find . -name __pycache__ -type d -prune -exec rm -rf {} +' EXIT
 ROOT="$TMP/root"
 SHARE="$ROOT/usr/share/$PKG"
-LIBD="$ROOT/usr/lib/$PKG/prova"
 DOC="$ROOT/usr/share/doc/$PKG"
 
 # ── Traduzioni: stesse chiavi e segnaposto di en.json; testi per .desktop
@@ -85,7 +80,7 @@ for name, lines in rows.items():
 PYCHECK
 
 # ── File ─────────────────────────────────────────────────────────────────────
-mkdir -p "$ROOT/DEBIAN" "$ROOT/usr/bin" "$SHARE/lang" "$SHARE/entities" "$DOC" "$LIBD" \
+mkdir -p "$ROOT/DEBIAN" "$ROOT/usr/bin" "$SHARE/lang" "$SHARE/entities" "$DOC" \
          "$ROOT/usr/share/applications" "$ROOT/usr/share/metainfo" \
          "$ROOT/usr/share/icons/hicolor/scalable/apps" \
          "$ROOT/usr/share/icons/hicolor/symbolic/apps"
@@ -98,14 +93,6 @@ ln -s "../share/$PKG/$PKG.py" "$ROOT/usr/bin/$PKG"
 install -m 644 "$PKG.svg" "$ROOT/usr/share/icons/hicolor/scalable/apps/$APP_ID.svg"
 install -m 644 "$PKG-symbolic.svg" "$ROOT/usr/share/icons/hicolor/symbolic/apps/$APP_ID-symbolic.svg"
 for f in docs/*.md; do gzip -9n -c "$f" > "$DOC/$(basename "$f").gz"; done
-# Motori di prova
-install -m 644 "$MOTORI/libvosk.so" "$LIBD/libvosk.so"
-cp -r "$MOTORI/python" "$LIBD/python"
-cp -r "$MOTORI/licenze" "$DOC/licenze-motori"
-install -m 644 "$MOTORI/VERSIONI" "$DOC/VERSIONI-motori"
-find "$LIBD" -type d -exec chmod 755 {} +
-find "$LIBD" -type f -exec chmod 644 {} +
-find "$LIBD" -name "*.so*" -exec chmod 755 {} +
 
 cat > "$ROOT/usr/share/applications/$APP_ID.desktop" <<DESKTOP
 [Desktop Entry]
@@ -154,10 +141,8 @@ Upstream-Name: RuscaLLisse
 Source: https://github.com/ruscalinux/ruscalinux
 Comment: Design, specifications and testing by the author; code written with
  the assistance of AI tools. See NOTA-IA.md in the RuscaLinux repository.
- .
- TEST VERSION: the speech engines in /usr/lib/ruscallisse/prova/ are the
- prebuilt binaries of the official packages (see VERSIONI-motori); their
- licence texts are in licenze-motori/.
+ The speech engines are separate packages (ruscavosk-engine,
+ ruscapiper-engine, ruscallama-engine), with their own copyright files.
 
 Files: *
 Copyright: 2026 Nunzio Curcuruto <info@ruscalinux.org>
@@ -167,25 +152,6 @@ License: GPL-3.0-or-later
 Files: usr/share/ruscallisse/markdown_it_mark.py
 Copyright: 2014-2015 Vitaly Puzrin, Alex Kocharin; ExecutableBookProject
 License: Expat
-
-Files: usr/lib/ruscallisse/prova/libvosk.so
-Copyright: Alpha Cephei Inc.; Kaldi authors
-License: Apache-2.0
- On Debian systems the full text is in /usr/share/common-licenses/Apache-2.0.
-
-Files: usr/lib/ruscallisse/prova/python/piper/*
-Copyright: Michael Hansen and the Piper authors; espeak-ng authors
-License: GPL-3.0-or-later
-
-Files: usr/lib/ruscallisse/prova/python/onnxruntime/*
-Copyright: Microsoft Corporation
-License: Expat
- Third-party notices in licenze-motori/onnxruntime/ThirdPartyNotices.txt.
-
-Files: usr/lib/ruscallisse/prova/python/numpy*
-Copyright: NumPy Developers
-License: BSD-3-Clause
- See licenze-motori/numpy/ (bundled OpenBLAS and runtime libraries included).
 COPYRIGHT
 
 SIZE=$(du -sk "$ROOT" | cut -f1)
@@ -196,7 +162,7 @@ Section: sound
 Priority: optional
 Architecture: $ARCH
 Installed-Size: $SIZE
-Depends: python3 (>= 3.13), python3 (<< 3.14), python3-gi, python3-gi-cairo, gir1.2-gtk-4.0 (>= 4.18), gir1.2-adw-1 (>= 1.7), python3-markdown-it (>= 3.0), python3-mdit-py-plugins (>= 0.4), python3-linkify-it (>= 2.0), pipewire-bin, ruscallama-engine, libstdc++6, libgcc-s1
+Depends: python3 (>= 3.10), python3-gi, python3-gi-cairo, gir1.2-gtk-4.0 (>= 4.18), gir1.2-adw-1 (>= 1.7), python3-markdown-it (>= 3.0), python3-mdit-py-plugins (>= 0.4), python3-linkify-it (>= 2.0), pipewire-bin, ruscallama-engine, ruscavosk-engine, ruscapiper-engine
 Maintainer: $MAINT
 Homepage: $HOMEPAGE
 Description: Voice conversation with a digital entity (test version)
@@ -206,7 +172,7 @@ Description: Voice conversation with a digital entity (test version)
  ruscallama-engine on 127.0.0.1, speaks with Piper. Everything stays on the
  computer.
  .
- TEST VERSION with the prebuilt engines of the official packages.
+ TEST VERSION, not yet part of the RuscaLinux ISO.
 CONTROL
 
 dpkg-deb --root-owner-group -Zxz --build "$ROOT" "$OUT/${PKG}-ruscalinux_${DEBVER}_${ARCH}.deb" >/dev/null

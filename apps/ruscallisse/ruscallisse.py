@@ -52,10 +52,11 @@ LEXICON_SYSTEM = os.path.join(BASE_DIR, "pronunce.tsv")
 LEXICON_USER = os.path.join(DATA_DIR, "pronunce.tsv")
 COMPONENTS = (
     ("Vosk (libvosk)", "Apache 2.0 — Alpha Cephei Inc.", "https://github.com/alphacep/vosk-api"),
+    ("Kaldi, OpenFst", "Apache 2.0", "https://github.com/alphacep/kaldi"),
+    ("OpenBLAS", "BSD-3-Clause", "https://www.openblas.net"),
     ("Piper (piper1-gpl)", "GPL-3.0 — Michael Hansen", "https://github.com/OHF-Voice/piper1-gpl"),
     ("espeak-ng", "GPL-3.0", "https://github.com/espeak-ng/espeak-ng"),
     ("ONNX Runtime", "MIT — Microsoft", "https://github.com/microsoft/onnxruntime"),
-    ("NumPy", "BSD-3-Clause", "https://numpy.org"),
     ("llama.cpp (llama-server)", "MIT — The ggml authors", "https://github.com/ggml-org/llama.cpp"),
     ("markdown-it-mark", "MIT — Vitaly Puzrin, Alex Kocharin; ExecutableBookProject",
      "https://github.com/markdown-it/markdown-it-mark"),
@@ -573,8 +574,7 @@ class LisseWindow(Adw.ApplicationWindow):
             self._on_state, self._on_level, self._on_error,
             greeting=GREETING.get(self.lang, GREETING["en"]).format(name=self.ent["name"]),
             on_notice=self._on_notice)
-        raw = piper.backend() == "prova"
-        self.conv.lexicon_apply = lambda text: st.apply_lexicon(text, self.lexicon, raw)
+        self.conv.lexicon_apply = lambda text: st.apply_lexicon(text, self.lexicon)
         self.conv.start()
         return False
 

@@ -3,4 +3,5 @@
 # scriverlo, acuto sulle vocali chiuse e grave su quelle aperte.
 #   ancora<TAB>ancóra
 # Il file dell'utente (~/.local/share/ruscallisse/pronunce.tsv) vale di più.
-# Fonemi IPA fra [[ ]] funzionano solo con la voce della versione di prova.
+# I fonemi IPA fra [[ ]] non si usano: libpiper non li capisce, e la riga
+# si salta.

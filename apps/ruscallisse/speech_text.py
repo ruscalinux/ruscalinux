@@ -164,9 +164,8 @@ def clean(sentence):
 # ── Lessico delle pronunce ─────────────────────────────────────────────────
 # Una riga per parola: parola<TAB>come scriverla per la voce. espeak-ng
 # rispetta l'accento grafico, quindi di solito basta scriverlo: «ancora →
-# ancóra», «subito → subìto». Fonemi IPA fra [[ ]] si accettano solo con il
-# Piper in Python della versione di prova: libpiper (ruscapiper-stream) non
-# li capisce, e lì la riga si salta.
+# ancóra», «subito → subìto». I fonemi IPA fra [[ ]] non si usano: libpiper
+# (ruscapiper-stream) non li capisce, e la riga si salta.
 def load_lexicon(*paths):
     """Più file: l'ultimo vince (quello dell'utente dopo quello di sistema)."""
     lex = {}
@@ -187,13 +186,13 @@ def load_lexicon(*paths):
     return lex
 
 
-def apply_lexicon(text, lex, raw_phonemes=False):
+def apply_lexicon(text, lex):
     if not lex:
         return text
 
     def sub(m):
         say = lex.get(unicodedata.normalize("NFC", m.group(0).lower()))
-        if not say or (say.startswith("[[") and not raw_phonemes):
+        if not say or say.startswith("[["):
             return m.group(0)
         return say
     return re.sub(r"\w+", sub, unicodedata.normalize("NFC", text))

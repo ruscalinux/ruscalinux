@@ -6,15 +6,14 @@
 # pipewire-bin) sempre aperto per la riproduzione. Le frasi arrivano in una
 # coda e si dicono una dopo l'altra, mentre il modello scrive ancora.
 #
-# Due modi di far parlare Piper, con la stessa interfaccia:
-#   * ruscapiper-stream di ruscapiper-engine (compilato dal sorgente, la
-#     voce resta caricata in un processo a parte): si usa quando c'è;
-#   * VERSIONE DI PROVA: Piper e ONNX Runtime dei pacchetti ufficiali già
-#     compilati, in /usr/lib/ruscallisse/prova/python, dentro il processo.
+# Piper parla con ruscapiper-stream di ruscapiper-engine (compilato dal
+# sorgente): la voce resta caricata in un processo a parte, che riceve le
+# frasi e restituisce audio e fonemi.
 #
 # Per il volto si tiene una linea del tempo: per ogni blocco di 20 ms
-# d'audio, quando suonerà, quanto è forte e quale visema si vede. Con
-# ruscapiper-stream i visemi seguono la durata vera di ogni fonema.
+# d'audio, quando suonerà, quanto è forte e quale visema si vede. I visemi
+# seguono la durata vera di ogni fonema quando la voce la dà, altrimenti si
+# distribuiscono in parti uguali.
 import array
 import collections
 import json
@@ -35,7 +34,6 @@ try:
 except ImportError:
     import speech_text as st
 
-VENDOR_DIR = os.environ.get("RUSCALLISSE_PROVA_DIR", "/usr/lib/ruscallisse/prova/python")
 STREAM = os.environ.get("RUSCAPIPER_STREAM", "/usr/lib/ruscapiper-engine/ruscapiper-stream")
 PW_PLAY = "/usr/bin/pw-play"
 USER_VOICE_DIR = os.path.join(GLib.get_user_data_dir(), "ruscapiper", "voices")
@@ -127,11 +125,10 @@ def import_voice(onnx):
     return dest
 
 
-def _import_piper():
-    if os.path.isdir(VENDOR_DIR) and VENDOR_DIR not in sys.path:
-        sys.path.insert(0, VENDOR_DIR)
-    from piper import PiperVoice, SynthesisConfig   # noqa: E402
-    return PiperVoice, SynthesisConfig
+class PiperError(Exception):
+    def __init__(self, key, detail=""):
+        super().__init__(f"{key}: {detail}" if detail else key)
+        self.key = key
 
 
 # ── ruscapiper-stream ─────────────────────────────────────────────────────
@@ -270,27 +267,9 @@ class _StreamVoice:
             self.proc.kill()
 
 
-class _PythonVoice:
-    """VERSIONE DI PROVA: Piper in Python, dentro il processo."""
-
-    def __init__(self, onnx):
-        PiperVoice, SynthesisConfig = _import_piper()
-        self.voice = PiperVoice.load(onnx)
-        self.rate = int(self.voice.config.sample_rate)
-        self._cfg_cls = SynthesisConfig
-
-    def synthesize(self, text, length_scale):
-        cfg = self._cfg_cls(length_scale=length_scale)
-        for chunk in self.voice.synthesize(text, syn_config=cfg):
-            yield chunk.audio_int16_bytes, st.visemes(getattr(chunk, "phonemes", []) or [])
-
-    def close(self):
-        pass
-
-
-def backend():
-    """Quale motore della voce si userà: "ruscapiper-engine" o "prova"."""
-    return "ruscapiper-engine" if os.access(STREAM, os.X_OK) else "prova"
+def available():
+    """C'è ruscapiper-engine?"""
+    return os.access(STREAM, os.X_OK)
 
 
 def _rms(samples):
@@ -304,7 +283,9 @@ class Speaker:
     stop() fa tacere subito; busy dice se sta ancora parlando."""
 
     def __init__(self, onnx, speed=1.0, debug=False):
-        self.voice = _StreamVoice(onnx) if backend() == "ruscapiper-engine" else _PythonVoice(onnx)
+        if not available():
+            raise PiperError("err_no_piper", STREAM)
+        self.voice = _StreamVoice(onnx)
         self.rate = int(self.voice.rate)
         self.set_speed(speed)
         self.debug = debug

@@ -76,10 +76,8 @@ class TestTesto(unittest.TestCase):
             open(sys_l, "w", encoding="utf-8").write("# commento\nancora\tàncora\nbravo\t[[ brˈaːvo ]]\n")
             open(usr_l, "w", encoding="utf-8").write("ancora\tancóra\n")
             lex = self.st.load_lexicon(sys_l, usr_l)
-            # l'utente vince; i fonemi [[ ]] solo con il Piper della prova
+            # l'utente vince; le righe con i fonemi [[ ]] si saltano
             self.assertEqual(self.st.apply_lexicon("Ancora, bravo!", lex), "ancóra, bravo!")
-            self.assertEqual(self.st.apply_lexicon("Ancora, bravo!", lex, raw_phonemes=True),
-                             "ancóra, [[ brˈaːvo ]]!")
 
     def test_visemi(self):
         ph = ['t', 'ʃ', 'ˈ', 'a', 'o', ',', ' ', 'm', 'i', 'f', 'u', 'ɛ']
@@ -277,46 +275,32 @@ class TestTurno(unittest.TestCase):
 
 @unittest.skipUnless(HAVE_GI, "serve PyGObject")
 class TestVoce(unittest.TestCase):
-    """Speaker con un Piper finto e un pw-play finto che salva ciò che riceve."""
+    """Speaker con un ruscapiper-stream finto e un pw-play finto che salva
+    ciò che riceve."""
 
-    def _speaker(self, d, fail=False):
+    def _speaker(self, d):
         import rusca_piper as rp
-
-        class Chunk:
-            def __init__(self, n):
-                self.audio_int16_bytes = b"\x10\x00" * n
-                self.phonemes = list("tʃˈao")
-
-        class Voice:
-            class config:
-                sample_rate = 16000
-            @classmethod
-            def load(cls, path):
-                return cls()
-            def synthesize(self, text, syn_config=None):
-                if fail:
-                    raise RuntimeError("voce rotta")
-                yield Chunk(1600)
-
-        class Cfg:
-            def __init__(self, length_scale=1.0):
-                self.length_scale = length_scale
-
+        stream = os.path.join(d, "ruscapiper-stream")
+        open(stream, "w").write(FAKE_STREAM.replace("/usr/bin/env python3", sys.executable))
+        os.chmod(stream, 0o755)
+        voce = os.path.join(d, "voce.onnx")
+        open(voce, "wb").close()
+        open(voce + ".json", "w").write('{"audio": {"sample_rate": 16000}}')
         out = os.path.join(d, "audio.raw")
         fake = os.path.join(d, "pw-play")
         with open(fake, "w") as f:
             f.write("#!/bin/sh\n[ \"$1\" = --help ] && { echo '  -a | --raw   RAW mode'; exit 0; }\n"
                     "echo \"$@\" > '%s.args'\ncat > '%s'\n" % (out, out))
         os.chmod(fake, 0o755)
-        self._old = (rp._import_piper, rp.PW_PLAY)
-        rp._import_piper = lambda: (Voice, Cfg)
-        rp.PW_PLAY = fake
-        return rp.Speaker("x.onnx", 1.0), out
+        self._old = (rp.STREAM, rp.PW_PLAY)
+        rp.STREAM, rp.PW_PLAY = stream, fake
+        spk = rp.Speaker(voce, 1.0)
+        return spk, out
 
     def tearDown(self):
         import rusca_piper as rp
         if hasattr(self, "_old"):
-            rp._import_piper, rp.PW_PLAY = self._old
+            rp.STREAM, rp.PW_PLAY = self._old
 
     def test_silenzio_iniziale_e_frase(self):
         import rusca_piper as rp
@@ -332,7 +316,7 @@ class TestVoce(unittest.TestCase):
             data = open(out, "rb").read()
             pre = int(16000 * rp.PREROLL) * 2
             self.assertEqual(data[:pre], b"\0" * pre)          # silenzio iniziale
-            self.assertIn(b"\x10\x00" * 1600, data)             # la frase
+            self.assertIn(b"\xa0\x0f" * 1600, data)             # la frase
             args = open(out + ".args").read().split()
             self.assertEqual(args[0], "--raw")              # PipeWire recente: dati grezzi
             self.assertEqual(args[-1], "-")
@@ -350,10 +334,10 @@ class TestVoce(unittest.TestCase):
 
     def test_errore_segnalato(self):
         with tempfile.TemporaryDirectory() as d:
-            spk, _out = self._speaker(d, fail=True)
+            spk, _out = self._speaker(d)
             errors = []
             spk.on_error = lambda key: errors.append(key)
-            spk.say("Ciao.")
+            spk.say("ERRORE")           # il ruscapiper-stream finto risponde con il flag 2
             ctx = GLib.MainContext.default()
             deadline = time.monotonic() + 3
             while not errors and time.monotonic() < deadline:
@@ -557,13 +541,20 @@ class TestRuscapiperStream(unittest.TestCase):
         import shutil
         shutil.rmtree(self.d, ignore_errors=True)
 
+    def test_senza_ruscapiper_engine(self):
+        """Senza ruscapiper-stream la voce non parte, con un errore chiaro."""
+        self.rp.STREAM = os.path.join(self.d, "non-installato")
+        with self.assertRaises(self.rp.PiperError) as e:
+            self.rp.Speaker(self.voice, 1.0)
+        self.assertEqual(e.exception.key, "err_no_piper")
+
     def test_segmenti(self):
         seg = self.rp.segments([ord("a"), ord("a"), 0, ord("m"), 0, ord("o")], [10, 5, 7, 20])
         self.assertEqual(seg, [("A", 15), ("M", 7), ("O", 20)])
         self.assertEqual(self.rp.segments([ord("a"), ord("a")], [1]), [])   # lunghezze sbagliate
 
     def test_frase_detta_con_i_visemi_veri(self):
-        self.assertEqual(self.rp.backend(), "ruscapiper-engine")
+        self.assertTrue(self.rp.available())
         spk = self.rp.Speaker(self.voice, 1.0)
         self.assertEqual(spk.rate, 16000)
         spk.say("Ciao.")

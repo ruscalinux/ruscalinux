@@ -50,6 +50,7 @@
  "err_load": "A model did not load",
  "err_no_vosk": "The listening engine is missing (libvosk)",
  "err_vosk_model": "The listening model does not load",
+ "err_no_piper": "The speaking engine is missing (ruscapiper-engine)",
  "err_no_engine": "ruscallama-engine is missing",
  "err_no_model": "The thinking model is missing",
  "err_start": "The language model does not start",

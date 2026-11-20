@@ -161,6 +161,9 @@ liblapacke-dev
 # LIBS SUPPORT
 # ===========================================================================
 python3-gi-cairo
+# RuscaLLisse: pw-record e pw-play (microfono e voce). libonnxruntime1.21 e
+# libopenblas0-serial, che servono ai motori, arrivano con i -dev piu' sotto.
+pipewire-bin
 
 # Motore Markdown comune di RuscaLLama, RuscaMark e RuscaWriter
 # (apps/*/rusca_markdown.py, CommonMark)

@@ -2,7 +2,7 @@
 
 A voice conversation with Ellittica, an intellectual, gentle and sensitive digital woman who explains things simply. It is a conversation like in real life: only her face is on screen, nothing is written and the conversation is not saved.
 
-**Test version.** The engines to listen (Vosk) and to speak (Piper) are the prebuilt ones of the official packages, in `/usr/lib/ruscallisse/prova/`.
+**Test version.** RuscaLLisse is not yet part of the RuscaLinux ISO. The engines to listen (ruscavosk-engine: Vosk), think (ruscallama-engine: llama.cpp) and speak (ruscapiper-engine: Piper) are separate packages, built from source, installed together with RuscaLLisse.
 
 ## First time
 

@@ -17,8 +17,7 @@ from gi.repository import GLib
 
 # RUSCAVOSK_ENGINE_DIR: per provare una libreria compilata a mano.
 LIB_DIRS = tuple(filter(None, (os.environ.get("RUSCAVOSK_ENGINE_DIR"),
-                               "/usr/lib/ruscavosk-engine",
-                               "/usr/lib/ruscallisse/prova")))
+                               "/usr/lib/ruscavosk-engine")))
 USER_MODEL_DIR = os.path.join(GLib.get_user_data_dir(), "ruscavosk", "models")
 MODEL_DIRS = ("/usr/share/ruscavosk/models", USER_MODEL_DIR)
 
