@@ -7,6 +7,7 @@ modello e una voce finti. Senza PyGObject si saltano.
 """
 import ast
 import os
+import struct
 import sys
 import tempfile
 import threading
@@ -72,11 +73,13 @@ class TestTesto(unittest.TestCase):
     def test_lessico(self):
         with tempfile.TemporaryDirectory() as d:
             sys_l, usr_l = os.path.join(d, "a.tsv"), os.path.join(d, "b.tsv")
-            open(sys_l, "w", encoding="utf-8").write("# commento\nancora\taŋkˈoːra\nbravo\tbrˈaːvo\n")
-            open(usr_l, "w", encoding="utf-8").write("ancora\tˈaŋkora\n")
+            open(sys_l, "w", encoding="utf-8").write("# commento\nancora\tàncora\nbravo\t[[ brˈaːvo ]]\n")
+            open(usr_l, "w", encoding="utf-8").write("ancora\tancóra\n")
             lex = self.st.load_lexicon(sys_l, usr_l)
-            self.assertEqual(self.st.apply_lexicon("Ancora, bravo!", lex),
-                             "[[ ˈaŋkora ]], [[ brˈaːvo ]]!")
+            # l'utente vince; i fonemi [[ ]] solo con il Piper della prova
+            self.assertEqual(self.st.apply_lexicon("Ancora, bravo!", lex), "ancóra, bravo!")
+            self.assertEqual(self.st.apply_lexicon("Ancora, bravo!", lex, raw_phonemes=True),
+                             "ancóra, [[ brˈaːvo ]]!")
 
     def test_visemi(self):
         ph = ['t', 'ʃ', 'ˈ', 'a', 'o', ',', ' ', 'm', 'i', 'f', 'u', 'ɛ']
@@ -497,6 +500,93 @@ class TestTurniAlternati(unittest.TestCase):
         c.history.append({"role": "assistant", "content": "Ciao, sono Ellittica."})
         c._turn("come stai", 1.0, time.monotonic())
         self.check(eng.body["messages"])
+
+
+FAKE_STREAM = r"""#!/usr/bin/env python3
+import struct, sys
+out = sys.stdout.buffer
+args = sys.argv[1:]
+if "--voice" not in args or args[args.index("--voice") + 1].endswith("rotta.onnx"):
+    sys.stderr.write("non riesco ad aprire la voce\n"); sys.exit(1)
+out.write(b"RPS1" + struct.pack("<I", 1)); out.flush()
+for line in sys.stdin.buffer:
+    cid, scale, text = line.decode().rstrip("\n").split("\t", 2)
+    cid = int(cid)
+    if text == "ERRORE":
+        out.write(struct.pack("<4s6I", b"RPSC", cid, 3, 0, 0, 0, 0)); out.flush(); continue
+    n = 1600
+    pcm = struct.pack(f"<{n}h", *([4000] * n))
+    ph = [ord("a"), ord("a"), 0, ord("m"), ord("m"), 0, ord("o"), ord("o")]
+    al = [400, 0, 400, 0, 800, 0]
+    out.write(struct.pack("<4s6I", b"RPSC", cid, 1, 16000, n, len(ph), len(al)))
+    out.write(pcm + struct.pack(f"<{len(ph)}I", *ph) + struct.pack(f"<{len(al)}i", *al))
+    out.flush()
+"""
+
+
+@unittest.skipUnless(HAVE_GI, "serve PyGObject")
+class TestRuscapiperStream(unittest.TestCase):
+    """La voce con ruscapiper-stream (qui finto, stesso protocollo)."""
+
+    def setUp(self):
+        import rusca_piper as rp
+        self.rp = rp
+        self.d = tempfile.mkdtemp()
+        self.stream = os.path.join(self.d, "ruscapiper-stream")
+        open(self.stream, "w").write(FAKE_STREAM.replace("/usr/bin/env python3", sys.executable))
+        os.chmod(self.stream, 0o755)
+        self.out = os.path.join(self.d, "audio.raw")
+        play = os.path.join(self.d, "pw-play")
+        open(play, "w").write("#!/bin/sh\n[ \"$1\" = --help ] && exit 0\ncat > '%s'\n" % self.out)
+        os.chmod(play, 0o755)
+        self.old = (rp.STREAM, rp.PW_PLAY)
+        rp.STREAM, rp.PW_PLAY = self.stream, play
+        self.voice = os.path.join(self.d, "voce.onnx")
+        open(self.voice, "wb").close()
+        open(self.voice + ".json", "w").write('{"audio": {"sample_rate": 16000}}')
+
+    def tearDown(self):
+        self.rp.STREAM, self.rp.PW_PLAY = self.old
+        import shutil
+        shutil.rmtree(self.d, ignore_errors=True)
+
+    def test_segmenti(self):
+        seg = self.rp.segments([ord("a"), ord("a"), 0, ord("m"), 0, ord("o")], [10, 5, 7, 20])
+        self.assertEqual(seg, [("A", 15), ("M", 7), ("O", 20)])
+        self.assertEqual(self.rp.segments([ord("a"), ord("a")], [1]), [])   # lunghezze sbagliate
+
+    def test_frase_detta_con_i_visemi_veri(self):
+        self.assertEqual(self.rp.backend(), "ruscapiper-engine")
+        spk = self.rp.Speaker(self.voice, 1.0)
+        self.assertEqual(spk.rate, 16000)
+        spk.say("Ciao.")
+        deadline = time.monotonic() + 5
+        while spk.busy and time.monotonic() < deadline:
+            time.sleep(0.02)
+        vis = [v for _t, _a, v in spk.timeline]
+        spk.close()
+        time.sleep(0.2)
+        data = open(self.out, "rb").read()
+        self.assertIn(struct.pack("<h", 4000) * 1600, data)
+        # 1600 campioni a 16 kHz = 5 blocchi da 20 ms: A A? M O O secondo le durate
+        self.assertEqual(vis[:5], ["A", "M", "O", "O", "O"])
+
+    def test_errore_e_voce_rotta(self):
+        spk = self.rp.Speaker(self.voice, 1.0)
+        errors = []
+        spk.on_error = errors.append
+        spk.say("ERRORE")
+        spk.say("Ciao.")                 # dopo un errore il flusso resta allineato
+        ctx = GLib.MainContext.default()
+        deadline = time.monotonic() + 5
+        while (spk.busy or not errors) and time.monotonic() < deadline:
+            ctx.iteration(False)
+            time.sleep(0.01)
+        self.assertEqual(errors, ["err_voice"])
+        self.assertTrue(any(v for _t, _a, v in spk.timeline))
+        spk.close()
+        with self.assertRaises(RuntimeError):
+            self.rp.Speaker(os.path.join(self.d, "rotta.onnx"), 1.0)
 
 
 class TestSicurezza(unittest.TestCase):

@@ -41,7 +41,7 @@ import speech_text as st  # noqa: E402
 APP_ID = "org.ruscalinux.RuscaLLisse"
 APP_NAME = "RuscaLLisse"
 APP_VERSION = "1.99.3"
-PROVA = "prova 8"            # versione di prova: motori precompilati
+PROVA = "prova 9"            # versione di prova: motori precompilati
 STYLE_SRC = os.path.join(BASE_DIR, "style.css")
 ICON_SRC = os.path.join(BASE_DIR, "ruscallisse.svg")
 LANG_DIR = os.path.join(BASE_DIR, "lang")
@@ -573,7 +573,8 @@ class LisseWindow(Adw.ApplicationWindow):
             self._on_state, self._on_level, self._on_error,
             greeting=GREETING.get(self.lang, GREETING["en"]).format(name=self.ent["name"]),
             on_notice=self._on_notice)
-        self.conv.lexicon_apply = lambda text: st.apply_lexicon(text, self.lexicon)
+        raw = piper.backend() == "prova"
+        self.conv.lexicon_apply = lambda text: st.apply_lexicon(text, self.lexicon, raw)
         self.conv.start()
         return False
 

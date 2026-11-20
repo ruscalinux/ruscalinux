@@ -161,7 +161,12 @@ def clean(sentence):
     return text, emotion
 
 
-# ── Lessico delle pronunce: parola<TAB>fonemi IPA, come li vuole Piper ─────
+# ── Lessico delle pronunce ─────────────────────────────────────────────────
+# Una riga per parola: parola<TAB>come scriverla per la voce. espeak-ng
+# rispetta l'accento grafico, quindi di solito basta scriverlo: «ancora →
+# ancóra», «subito → subìto». Fonemi IPA fra [[ ]] si accettano solo con il
+# Piper in Python della versione di prova: libpiper (ruscapiper-stream) non
+# li capisce, e lì la riga si salta.
 def load_lexicon(*paths):
     """Più file: l'ultimo vince (quello dell'utente dopo quello di sistema)."""
     lex = {}
@@ -173,21 +178,24 @@ def load_lexicon(*paths):
                 for line in f:
                     if line.startswith("#") or "\t" not in line:
                         continue
-                    word, ipa = line.rstrip("\n").split("\t", 1)
-                    word, ipa = word.strip().lower(), ipa.strip()
-                    if word and ipa:
-                        lex[unicodedata.normalize("NFC", word)] = ipa
+                    word, say = line.rstrip("\n").split("\t", 1)
+                    word, say = word.strip().lower(), say.strip()
+                    if word and say:
+                        lex[unicodedata.normalize("NFC", word)] = say
         except OSError:
             continue
     return lex
 
 
-def apply_lexicon(text, lex):
+def apply_lexicon(text, lex, raw_phonemes=False):
     if not lex:
         return text
+
     def sub(m):
-        ipa = lex.get(unicodedata.normalize("NFC", m.group(0).lower()))
-        return f"[[ {ipa} ]]" if ipa else m.group(0)
+        say = lex.get(unicodedata.normalize("NFC", m.group(0).lower()))
+        if not say or (say.startswith("[[") and not raw_phonemes):
+            return m.group(0)
+        return say
     return re.sub(r"\w+", sub, unicodedata.normalize("NFC", text))
 
 

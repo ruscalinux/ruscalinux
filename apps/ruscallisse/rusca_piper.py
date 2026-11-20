@@ -6,13 +6,15 @@
 # pipewire-bin) sempre aperto per la riproduzione. Le frasi arrivano in una
 # coda e si dicono una dopo l'altra, mentre il modello scrive ancora.
 #
-# Per il volto si tiene una linea del tempo: per ogni blocco di 20 ms
-# d'audio, quando suonerà, quanto è forte e quale visema si vede.
+# Due modi di far parlare Piper, con la stessa interfaccia:
+#   * ruscapiper-stream di ruscapiper-engine (compilato dal sorgente, la
+#     voce resta caricata in un processo a parte): si usa quando c'è;
+#   * VERSIONE DI PROVA: Piper e ONNX Runtime dei pacchetti ufficiali già
+#     compilati, in /usr/lib/ruscallisse/prova/python, dentro il processo.
 #
-# VERSIONE DI PROVA: Piper e ONNX Runtime vengono dai pacchetti ufficiali
-# già compilati, in /usr/lib/ruscallisse/prova/python. Nella versione
-# definitiva qui ci sarà ruscapiper-stream di ruscapiper-engine
-# (specifiche, sezione 1.7.7).
+# Per il volto si tiene una linea del tempo: per ogni blocco di 20 ms
+# d'audio, quando suonerà, quanto è forte e quale visema si vede. Con
+# ruscapiper-stream i visemi seguono la durata vera di ogni fonema.
 import array
 import collections
 import json
@@ -20,6 +22,7 @@ import math
 import os
 import queue
 import shutil
+import struct
 import subprocess
 import sys
 import threading
@@ -33,6 +36,7 @@ except ImportError:
     import speech_text as st
 
 VENDOR_DIR = os.environ.get("RUSCALLISSE_PROVA_DIR", "/usr/lib/ruscallisse/prova/python")
+STREAM = os.environ.get("RUSCAPIPER_STREAM", "/usr/lib/ruscapiper-engine/ruscapiper-stream")
 PW_PLAY = "/usr/bin/pw-play"
 USER_VOICE_DIR = os.path.join(GLib.get_user_data_dir(), "ruscapiper", "voices")
 VOICE_DIRS = ("/usr/share/ruscapiper/voices", USER_VOICE_DIR)
@@ -130,6 +134,132 @@ def _import_piper():
     return PiperVoice, SynthesisConfig
 
 
+# ── ruscapiper-stream ─────────────────────────────────────────────────────
+FLAG_LAST, FLAG_ERROR = 1, 2
+_HEADER = struct.Struct("<4s6I")         # "RPSC" id flags frequenza campioni fonemi allineamenti
+
+
+def _read_exact(f, n):
+    data = b""
+    while len(data) < n:
+        part = f.read(n - len(data))
+        if not part:
+            raise EOFError("ruscapiper-stream si è fermato")
+        data += part
+    return data
+
+
+def read_hello(f):
+    magic, version = struct.unpack("<4sI", _read_exact(f, 8))
+    if magic != b"RPS1":
+        raise ValueError("ruscapiper-stream: risposta inattesa all'avvio")
+    return version
+
+
+def read_chunk(f):
+    """Un pezzo d'audio di ruscapiper-stream: dizionario con id, flags,
+    rate, pcm (bytes a 16 bit), phonemes (codepoint) e alignments."""
+    magic, cid, flags, rate, n_s, n_ph, n_al = _HEADER.unpack(_read_exact(f, _HEADER.size))
+    if magic != b"RPSC":
+        raise ValueError("ruscapiper-stream: pezzo d'audio non valido")
+    pcm = _read_exact(f, n_s * 2)
+    ph = struct.unpack(f"<{n_ph}I", _read_exact(f, n_ph * 4)) if n_ph else ()
+    al = struct.unpack(f"<{n_al}i", _read_exact(f, n_al * 4)) if n_al else ()
+    return {"id": cid, "flags": flags, "rate": rate, "pcm": pcm, "phonemes": ph,
+            "alignments": al}
+
+
+def segments(phonemes, alignments):
+    """Fonemi e allineamenti di libpiper -> [(visema, campioni)]. I fonemi
+    sono gruppi di codepoint ripetuti separati da 0; ogni gruppo di N
+    codepoint corrisponde ai prossimi N allineamenti. Se le lunghezze non
+    tornano, lista vuota (i visemi si distribuiscono allora in modo uguale)."""
+    out, group, k = [], [], 0
+    for cp in list(phonemes) + [0]:
+        if cp:
+            group.append(cp)
+            continue
+        if not group:
+            continue
+        n = len(group)
+        if k + n > len(alignments):
+            return []
+        vis = st.visemes([chr(group[0])])
+        out.append((vis[0] if vis else "", sum(max(0, a) for a in alignments[k:k + n])))
+        k += n
+        group = []
+    return out
+
+
+class _StreamVoice:
+    """La voce dentro ruscapiper-stream, sempre caricata."""
+
+    def __init__(self, onnx):
+        self.rate = 22050
+        try:
+            with open(onnx + ".json", encoding="utf-8") as f:
+                self.rate = int(json.load(f)["audio"]["sample_rate"])
+        except (OSError, ValueError, KeyError, TypeError):
+            pass
+        self.proc = subprocess.Popen([STREAM, "--voice", onnx], stdin=subprocess.PIPE,
+                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            read_hello(self.proc.stdout)
+        except (EOFError, ValueError) as e:
+            err = self.proc.stderr.read().decode("utf-8", "replace").strip()
+            self.proc.kill()
+            raise RuntimeError(err or str(e)) from e
+        self._id = 0
+
+    def synthesize(self, text, length_scale):
+        """Genera (pcm, segmenti) per una frase. Legge sempre fino all'ultimo
+        pezzo, così il flusso resta allineato anche se la frase si scarta."""
+        self._id += 1
+        clean = " ".join(text.replace("\t", " ").split())
+        self.proc.stdin.write(f"{self._id}\t{length_scale:.3f}\t{clean}\n".encode("utf-8"))
+        self.proc.stdin.flush()
+        while True:
+            c = read_chunk(self.proc.stdout)
+            if c["flags"] & FLAG_ERROR:
+                raise RuntimeError("ruscapiper-stream non ha potuto dire la frase")
+            if c["rate"]:
+                self.rate = c["rate"]
+            if c["pcm"]:
+                yield c["pcm"], segments(c["phonemes"], c["alignments"])
+            if c["flags"] & FLAG_LAST:
+                return
+
+    def close(self):
+        try:
+            self.proc.stdin.close()
+            self.proc.wait(timeout=2)
+        except (OSError, subprocess.TimeoutExpired):
+            self.proc.kill()
+
+
+class _PythonVoice:
+    """VERSIONE DI PROVA: Piper in Python, dentro il processo."""
+
+    def __init__(self, onnx):
+        PiperVoice, SynthesisConfig = _import_piper()
+        self.voice = PiperVoice.load(onnx)
+        self.rate = int(self.voice.config.sample_rate)
+        self._cfg_cls = SynthesisConfig
+
+    def synthesize(self, text, length_scale):
+        cfg = self._cfg_cls(length_scale=length_scale)
+        for chunk in self.voice.synthesize(text, syn_config=cfg):
+            yield chunk.audio_int16_bytes, st.visemes(getattr(chunk, "phonemes", []) or [])
+
+    def close(self):
+        pass
+
+
+def backend():
+    """Quale motore della voce si userà: "ruscapiper-engine" o "prova"."""
+    return "ruscapiper-engine" if os.access(STREAM, os.X_OK) else "prova"
+
+
 def _rms(samples):
     if not samples:
         return 0.0
@@ -141,10 +271,8 @@ class Speaker:
     stop() fa tacere subito; busy dice se sta ancora parlando."""
 
     def __init__(self, onnx, speed=1.0, debug=False):
-        PiperVoice, SynthesisConfig = _import_piper()
-        self.voice = PiperVoice.load(onnx)
-        self.rate = int(self.voice.config.sample_rate)
-        self._cfg_cls = SynthesisConfig
+        self.voice = _StreamVoice(onnx) if backend() == "ruscapiper-engine" else _PythonVoice(onnx)
+        self.rate = int(self.voice.rate)
         self.set_speed(speed)
         self.debug = debug
         self._q = queue.Queue()
@@ -163,7 +291,7 @@ class Speaker:
 
     def set_speed(self, speed):
         speed = min(1.3, max(0.7, speed or 1.0))
-        self.cfg = self._cfg_cls(length_scale=1.0 / speed)
+        self.length_scale = 1.0 / speed
 
     # ── riproduzione ─────────────────────────────────────────────────────
     def _report(self, key, detail=""):
@@ -216,9 +344,19 @@ class Speaker:
         samples.frombytes(data[: n * 2])
         step = max(1, int(self.rate * BLOCK))
         blocks = max(1, n // step)
+        timed = bool(visemes) and isinstance(visemes[0], tuple)
+        if timed:     # (visema, campioni): la durata vera di ogni fonema
+            bounds, acc = [], 0
+            for v, count in visemes:
+                acc += count
+                bounds.append((acc, v))
         for b in range(blocks):
             chunk = samples[b * step:(b + 1) * step]
-            v = visemes[min(len(visemes) - 1, b * len(visemes) // blocks)] if visemes else ""
+            if timed:
+                mid = b * step + step // 2
+                v = next((vv for end, vv in bounds if mid < end), "")
+            else:
+                v = visemes[min(len(visemes) - 1, b * len(visemes) // blocks)] if visemes else ""
             self.timeline.append((start + PLAY_LATENCY + b * BLOCK, _rms(chunk), v))
         if gen != self._gen:
             return
@@ -240,13 +378,12 @@ class Speaker:
                     continue
                 if self.on_sentence:
                     GLib.idle_add(self.on_sentence, emotion)
-                for chunk in self.voice.synthesize(text, syn_config=self.cfg):
+                for pcm, vis in self.voice.synthesize(text, self.length_scale):
                     if gen != self._gen:
-                        break
+                        continue          # si legge fino in fondo, ma non si suona
                     if self.first_audio is None:
                         self.first_audio = time.monotonic()
-                    vis = st.visemes(getattr(chunk, "phonemes", []) or [])
-                    self._write(chunk.audio_int16_bytes, vis, gen)
+                    self._write(pcm, vis, gen)
                 if gen == self._gen:
                     self._silence(0.35 if text.rstrip().endswith("?") else 0.2, gen)
             except Exception as e:                       # noqa: BLE001
@@ -306,3 +443,4 @@ class Speaker:
 
     def close(self):
         self.stop()
+        self.voice.close()
