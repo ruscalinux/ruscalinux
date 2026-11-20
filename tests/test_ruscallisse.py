@@ -216,6 +216,34 @@ class TestTurno(unittest.TestCase):
         c.restart()
         self.assertEqual(c.history, [])
 
+    def test_quit_aspetta_il_thread(self):
+        """Il riconoscitore si libera solo a thread fermo (crash di Vosk)."""
+        import conversation as cv
+        busy = threading.Event()
+
+        class Rec:
+            def accept(self, d):
+                busy.set(); time.sleep(0.3); return False
+            def result(self): return {}
+            def reset(self): pass
+
+        class Nothing:
+            def cancel(self): pass
+            def stop(self): pass
+            def say(self, *a): pass
+            def wait_idle(self, ev=None): return True
+
+        c = cv.Conversation(Rec(), Nothing(), Nothing(), lambda: "", lambda: 10,
+                            lambda s: False, lambda l: False, lambda k: False)
+        c._start_mic = lambda: setattr(c, "_mic", type("M", (), {
+            "poll": lambda self: None,
+            "stdout": type("S", (), {"read": lambda self, n: b"\0" * n})(),
+            "terminate": lambda self: None, "wait": lambda self, timeout=0: 0})())
+        c.start()
+        self.assertTrue(busy.wait(3))
+        self.assertTrue(c.quit())
+        self.assertFalse(c._thread.is_alive())
+
 
 @unittest.skipUnless(HAVE_GI, "serve PyGObject")
 class TestVoce(unittest.TestCase):
@@ -247,7 +275,8 @@ class TestVoce(unittest.TestCase):
         out = os.path.join(d, "audio.raw")
         fake = os.path.join(d, "pw-play")
         with open(fake, "w") as f:
-            f.write("#!/bin/sh\ncat > '%s'\n" % out)
+            f.write("#!/bin/sh\n[ \"$1\" = --help ] && { echo '  -a | --raw   RAW mode'; exit 0; }\n"
+                    "echo \"$@\" > '%s.args'\ncat > '%s'\n" % (out, out))
         os.chmod(fake, 0o755)
         self._old = (rp._import_piper, rp.PW_PLAY)
         rp._import_piper = lambda: (Voice, Cfg)
@@ -274,7 +303,20 @@ class TestVoce(unittest.TestCase):
             pre = int(16000 * rp.PREROLL) * 2
             self.assertEqual(data[:pre], b"\0" * pre)          # silenzio iniziale
             self.assertIn(b"\x10\x00" * 1600, data)             # la frase
-            self.assertTrue(any(v for _t, _a, v in spk.timeline) or True)
+            args = open(out + ".args").read().split()
+            self.assertEqual(args[0], "--raw")              # PipeWire recente: dati grezzi
+            self.assertEqual(args[-1], "-")
+
+    def test_raw_solo_se_esiste(self):
+        import rusca_piper as rp
+        with tempfile.TemporaryDirectory() as d:
+            new, old = os.path.join(d, "nuovo"), os.path.join(d, "vecchio")
+            open(new, "w").write("#!/bin/sh\necho '  -a | --raw  RAW mode'\n")
+            open(old, "w").write("#!/bin/sh\necho '  --format=VALUE'\n")
+            for f in (new, old):
+                os.chmod(f, 0o755)
+            self.assertEqual(rp.pw_raw_args(new), ["--raw"])
+            self.assertEqual(rp.pw_raw_args(old), [])
 
     def test_errore_segnalato(self):
         with tempfile.TemporaryDirectory() as d:

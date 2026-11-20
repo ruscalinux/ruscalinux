@@ -45,6 +45,24 @@ BLOCK = 0.02                                   # s: un blocco del volto
 PREROLL = float(os.environ.get("RUSCALLISSE_PREROLL", "0.4"))
 
 
+_RAW = {}
+
+
+def pw_raw_args(binary):
+    """Opzioni per dati grezzi con pw-play e pw-record. Da PipeWire 1.6 con
+    «-» libsndfile cerca un'intestazione (in ingresso) o scrive il formato AU
+    (in uscita): serve --raw. Prima --raw non esisteva e «-» era già grezzo.
+    Si chiede a --help una volta sola."""
+    if binary not in _RAW:
+        try:
+            out = subprocess.run([binary, "--help"], capture_output=True, text=True,
+                                 timeout=5).stdout
+        except (OSError, subprocess.SubprocessError):
+            out = ""
+        _RAW[binary] = ["--raw"] if "--raw" in out else []
+    return _RAW[binary]
+
+
 def find_voices():
     """File .onnx che hanno accanto il loro .onnx.json."""
     out = []
@@ -157,13 +175,19 @@ class Speaker:
     def _player(self):
         if self._play is None or self._play.poll() is not None:
             if self._play is not None:
-                self._report("err_play", f"pw-play è uscito con il codice {self._play.returncode}")
+                why = ""
+                try:
+                    why = self._play.stderr.read().decode("utf-8", "replace").strip()
+                except (OSError, ValueError, AttributeError):
+                    pass
+                self._report("err_play", f"pw-play è uscito con il codice "
+                                         f"{self._play.returncode}: {why}")
             try:
                 self._play = subprocess.Popen(
-                    [PW_PLAY, "--rate", str(self.rate), "--channels", "1",
-                     "--format", "s16", "-"],
+                    [PW_PLAY, *pw_raw_args(PW_PLAY), "--rate", str(self.rate),
+                     "--channels", "1", "--format", "s16", "-"],
                     stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
-                    stderr=None if self.debug else subprocess.DEVNULL)
+                    stderr=subprocess.PIPE)
             except OSError as e:
                 self._play = None
                 self._report("err_play", str(e))

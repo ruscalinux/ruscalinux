@@ -41,7 +41,7 @@ import speech_text as st  # noqa: E402
 APP_ID = "org.ruscalinux.RuscaLLisse"
 APP_NAME = "RuscaLLisse"
 APP_VERSION = "1.99.3"
-PROVA = "prova 2"            # versione di prova: motori precompilati
+PROVA = "prova 3"            # versione di prova: motori precompilati
 STYLE_SRC = os.path.join(BASE_DIR, "style.css")
 ICON_SRC = os.path.join(BASE_DIR, "ruscallisse.svg")
 LANG_DIR = os.path.join(BASE_DIR, "lang")
@@ -526,14 +526,16 @@ class LisseWindow(Adw.ApplicationWindow):
         return False
 
     def _stop_session(self):
+        stopped = True
         if self.conv is not None:
-            self.conv.quit()
+            stopped = self.conv.quit()
             self.conv = None
         if self.speaker is not None:
             self.speaker.close()
             self.speaker = None
         if self.recognizer is not None:
-            self.recognizer.close()
+            if stopped:          # mai mentre il thread dell'ascolto lo usa ancora
+                self.recognizer.close()
             self.recognizer = None
         self.face.speech_source = None
         self.engine.stop(wait=True)

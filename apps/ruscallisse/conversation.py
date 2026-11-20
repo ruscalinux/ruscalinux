@@ -22,8 +22,10 @@ from gi.repository import GLib
 
 try:
     from . import speech_text as st
+    from .rusca_piper import pw_raw_args
 except ImportError:
     import speech_text as st
+    from rusca_piper import pw_raw_args
 
 PW_RECORD = "/usr/bin/pw-record"
 DEBUG = int(os.environ.get("RUSCALLISSE_DEBUG", "0") or 0)
@@ -100,10 +102,17 @@ class Conversation:
         self.interrupt()
         self.history = []
 
-    def quit(self):
+    def quit(self, timeout=5.0):
+        """Ferma il thread e lo aspetta: il riconoscitore si può liberare solo
+        dopo (liberarlo mentre il thread lo usa fa cadere Vosk). Restituisce
+        False se il thread non si è fermato in tempo."""
         self._quit.set()
         self.interrupt()
         self._stop_mic()
+        if self._thread is not None and self._thread is not threading.current_thread():
+            self._thread.join(timeout)
+            return not self._thread.is_alive()
+        return True
 
     # ── interni ──────────────────────────────────────────────────────────
     def _set_state(self, state):
@@ -113,7 +122,8 @@ class Conversation:
 
     def _start_mic(self):
         self._mic = subprocess.Popen(
-            [PW_RECORD, "--rate", "16000", "--channels", "1", "--format", "s16", "-"],
+            [PW_RECORD, *pw_raw_args(PW_RECORD), "--rate", "16000", "--channels", "1",
+             "--format", "s16", "-"],
             stdout=subprocess.PIPE, stdin=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     def _stop_mic(self):
@@ -205,6 +215,8 @@ class Conversation:
             if abs(level - self._last_level) > 0.02:
                 self._last_level = level
                 GLib.idle_add(self.on_level, level)
+            if self._quit.is_set():
+                break
             if not self.rec.accept(data):
                 continue
             t_end = time.monotonic()
