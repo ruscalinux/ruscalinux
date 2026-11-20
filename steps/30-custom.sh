@@ -6,7 +6,7 @@ set -e
 # ruscalinux-shell-theme e le utility di
 # tools/ (ruscacleaner, ruscahub, ruscamark, ruscawriter, ruscallama-engine, ruscallama,
 # ruscatranslator, ruscawhisper-engine, ruscatranscriber, ruscanarrator, ruscacat,
-# ruscadiffusion-engine)
+# ruscadiffusion-engine, ruscapinball)
 cp local/extra_debs/*.deb .work/config/packages.chroot/
 
 # IMPOSTAZIONE splash.png BINARY

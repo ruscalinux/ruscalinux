@@ -103,6 +103,12 @@
   with the voice model of RuscaNarrator, starting to speak while the answer
   is still being written. The microphone is open only while he listens, and
   nothing leaves the computer.
+- **A pinball game.** RuscaPinball brings the “Amethyst” table, seen in
+  perspective like the 1980s home computer pinball games: mushroom
+  bumpers, the bonus trap, a ring of bonus lamps that counts down at the
+  end of each ball, the SPECIAL for an extra ball and the R-U-S-C-A
+  letters. Original table, graphics and sounds; keyboard or gamepad. It is
+  in the RuscaLinux-Tools folder and in the Games category.
 - **NVIDIA graphics, optional.** The image includes the NVIDIA driver
   @NVIDIA@, with open kernel modules, for GTX 16, RTX 20 and later cards,
   RTX 50 included. RuscaLinux still starts and installs with the free

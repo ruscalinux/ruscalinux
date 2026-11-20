@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- RuscaPinball — icona dell'applicazione — GPL-3.0-or-later -->
+<!-- Il tavolo «Amethyst» in prospettiva, come nei flipper per home computer anni '80. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <defs>
+    <radialGradient id="ball" cx="0.35" cy="0.35" r="0.7">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#d9d2d6"/>
+    </radialGradient>
+    <pattern id="dither" width="4" height="4" patternUnits="userSpaceOnUse">
+      <rect width="4" height="4" fill="#4e236b"/>
+      <rect width="2" height="2" fill="#8e55b8"/>
+      <rect x="2" y="2" width="2" height="2" fill="#8e55b8"/>
+    </pattern>
+  </defs>
+  <!-- ombra -->
+  <path d="M28 14 H100 L120 108 H8 Z" fill="#230716" opacity="0.35" transform="translate(0 4)"/>
+  <!-- cassa: piano in prospettiva e frontale a retino -->
+  <path d="M28 12 H100 L120 104 H8 Z" fill="#8e55b8"/>
+  <path d="M8 104 H120 V118 H8 Z" fill="url(#dither)"/>
+  <path d="M28 12 H100 L120 104 H8 Z" fill="none" stroke="#cba6ec" stroke-width="2" stroke-linejoin="round"/>
+  <!-- campo di gioco -->
+  <path d="M20 100 L33 40 A31 22 0 0 1 95 40 L108 100 Z" fill="#230716"/>
+  <!-- bumper a fungo -->
+  <g>
+    <ellipse cx="50" cy="45" rx="9" ry="5" fill="#7a2357"/>
+    <ellipse cx="50" cy="41" rx="9" ry="5" fill="#f2a7c8" stroke="#fff7f0" stroke-width="1.5"/>
+    <ellipse cx="76" cy="45" rx="9" ry="5" fill="#7a2357"/>
+    <ellipse cx="76" cy="41" rx="9" ry="5" fill="#f2a7c8" stroke="#fff7f0" stroke-width="1.5"/>
+    <ellipse cx="63" cy="60" rx="10" ry="5.5" fill="#7a2357"/>
+    <ellipse cx="63" cy="55.5" rx="10" ry="5.5" fill="#f2a7c8" stroke="#fff7f0" stroke-width="1.5"/>
+  </g>
+  <!-- slingshot -->
+  <path d="M27 70 L25 84 L36 90 Z" fill="#4e236b" stroke="#cba6ec" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M101 70 L103 84 L92 90 Z" fill="#4e236b" stroke="#cba6ec" stroke-width="1.5" stroke-linejoin="round"/>
+  <!-- flipper -->
+  <path d="M40 92 L58 98" stroke="#fff7f0" stroke-width="7" stroke-linecap="round"/>
+  <path d="M88 92 L70 98" stroke="#fff7f0" stroke-width="7" stroke-linecap="round"/>
+  <!-- pallina -->
+  <circle cx="84" cy="72" r="7" fill="url(#ball)"/>
+</svg>
