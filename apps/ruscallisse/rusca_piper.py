@@ -40,6 +40,9 @@ VOICE_DIRS = ("/usr/share/ruscapiper/voices", USER_VOICE_DIR)
 # tanto (pw-play usa 100 ms se non si dice altro).
 PLAY_LATENCY = float(os.environ.get("RUSCALLISSE_LATENCY", "0.10"))
 BLOCK = 0.02                                   # s: un blocco del volto
+# Silenzio all'apertura della riproduzione: l'uscita audio si sveglia e i
+# primi istanti andrebbero persi (si sentirebbe la voce già cominciata).
+PREROLL = float(os.environ.get("RUSCALLISSE_PREROLL", "0.4"))
 
 
 def find_voices():
@@ -135,21 +138,43 @@ class Speaker:
         self.first_audio = None
         self.timeline = collections.deque(maxlen=6000)   # (t, ampiezza, visema)
         self.on_sentence = None         # callback(emozione) quando una frase comincia
+        self.on_error = None            # callback(chiave, dettaglio): sempre segnalato
+        self._error_said = False
         threading.Thread(target=self._work, daemon=True).start()
+        self._player()                  # si apre subito, con il silenzio iniziale
 
     def set_speed(self, speed):
         speed = min(1.3, max(0.7, speed or 1.0))
         self.cfg = self._cfg_cls(length_scale=1.0 / speed)
 
     # ── riproduzione ─────────────────────────────────────────────────────
+    def _report(self, key, detail=""):
+        print(f"ruscallisse: {key}: {detail}", file=sys.stderr, flush=True)
+        if self.on_error and not self._error_said:
+            self._error_said = True
+            GLib.idle_add(self.on_error, key)
+
     def _player(self):
         if self._play is None or self._play.poll() is not None:
-            self._play = subprocess.Popen(
-                [PW_PLAY, "--rate", str(self.rate), "--channels", "1",
-                 "--format", "s16", "-"],
-                stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL)
-            self._end = 0.0
+            if self._play is not None:
+                self._report("err_play", f"pw-play è uscito con il codice {self._play.returncode}")
+            try:
+                self._play = subprocess.Popen(
+                    [PW_PLAY, "--rate", str(self.rate), "--channels", "1",
+                     "--format", "s16", "-"],
+                    stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
+                    stderr=None if self.debug else subprocess.DEVNULL)
+            except OSError as e:
+                self._play = None
+                self._report("err_play", str(e))
+                raise
+            with self._lock:
+                self._end = time.monotonic() + PREROLL
+            try:
+                self._play.stdin.write(b"\0\0" * int(self.rate * PREROLL))
+                self._play.stdin.flush()
+            except (BrokenPipeError, OSError) as e:
+                self._report("err_play", str(e))
         return self._play
 
     def _write(self, data, visemes, gen):
@@ -176,7 +201,8 @@ class Speaker:
         try:
             play.stdin.write(data)
             play.stdin.flush()
-        except (BrokenPipeError, OSError):
+        except (BrokenPipeError, OSError) as e:
+            self._report("err_play", str(e))
             self._play = None
 
     def _silence(self, seconds, gen):
@@ -200,8 +226,7 @@ class Speaker:
                 if gen == self._gen:
                     self._silence(0.35 if text.rstrip().endswith("?") else 0.2, gen)
             except Exception as e:                       # noqa: BLE001
-                if self.debug:
-                    print("ruscallisse: voce:", e, file=sys.stderr)
+                self._report("err_voice", f"{type(e).__name__}: {e}")
             finally:
                 with self._lock:
                     self._pending -= 1

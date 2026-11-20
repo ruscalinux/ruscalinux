@@ -41,7 +41,7 @@ import speech_text as st  # noqa: E402
 APP_ID = "org.ruscalinux.RuscaLLisse"
 APP_NAME = "RuscaLLisse"
 APP_VERSION = "1.99.3"
-PROVA = "prova 1"            # versione di prova: motori precompilati
+PROVA = "prova 2"            # versione di prova: motori precompilati
 STYLE_SRC = os.path.join(BASE_DIR, "style.css")
 ICON_SRC = os.path.join(BASE_DIR, "ruscallisse.svg")
 LANG_DIR = os.path.join(BASE_DIR, "lang")
@@ -500,8 +500,7 @@ class LisseWindow(Adw.ApplicationWindow):
 
     def _session_failed(self, key, detail):
         self._loading = False
-        if conv_mod.DEBUG:
-            print("ruscallisse:", key, detail, file=sys.stderr)
+        print("ruscallisse:", key, detail, file=sys.stderr)
         self._on_error(key if key in _STRINGS else "err_load")
         self.engine.stop()
         self._set_subtitle("sub_error")
@@ -516,6 +515,7 @@ class LisseWindow(Adw.ApplicationWindow):
         self.recognizer, self.speaker = rec, spk
         self.lexicon = st.load_lexicon(LEXICON_SYSTEM, LEXICON_USER)
         spk.on_sentence = lambda emo: (self.face.set_emotion(emo) if emo else None) or False
+        spk.on_error = self._on_error
         self.face.speech_source = spk.level_at
         self.conv = conv_mod.Conversation(
             rec, spk, self.engine, self._prompt, lambda: self.cfg["max_words"] * 2,

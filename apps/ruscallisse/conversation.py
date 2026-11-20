@@ -70,6 +70,7 @@ class Conversation:
         self._mic = None
         self._thread = None
         self._last_level = 0.0
+        self._mic_failures = 0
 
     # ── comandi dall'interfaccia ─────────────────────────────────────────
     def start(self):
@@ -153,6 +154,19 @@ class Conversation:
             self.speaker.wait_idle(self._interrupt)
 
     def _run(self):
+        """Il ciclo non deve mai morire in silenzio: un errore si segnala e
+        si torna ad ascoltare."""
+        while not self._quit.is_set():
+            try:
+                self._loop()
+                return
+            except Exception as e:                   # noqa: BLE001
+                _log("errore:", f"{type(e).__name__}: {e}")
+                GLib.idle_add(self.on_error, "err_internal")
+                self._stop_mic()
+                time.sleep(0.5)
+
+    def _loop(self):
         try:
             self._say_greeting()
         except Exception as e:                       # noqa: BLE001
@@ -168,15 +182,25 @@ class Conversation:
                 try:
                     self._start_mic()
                     self.rec.reset()
-                except OSError:
+                except OSError as e:
+                    _log("microfono:", e)
                     GLib.idle_add(self.on_error, "err_mic")
                     self._paused.set()
                     continue
             self._set_state("listening")
             data = self._mic.stdout.read(FRAME)
             if not data:
+                code = self._mic.poll()
+                if not self._paused.is_set() and not self._quit.is_set():
+                    _log("microfono: pw-record si è fermato", code)
+                    self._mic_failures += 1
+                    if self._mic_failures >= 3:
+                        GLib.idle_add(self.on_error, "err_mic")
+                        self._paused.set()
+                    time.sleep(0.5)
                 self._mic = None
                 continue
+            self._mic_failures = 0
             level = min(1.0, _rms(data) * 6.0)
             if abs(level - self._last_level) > 0.02:
                 self._last_level = level
@@ -224,8 +248,7 @@ class Conversation:
                 t_first = t_first or t
         except Exception as e:                       # noqa: BLE001
             if not self._interrupt.is_set():
-                if DEBUG:
-                    _log("modello:", e)
+                _log("modello:", e)
                 GLib.idle_add(self.on_error, "err_engine")
         if answer.strip():
             self.history.append({"role": "assistant", "content": answer.strip()})

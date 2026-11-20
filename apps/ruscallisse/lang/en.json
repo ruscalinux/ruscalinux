@@ -83,5 +83,8 @@
  "pref_voice_licence": "Voice license",
  "pref_model": "Model",
  "pref_gpu": "Use the graphics card",
- "pref_look": "Appearance"
+ "pref_look": "Appearance",
+ "err_play": "No sound: the audio output does not respond (see the terminal)",
+ "err_voice": "The voice does not work (see the terminal)",
+ "err_internal": "Something got stuck: listening again"
 }

@@ -83,5 +83,8 @@
  "pref_voice_licence": "Licenza della voce",
  "pref_model": "Modello",
  "pref_gpu": "Usa la scheda grafica",
- "pref_look": "Aspetto"
+ "pref_look": "Aspetto",
+ "err_play": "La voce non esce: l’uscita audio non risponde (vedi il terminale)",
+ "err_voice": "La voce non funziona (vedi il terminale)",
+ "err_internal": "Qualcosa si è inceppato: ascolto di nuovo"
 }

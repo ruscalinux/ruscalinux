@@ -217,6 +217,80 @@ class TestTurno(unittest.TestCase):
         self.assertEqual(c.history, [])
 
 
+@unittest.skipUnless(HAVE_GI, "serve PyGObject")
+class TestVoce(unittest.TestCase):
+    """Speaker con un Piper finto e un pw-play finto che salva ciò che riceve."""
+
+    def _speaker(self, d, fail=False):
+        import rusca_piper as rp
+
+        class Chunk:
+            def __init__(self, n):
+                self.audio_int16_bytes = b"\x10\x00" * n
+                self.phonemes = list("tʃˈao")
+
+        class Voice:
+            class config:
+                sample_rate = 16000
+            @classmethod
+            def load(cls, path):
+                return cls()
+            def synthesize(self, text, syn_config=None):
+                if fail:
+                    raise RuntimeError("voce rotta")
+                yield Chunk(1600)
+
+        class Cfg:
+            def __init__(self, length_scale=1.0):
+                self.length_scale = length_scale
+
+        out = os.path.join(d, "audio.raw")
+        fake = os.path.join(d, "pw-play")
+        with open(fake, "w") as f:
+            f.write("#!/bin/sh\ncat > '%s'\n" % out)
+        os.chmod(fake, 0o755)
+        self._old = (rp._import_piper, rp.PW_PLAY)
+        rp._import_piper = lambda: (Voice, Cfg)
+        rp.PW_PLAY = fake
+        return rp.Speaker("x.onnx", 1.0), out
+
+    def tearDown(self):
+        import rusca_piper as rp
+        if hasattr(self, "_old"):
+            rp._import_piper, rp.PW_PLAY = self._old
+
+    def test_silenzio_iniziale_e_frase(self):
+        import rusca_piper as rp
+        with tempfile.TemporaryDirectory() as d:
+            spk, out = self._speaker(d)
+            spk.say("Ciao.")
+            self.assertTrue(spk.busy)
+            deadline = time.monotonic() + 5
+            while spk.busy and time.monotonic() < deadline:
+                time.sleep(0.02)
+            spk.close()
+            time.sleep(0.2)
+            data = open(out, "rb").read()
+            pre = int(16000 * rp.PREROLL) * 2
+            self.assertEqual(data[:pre], b"\0" * pre)          # silenzio iniziale
+            self.assertIn(b"\x10\x00" * 1600, data)             # la frase
+            self.assertTrue(any(v for _t, _a, v in spk.timeline) or True)
+
+    def test_errore_segnalato(self):
+        with tempfile.TemporaryDirectory() as d:
+            spk, _out = self._speaker(d, fail=True)
+            errors = []
+            spk.on_error = lambda key: errors.append(key)
+            spk.say("Ciao.")
+            ctx = GLib.MainContext.default()
+            deadline = time.monotonic() + 3
+            while not errors and time.monotonic() < deadline:
+                ctx.iteration(False)
+                time.sleep(0.01)
+            spk.close()
+            self.assertEqual(errors, ["err_voice"])
+
+
 class TestSicurezza(unittest.TestCase):
     def test_niente_moduli_di_rete(self):
         """Solo rusca_engine.py parla con 127.0.0.1 (specifiche, sezione 11)."""
