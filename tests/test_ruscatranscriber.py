@@ -22,7 +22,7 @@ import textwrap
 import unittest
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TOOL = os.path.join(REPO, "tools", "ruscatranscriber")
+TOOL = os.path.join(REPO, "apps", "ruscatranscriber")
 sys.path.insert(0, TOOL)
 
 try:
@@ -32,7 +32,7 @@ except (ImportError, ValueError):
     rw = None
 
 try:
-    sys.path.insert(0, os.path.join(REPO, "tools", "ruscamark"))
+    sys.path.insert(0, os.path.join(REPO, "apps", "ruscamark"))
     import rusca_markdown as md
 except ImportError:
     md = None

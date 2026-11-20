@@ -187,7 +187,7 @@ sudo apt install live-build python3-pil openssl squashfs-tools
 The build also needs the key of the NVIDIA repository in `local/nvidia/`,
 downloaded once: see `docs/NVIDIA.md`.
 
-The version of the image lives in `release.conf`. Each utility in `tools/`
+The version of the image lives in `release.conf`. Each utility in `apps/`
 carries the same version in its own `make-deb.sh`; `make-debs.sh` warns if
 they differ.
 

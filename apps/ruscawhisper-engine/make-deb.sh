@@ -208,7 +208,7 @@ if [ -f "$PIN" ]; then
 else
     echo "$OTTENUTO  $ARCHIVE" > "$PIN"
     avviso "whisper.cpp $TAG e' una versione nuova: impronta registrata in
-            tools/ruscawhisper-engine/checksums/$ARCHIVE.sha256
+            apps/ruscawhisper-engine/checksums/$ARCHIVE.sha256
             Aggiungila al repository (git add) insieme alla prossima modifica."
 fi
 say "Sorgente whisper.cpp $TAG verificato (commit ${COMMIT:0:12})"

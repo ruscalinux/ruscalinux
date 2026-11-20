@@ -3,8 +3,8 @@
 # Costruisce i pacchetti .deb che finiscono nella ISO.
 #
 # Vengono messi in local/extra_debs/, che NON sta in git: sono il risultato
-# di branding/ e tools/, non sorgenti. build.sh li ricostruisce da solo se
-# la cartella non c'e' o se qualcosa in branding/ o tools/ e' cambiato.
+# di branding/ e apps/, non sorgenti. build.sh li ricostruisce da solo se
+# la cartella non c'e' o se qualcosa in branding/ o apps/ e' cambiato.
 # Puoi comunque lanciarlo a mano quando vuoi.
 #
 # Dalla 1.99.2 tutto si costruisce qui, senza rete: RuscaWriter e la
@@ -87,7 +87,7 @@ cd "$QUI"
 
 # --- Utility di RuscaLinux -------------------------------------------------
 #
-# Ogni cartella dentro tools/ e' un'applicazione, con il suo script di
+# Ogni cartella dentro apps/ e' un'applicazione, con il suo script di
 # pacchettizzazione (make-deb.sh). Lo script:
 #   - si lancia dalla sua cartella, senza argomenti;
 #   - ha la versione scritta dentro di se';
@@ -97,13 +97,13 @@ cd "$QUI"
 
 ATTENZIONE=""
 
-for CARTELLA in "$QUI"/tools/*/; do
+for CARTELLA in "$QUI"/apps/*/; do
     CARTELLA="${CARTELLA%/}"
     NOME=$(basename "$CARTELLA")
 
     SCRIPT="make-deb.sh"
     if [ ! -f "$CARTELLA/$SCRIPT" ]; then
-        echo "ERRORE: in tools/$NOME/ non c'e' lo script make-deb.sh."
+        echo "ERRORE: in apps/$NOME/ non c'e' lo script make-deb.sh."
         exit 1
     fi
 
@@ -128,7 +128,7 @@ for CARTELLA in "$QUI"/tools/*/; do
     # build.sh cerca un pacchetto con il nome della cartella.
     PACCHETTO=$(dpkg-deb -f "$DEB" Package)
     if [ "$PACCHETTO" != "$NOME" ]; then
-        echo "ERRORE: tools/$NOME/ produce il pacchetto \"$PACCHETTO\"."
+        echo "ERRORE: apps/$NOME/ produce il pacchetto \"$PACCHETTO\"."
         echo "        Il pacchetto Debian deve chiamarsi come la cartella."
         exit 1
     fi

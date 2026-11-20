@@ -4,7 +4,7 @@ set -e
 # COPIA DEI PACCHETTI DA LOCAL PER ESSERE INSTALLATI DURANTE LA FASE DI BUILD
 # adwaita-prugna, ruscalinux-backgrounds-it, ruscalinux-fonts, ruscalinux-theme,
 # ruscalinux-shell-theme e le utility di
-# tools/ (ruscacleaner, ruscahub, ruscamark, ruscawriter, ruscallama-engine, ruscallama,
+# apps/ (ruscacleaner, ruscahub, ruscamark, ruscawriter, ruscallama-engine, ruscallama,
 # ruscatranslator, ruscawhisper-engine, ruscatranscriber, ruscanarrator,
 # ruscadiffusion-engine, ruscapinball)
 cp local/extra_debs/*.deb .work/config/packages.chroot/

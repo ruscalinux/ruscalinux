@@ -15,7 +15,7 @@ import sys
 import unittest
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TOOL = os.path.join(REPO, "tools", "ruscatranslator")
+TOOL = os.path.join(REPO, "apps", "ruscatranslator")
 
 try:
     sys.path.insert(0, TOOL)

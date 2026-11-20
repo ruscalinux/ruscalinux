@@ -9,7 +9,7 @@ ISO: quello lo decidono i tre file in `steps/`.
 | | |
 |---|---|
 | `release.conf` | Le impostazioni. **L'unico file dove è scritta la versione.** |
-| `make-debs.sh` | Costruisce i pacchetti `.deb` da `branding/` e `tools/`. |
+| `make-debs.sh` | Costruisce i pacchetti `.deb` da `branding/` e `apps/`. |
 | `build.sh` | Costruisce la ISO. |
 | `test.sh` | La avvia in QEMU per provarla. |
 
@@ -65,8 +65,8 @@ La rete non serve più per preparare i pacchetti: si costruisce tutto qui.
 1. Controlla che ci siano `live-build`, `dpkg-deb` e `python3`, e che tu non
    sia root.
 2. Lancia `make-debs.sh` se manca `local/extra_debs/` o se qualcosa in
-   `branding/` o `tools/` è più recente dei pacchetti.
-3. Verifica che ci sia un pacchetto per ogni utility di `tools/`.
+   `branding/` o `apps/` è più recente dei pacchetti.
+3. Verifica che ci sia un pacchetto per ogni utility di `apps/`.
 4. Copia `steps/*.sh` in `.gen/` sostituendo `@VERSION@` col numero vero, e
    disegna in `.gen/banner.png` il banner dell'installer con la versione.
 5. Esegue i tre step, che preparano `.work/`.
@@ -86,14 +86,14 @@ configurazione senza aspettare la build lunga.
 |---|---|
 | `steps/` | **I tre script che determinano la ISO.** Sono i tuoi. |
 | `branding/` | Sorgenti: logo, icone, sfondi, caratteri, generatori HTML. |
-| `tools/` | Le applicazioni di RuscaLinux, una cartella ciascuna. |
+| `apps/` | Le applicazioni di RuscaLinux, una cartella ciascuna. |
 | `local/` | File che live-build usa direttamente (splash, logo). |
 | `.work/` | Dove lavora live-build. Si rigenera, non sta in git. |
 | `.gen/` | Gli script di `steps/` col numero di versione dentro. |
 
 ## Aggiungere un'applicazione
 
-Crea `tools/<nome>/` con dentro uno script `make-deb.sh` che:
+Crea `apps/<nome>/` con dentro uno script `make-deb.sh` che:
 
 - si lancia dalla sua cartella, senza argomenti;
 - ha la versione scritta dentro di sé, uguale a `VERSION` di `release.conf`;
@@ -101,7 +101,7 @@ Crea `tools/<nome>/` con dentro uno script `make-deb.sh` che:
   `<nome>-ruscalinux_1.99.3_all.deb`);
 - produce un pacchetto Debian che si chiama `<nome>`, come la cartella.
 
-Nient'altro. `make-debs.sh` scorre `tools/*/` e costruisce quello che trova;
+Nient'altro. `make-debs.sh` scorre `apps/*/` e costruisce quello che trova;
 `build.sh` pretende poi un pacchetto con quel nome e si ferma se manca.
 Nessuno script nomina le applicazioni, quindi aggiungerne una non richiede
 di modificare niente.

@@ -43,7 +43,7 @@ if ! command -v lb > /dev/null; then
     exit 1
 fi
 
-# Servono a make-debs.sh per costruire i pacchetti di branding/ e tools/.
+# Servono a make-debs.sh per costruire i pacchetti di branding/ e apps/.
 for comando in dpkg-deb python3; do
     if ! command -v "$comando" > /dev/null; then
         echo "ERRORE: manca $comando.  Installalo con:  sudo apt install $comando"
@@ -110,8 +110,8 @@ fi
 # --- 2. Pacchetti .deb -----------------------------------------------------
 #
 # I .deb non stanno in git: sono prodotti da make-debs.sh a partire da
-# branding/ e tools/. Li ricostruisce se la cartella non c'e', oppure se un
-# file in branding/ o tools/ e' piu' recente dei pacchetti (le cartelle
+# branding/ e apps/. Li ricostruisce se la cartella non c'e', oppure se un
+# file in branding/ o apps/ e' piu' recente dei pacchetti (le cartelle
 # build-deb/ dei tool sono escluse: sono a loro volta risultati).
 
 echo
@@ -119,16 +119,16 @@ echo "==> Pacchetti"
 
 if [ ! -d local/extra_debs ]; then
     ./make-debs.sh
-elif [ -n "$(find branding tools -name build-deb -prune -o \
+elif [ -n "$(find branding apps -name build-deb -prune -o \
              -type f -newer local/extra_debs -print -quit)" ]; then
-    echo "    branding/ o tools/ sono cambiati: ricostruisco i pacchetti"
+    echo "    branding/ o apps/ sono cambiati: ricostruisco i pacchetti"
     ./make-debs.sh
 fi
 
 # Motori: il make-deb.sh di ruscallama-engine, ruscawhisper-engine e
 # ruscadiffusion-engine costruisce l'ultima release di llama.cpp, whisper.cpp
 # e stable-diffusion.cpp. Se ne e' uscita una piu' nuova di quella gia'
-# impacchettata, si ricostruisce anche se in tools/ non e' cambiato nulla
+# impacchettata, si ricostruisce anche se in apps/ non e' cambiato nulla
 # (una volta sola: make-debs.sh rifa' tutti i motori). Senza rete il
 # controllo si salta e restano i pacchetti che ci sono.
 for coppia in ruscallama-engine:llama.cpp ruscawhisper-engine:whisper.cpp \
@@ -136,7 +136,7 @@ for coppia in ruscallama-engine:llama.cpp ruscawhisper-engine:whisper.cpp \
     motore=${coppia%%:*}
     progetto=${coppia#*:}
     DEB=$(ls local/extra_debs/"$motore"-*.deb 2> /dev/null | head -n 1)
-    ULTIMA=$(bash "tools/$motore/ultima-versione.sh" 2> /dev/null | cut -d ' ' -f 1 || true)
+    ULTIMA=$(bash "apps/$motore/ultima-versione.sh" 2> /dev/null | cut -d ' ' -f 1 || true)
     if [ -n "$DEB" ] && [ -n "$ULTIMA" ] && \
        ! dpkg-deb -f "$DEB" Description | grep -qF "$progetto $ULTIMA,"; then
         echo "    $progetto $ULTIMA e' piu' recente del motore impacchettato: ricostruisco i pacchetti"
@@ -150,7 +150,7 @@ done
 #
 # Si guarda il nome del pacchetto scritto DENTRO il .deb, non il nome del
 # file: i tool producono <nome>-ruscalinux_<versione>_all.deb.
-for cartella in tools/*/; do
+for cartella in apps/*/; do
     atteso=$(basename "$cartella")
     trovato=""
     for deb in local/extra_debs/*.deb; do

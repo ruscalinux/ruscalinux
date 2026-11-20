@@ -18,7 +18,7 @@
 /local/make-debs.log
 
 # packages built by each tool's make-deb.sh
-/tools/*/build-deb/
+/apps/*/build-deb/
 
 # images and checksums
 *.iso

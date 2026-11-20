@@ -15,7 +15,7 @@ import sys
 import unittest
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TOOLS = os.path.join(REPO, "tools")
+TOOLS = os.path.join(REPO, "apps")
 COPIES = ["ruscallama/rusca_markdown.py", "ruscamark/rusca_markdown.py",
           "ruscawriter/src/ruscawriter/rusca_markdown.py",
           "ruscatranslator/rusca_markdown.py", "ruscanarrator/rusca_markdown.py"]

@@ -32,7 +32,7 @@ line propagates it to the ISO name, the volume label, `/etc/os-release`,
 | `test.sh` | Boots the built ISO in QEMU. |
 | `steps/` | The three scripts that determine what goes into the ISO. |
 | `branding/` | Design sources: logos, icon theme, wallpapers, fonts, generators. |
-| `tools/` | First-party applications, one directory each. |
+| `apps/` | First-party applications, one directory each. |
 | `tests/` | Tests shared by several applications, such as the common Markdown engine. |
 | `local/` | Files `live-build` consumes directly: splash images, vendor logo. |
 | `dist/` | Templates for the README and INSTALL published next to the ISO. |
@@ -41,7 +41,7 @@ line propagates it to the ISO name, the volume label, `/etc/os-release`,
 
 **[`COME-FUNZIONA.md`](COME-FUNZIONA.md)** — the maintainer's manual, in
 Italian: what each script does, how to cut a release, how to add an
-application to `tools/`.
+application to `apps/`.
 
 [`docs/NAMING.md`](docs/NAMING.md) — naming convention for the Rusca family of
 applications, and the identifiers that must agree for each one.

@@ -135,8 +135,8 @@ python3-pypdf
 
 # Compilare ruscallama-engine (llama.cpp), ruscawhisper-engine (whisper.cpp)
 # e ruscadiffusion-engine (stable-diffusion.cpp) con il backend Vulkan: vedi
-# tools/ruscallama-engine/README.md, tools/ruscawhisper-engine/README.md e
-# tools/ruscadiffusion-engine/README.md
+# apps/ruscallama-engine/README.md, apps/ruscawhisper-engine/README.md e
+# apps/ruscadiffusion-engine/README.md
 cmake
 wget
 libvulkan-dev
@@ -149,7 +149,7 @@ spirv-headers
 python3-gi-cairo
 
 # Motore Markdown comune di RuscaLLama, RuscaMark e RuscaWriter
-# (tools/*/rusca_markdown.py, CommonMark)
+# (apps/*/rusca_markdown.py, CommonMark)
 python3-markdown-it
 python3-mdit-py-plugins
 python3-linkify-it

@@ -29,10 +29,10 @@ For an application named `RuscaFoo`, all of these must agree:
 
 | Thing | Value |
 |---|---|
-| Directory | `tools/ruscafoo/` |
+| Directory | `apps/ruscafoo/` |
 | Version | `VER` in `make-deb.sh` and `APP_VERSION` in the program, equal to `VERSION` in `release.conf` |
-| Build script | `tools/ruscafoo/make-deb.sh` |
-| Package file | `tools/ruscafoo/build-deb/ruscafoo-ruscalinux_<version>_all.deb` |
+| Build script | `apps/ruscafoo/make-deb.sh` |
+| Package file | `apps/ruscafoo/build-deb/ruscafoo-ruscalinux_<version>_all.deb` |
 | Debian package | `ruscafoo` |
 | Command | `/usr/bin/ruscafoo` |
 | Data | `/usr/share/ruscafoo/` |
@@ -53,10 +53,10 @@ window to its icon in the dash. The metainfo `<launchable>` must name the
 
 ## Adding a utility
 
-Create `tools/ruscafoo/` containing a `make-deb.sh` that runs from its own
+Create `apps/ruscafoo/` containing a `make-deb.sh` that runs from its own
 directory with no arguments and writes exactly one `.deb` into `build-deb/`.
 
-Nothing else. `make-debs.sh` walks `tools/*/` and builds whatever it finds;
+Nothing else. `make-debs.sh` walks `apps/*/` and builds whatever it finds;
 `build.sh` then requires a package named after each directory and refuses to
 build the ISO if one is missing. No script names any application, so adding
 the fifth utility costs exactly as much as adding the second.

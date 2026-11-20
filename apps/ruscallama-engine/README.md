@@ -44,7 +44,7 @@ Poi `./make-deb.sh` (lo lancia anche `make-debs.sh` della distribuzione). La pri
 
 `make-deb.sh` costruisce sempre l’**ultima release stabile**: quella che GitHub indica come “Latest”, con un tag `vX.Y.Z` (i tag `bNNNN` sono build automatiche e non contano). `ultima-versione.sh` la cerca con l’API di GitHub, poi con il rinvio di `releases/latest`, poi con `git ls-remote`, perché l’API senza autenticazione ammette solo 60 richieste l’ora per indirizzo (con `GITHUB_TOKEN` nell’ambiente il limite sale).
 
-`build.sh` fa lo stesso controllo: se è uscita una release più nuova di quella impacchettata, ricostruisce i pacchetti anche se in `tools/` non è cambiato nulla.
+`build.sh` fa lo stesso controllo: se è uscita una release più nuova di quella impacchettata, ricostruisce i pacchetti anche se in `apps/` non è cambiato nulla.
 
 Per costruire una versione precisa (ad esempio quella precedente, se l’ultima dà problemi):
 

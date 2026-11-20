@@ -62,7 +62,7 @@ One line per change.
 ## [1.99.2] — RuscaLinux OS Tools
 
 RuscaWriter is now one of the RuscaLinux OS Tools: it lives in the RuscaLinux
-repository (`tools/ruscawriter`) and follows its specifications.
+repository (`apps/ruscawriter`) and follows its specifications.
 
 ### Look
 

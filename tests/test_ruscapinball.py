@@ -12,7 +12,7 @@ import tempfile
 import unittest
 
 ROOT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                    "tools", "ruscapinball")
+                    "apps", "ruscapinball")
 sys.path.insert(0, ROOT)
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("SDL_AUDIODRIVER", "dummy")

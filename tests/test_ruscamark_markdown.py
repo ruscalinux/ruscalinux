@@ -1,6 +1,6 @@
 """RuscaLinux OS Apps — test del Markdown di RuscaMark — 1.99.3 — GPL-3.0
 
-MarkdownDoc (tools/ruscamark/ruscamark.py) usa l'analisi del motore comune
+MarkdownDoc (apps/ruscamark/ruscamark.py) usa l'analisi del motore comune
 rusca_markdown.py e la rende in HTML (export), Pango (anteprima) ed elementi
 del PDF. Si lanciano dalla radice del repository:
     python3 -m unittest tests/test_ruscamark_markdown.py
@@ -16,7 +16,7 @@ import tempfile
 import unittest
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-RUSCAMARK = os.path.join(REPO, "tools", "ruscamark")
+RUSCAMARK = os.path.join(REPO, "apps", "ruscamark")
 
 try:
     sys.path.insert(0, RUSCAMARK)

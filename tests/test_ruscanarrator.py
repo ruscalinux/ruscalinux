@@ -19,7 +19,7 @@ import unittest
 import wave
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(REPO, "tools", "ruscanarrator"))
+sys.path.insert(0, os.path.join(REPO, "apps", "ruscanarrator"))
 
 try:
     from gi.repository import GLib

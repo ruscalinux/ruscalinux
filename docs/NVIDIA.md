@@ -111,7 +111,7 @@ versione provata. Conviene che la versione sia pubblicata da almeno due
 settimane. Le versioni disponibili si vedono nell'indice del repository
 (`NVIDIA_REPO`), cercando i file `nvidia-driver-pinning-*`.
 (llama.cpp invece segue da solo l'ultima release stabile: vedi
-`tools/ruscallama-engine/README.md`.)
+`apps/ruscallama-engine/README.md`.)
 
 La versione davvero installata nella ISO la legge `build.sh` dal file
 `.packages` e la scrive al posto di `@NVIDIA@` nelle note di rilascio e nei

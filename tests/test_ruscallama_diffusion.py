@@ -24,7 +24,7 @@ import threading
 import unittest
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TOOL = os.path.join(REPO, "tools", "ruscallama")
+TOOL = os.path.join(REPO, "apps", "ruscallama")
 sys.path.insert(0, TOOL)
 
 try:

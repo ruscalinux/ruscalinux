@@ -45,7 +45,7 @@ Poi `./make-deb.sh` (lo lancia anche `make-debs.sh` della distribuzione). La pri
 
 stable-diffusion.cpp non ha numeri di versione `X.Y.Z`: ogni release è un tag `master-<numero>-<commit>` (per esempio `master-1106-532d2c1`) e il numero cresce a ogni release. `make-deb.sh` costruisce sempre quella che GitHub indica come “Latest”. `ultima-versione.sh` la cerca con l’API di GitHub, poi con il rinvio di `releases/latest`, poi con `git ls-remote` (il numero più alto; con `GITHUB_TOKEN` nell’ambiente il limite dell’API sale).
 
-`build.sh` fa lo stesso controllo: se è uscita una release più nuova di quella impacchettata, ricostruisce i pacchetti anche se in `tools/` non è cambiato nulla. stable-diffusion.cpp pubblica una release a ogni modifica, quindi capiterà spesso.
+`build.sh` fa lo stesso controllo: se è uscita una release più nuova di quella impacchettata, ricostruisce i pacchetti anche se in `apps/` non è cambiato nulla. stable-diffusion.cpp pubblica una release a ogni modifica, quindi capiterà spesso.
 
 Per costruire una versione precisa (ad esempio una precedente, se l’ultima dà problemi), il tag intero o solo il numero:
 

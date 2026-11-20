@@ -280,7 +280,7 @@ if [ -f "$PIN" ]; then
 else
     printf '%s  %s\n%s  %s\n' "$OTTENUTO" "$ARCHIVE" "$OTTENUTO_GGML" "$GGML_ARCHIVE" > "$PIN"
     avviso "stable-diffusion.cpp $TAG e' una versione nuova: impronte registrate in
-            tools/ruscadiffusion-engine/checksums/$(basename "$PIN")
+            apps/ruscadiffusion-engine/checksums/$(basename "$PIN")
             Aggiungile al repository (git add) insieme alla prossima modifica."
 fi
 say "Sorgente verificato (stable-diffusion.cpp ${COMMIT:0:12}, ggml ${GGML_COMMIT:0:12})"

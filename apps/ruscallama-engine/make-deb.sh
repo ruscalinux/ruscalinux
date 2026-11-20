@@ -208,7 +208,7 @@ if [ -f "$PIN" ]; then
 else
     echo "$OTTENUTO  $ARCHIVE" > "$PIN"
     avviso "llama.cpp $TAG e' una versione nuova: impronta registrata in
-            tools/ruscallama-engine/checksums/$ARCHIVE.sha256
+            apps/ruscallama-engine/checksums/$ARCHIVE.sha256
             Aggiungila al repository (git add) insieme alla prossima modifica."
 fi
 say "Sorgente llama.cpp $TAG verificato (commit ${COMMIT:0:12})"
