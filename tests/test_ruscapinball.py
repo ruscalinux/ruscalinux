@@ -326,6 +326,7 @@ class DataTest(unittest.TestCase):
         self.assertEqual(it["ai_note"], "Progettazione, specifiche e verifica dell’autore; "
                          "codice scritto con l’assistenza di strumenti di intelligenza artificiale.")
 
+    @unittest.skipIf(pygame is None, "serve pygame")
     def test_scores_and_language(self):
         with tempfile.TemporaryDirectory() as tmp:
             os.environ["XDG_DATA_HOME"] = tmp
