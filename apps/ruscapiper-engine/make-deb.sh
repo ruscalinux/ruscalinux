@@ -94,11 +94,17 @@ for c in dpkg-deb dpkg-shlibdeps cmake g++ gcc make pkg-config strip nm readelf 
 done
 command -v wget >/dev/null || command -v curl >/dev/null || MANCA="$MANCA wget"
 command -v git >/dev/null || MANCA="$MANCA git"
-if ! ls /usr/include/onnxruntime/onnxruntime_cxx_api.h \
-        /usr/include/onnxruntime/core/session/onnxruntime_cxx_api.h \
-        /usr/include/onnxruntime_cxx_api.h >/dev/null 2>&1; then
-    MANCA="$MANCA libonnxruntime-dev"
-fi
+# Basta una delle posizioni possibili dell'intestazione; se non e' in
+# nessuna, si chiede a dpkg dove l'ha messa il pacchetto.
+ORT_H=""
+for h in /usr/include/onnxruntime/onnxruntime_cxx_api.h \
+         /usr/include/onnxruntime/core/session/onnxruntime_cxx_api.h \
+         /usr/include/onnxruntime_cxx_api.h; do
+    [ -f "$h" ] && { ORT_H="$h"; break; }
+done
+[ -n "$ORT_H" ] || ORT_H=$(dpkg -L libonnxruntime-dev 2>/dev/null | grep '/onnxruntime_cxx_api\.h$' | head -n1)
+[ -n "$ORT_H" ] || MANCA="$MANCA libonnxruntime-dev"
+[ -z "$ORT_H" ] || say "ONNX Runtime: $ORT_H"
 [ -f /usr/include/sonic.h ] || MANCA="$MANCA libsonic-dev"
 if [ -n "$MANCA" ]; then
     echo "ERRORE: mancano strumenti per compilare Piper:$MANCA" >&2
@@ -278,6 +284,7 @@ else
         -DPIPER_SRC="$BUILD/piper" \
         -DESPEAK_INSTALL="$BUILD/espeak-install" \
         -DUCD_LIB="$UCD_LIB" \
+        -DCMAKE_INCLUDE_PATH="$(dirname "$ORT_H")" \
         -DPIPER_VERSION="$PIPER_VERSION" \
         -DRUSCAPIPER_VERSION="$VER" \
         -DRUSCAPIPER_ESPEAK_DATA="/$LIBDIR/espeak-ng-data" \
