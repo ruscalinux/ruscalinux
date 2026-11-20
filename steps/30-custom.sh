@@ -206,26 +206,26 @@ EOF
 # rinomina, la svuota o la elimina, la sua scelta resta.
 #
 # La cartella raccoglie le applicazioni per categoria: ogni tool ha
-# X-RuscaLinux-Tools fra le Categories del suo .desktop (scritto dal suo
+# X-RuscaLinux-Apps fra le Categories del suo .desktop (scritto dal suo
 # make-deb.sh), quindi un tool nuovo ci entra da solo, senza toccare questo
 # script. Per sicurezza si elencano anche i .desktop org.ruscalinux.* gia'
 # installati.
 mkdir -p .work/config/includes.chroot_after_packages/usr/lib/ruscalinux \
          .work/config/includes.chroot_after_packages/etc/xdg/autostart
-cat <<'EOF' > .work/config/includes.chroot_after_packages/usr/lib/ruscalinux/ruscalinux-tools-folder
+cat <<'EOF' > .work/config/includes.chroot_after_packages/usr/lib/ruscalinux/ruscalinux-apps-folder
 #!/bin/sh
 # RuscaLinux — mette le RuscaLinux OS Apps nella cartella "RuscaLinux Apps"
 # della griglia delle applicazioni di GNOME, una volta per utente. Scritto da
 # steps/30-custom.sh; avviato da
-# /etc/xdg/autostart/ruscalinux-tools-folder.desktop.
+# /etc/xdg/autostart/ruscalinux-apps-folder.desktop.
 
 # ID e' il nome della cartella per dconf (niente spazi); NOME e' quello che
 # si vede nella griglia.
-ID=RuscaLinux-Tools
+ID=RuscaLinux-Apps
 NOME="RuscaLinux Apps"
 CARTELLE=org.gnome.desktop.app-folders
 CARTELLA="org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/$ID/"
-FATTO="${XDG_CONFIG_HOME:-$HOME/.config}/ruscalinux/ruscalinux-tools-folder.fatto"
+FATTO="${XDG_CONFIG_HOME:-$HOME/.config}/ruscalinux/ruscalinux-apps-folder.fatto"
 
 [ -e "$FATTO" ] && exit 0
 [ "$(id -u)" -ge 1000 ] || exit 0                         # utenti di sistema (GDM, g-i-s)
@@ -249,7 +249,7 @@ done
 
 gsettings set "$CARTELLA" name "$NOME"
 gsettings set "$CARTELLA" translate false
-gsettings set "$CARTELLA" categories "['X-RuscaLinux-Tools']"
+gsettings set "$CARTELLA" categories "['X-RuscaLinux-Apps']"
 gsettings set "$CARTELLA" apps "[$APPS]"
 
 FIGLI=$(gsettings get "$CARTELLE" folder-children)
@@ -268,14 +268,14 @@ gsettings reset org.gnome.shell app-picker-layout
 mkdir -p "$(dirname "$FATTO")"
 touch "$FATTO"
 EOF
-chmod +x .work/config/includes.chroot_after_packages/usr/lib/ruscalinux/ruscalinux-tools-folder
+chmod +x .work/config/includes.chroot_after_packages/usr/lib/ruscalinux/ruscalinux-apps-folder
 
-cat <<'EOF' > .work/config/includes.chroot_after_packages/etc/xdg/autostart/ruscalinux-tools-folder.desktop
+cat <<'EOF' > .work/config/includes.chroot_after_packages/etc/xdg/autostart/ruscalinux-apps-folder.desktop
 [Desktop Entry]
 Type=Application
 Name=RuscaLinux Apps folder
 Comment=Puts the RuscaLinux OS Apps in their folder of the app grid, once per user
-Exec=/usr/lib/ruscalinux/ruscalinux-tools-folder
+Exec=/usr/lib/ruscalinux/ruscalinux-apps-folder
 OnlyShowIn=GNOME;
 NoDisplay=true
 X-GNOME-Autostart-enabled=true

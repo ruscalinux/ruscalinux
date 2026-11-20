@@ -59,7 +59,7 @@ for code, s in langs.items():
     if code != "en" and s.get("app_description"):
         d.append(f"Comment[{code}]={s['app_description']}")
 d += [f"Exec=/usr/games/{pkg}", f"Icon={app_id}", "Terminal=false",
-      "Categories=Game;ArcadeGame;X-RuscaLinux-Tools;", f"Keywords={en['keywords']}"]
+      "Categories=Game;ArcadeGame;X-RuscaLinux-Apps;", f"Keywords={en['keywords']}"]
 for code, s in langs.items():
     if code != "en" and s.get("keywords"):
         d.append(f"Keywords[{code}]={s['keywords']}")

@@ -713,7 +713,7 @@ Comment[it]=Breve descrizione in italiano
 Exec=ruscafoo %U
 Icon=org.ruscalinux.RuscaFoo
 Terminal=false
-Categories=GNOME;GTK;Utility;X-RuscaLinux-Tools;
+Categories=GNOME;GTK;Utility;X-RuscaLinux-Apps;
 Keywords=keyword;another;
 Keywords[it]=parola;altra;
 StartupNotify=true
@@ -722,7 +722,7 @@ StartupWMClass=org.ruscalinux.RuscaFoo
 
 `Comment` e `Keywords` vanno tradotti in tutte le lingue della sezione 9 (`Comment[xx]=`), presi dai file di `lang/`. Il file va validato con `desktop-file-validate`.
 
-Fra le `Categories` di ogni tool c’è sempre **`X-RuscaLinux-Tools`**: è la categoria della cartella **RuscaLinux Apps** della griglia delle applicazioni di GNOME, che raccoglie tutti i tool. La cartella la crea, una volta per utente e dopo le cartelle di GNOME, lo script `/usr/lib/ruscalinux/ruscalinux-tools-folder` della ISO (scritto da `steps/30-custom.sh`, avviato da `/etc/xdg/autostart/`): un elenco di cartelle predefinito con dconf impedirebbe a GNOME Shell 48 di creare le sue (Sistema, Utilità). Un tool nuovo entra nella cartella da solo, grazie alla categoria. GNOME Shell salva la posizione di ogni icona (`org.gnome.shell app-picker-layout`) e non la ricompatta: quando un aggiornamento toglie, rinomina o sposta in una cartella delle applicazioni restano dei buchi, e quelle nuove finiscono in una pagina in più. Succede anche al primo accesso, quando i tool entrano nella cartella: azzerare la disposizione non basta, perché GNOME ha già le icone in memoria e non le ridispone. Per questo `/usr/lib/ruscalinux/ruscalinux-app-grid` (sempre da `steps/30-custom.sh`, avviato a ogni accesso, 25 e 90 secondi dopo) scrive una disposizione completa e compatta: le voci salvate nel loro ordine, senza quelle che non esistono più, che stanno in una cartella o nel dash, poi le altre in ordine alfabetico, a pagine da 24 (tutte le griglie di GNOME Shell 48 ne tengono 24). Scrive solo se cambia qualcosa. I componenti senza interfaccia (ruscallama-engine, ruscawhisper-engine) non hanno file `.desktop`. La categoria conserva il nome `X-RuscaLinux-Tools` (come l’identificativo della cartella per dconf, `RuscaLinux-Tools`): non si vede, e cambiarla vorrebbe dire riscrivere il `.desktop` di ogni tool.
+Fra le `Categories` di ogni tool c’è sempre **`X-RuscaLinux-Apps`**: è la categoria della cartella **RuscaLinux Apps** della griglia delle applicazioni di GNOME, che raccoglie tutti i tool. La cartella la crea, una volta per utente e dopo le cartelle di GNOME, lo script `/usr/lib/ruscalinux/ruscalinux-apps-folder` della ISO (scritto da `steps/30-custom.sh`, avviato da `/etc/xdg/autostart/`): un elenco di cartelle predefinito con dconf impedirebbe a GNOME Shell 48 di creare le sue (Sistema, Utilità). Un tool nuovo entra nella cartella da solo, grazie alla categoria. GNOME Shell salva la posizione di ogni icona (`org.gnome.shell app-picker-layout`) e non la ricompatta: quando un aggiornamento toglie, rinomina o sposta in una cartella delle applicazioni restano dei buchi, e quelle nuove finiscono in una pagina in più. Succede anche al primo accesso, quando i tool entrano nella cartella: azzerare la disposizione non basta, perché GNOME ha già le icone in memoria e non le ridispone. Per questo `/usr/lib/ruscalinux/ruscalinux-app-grid` (sempre da `steps/30-custom.sh`, avviato a ogni accesso, 25 e 90 secondi dopo) scrive una disposizione completa e compatta: le voci salvate nel loro ordine, senza quelle che non esistono più, che stanno in una cartella o nel dash, poi le altre in ordine alfabetico, a pagine da 24 (tutte le griglie di GNOME Shell 48 ne tengono 24). Scrive solo se cambia qualcosa. I componenti senza interfaccia (ruscallama-engine, ruscawhisper-engine) non hanno file `.desktop`. L’identificativo della cartella per dconf è `RuscaLinux-Apps` (con il trattino: dconf non ammette spazi). Durante lo sviluppo della 1.99.3 la cartella si chiamava «RuscaLinux-Tools», con la categoria `X-RuscaLinux-Tools`.
 
 ### 5.4 Metainfo AppStream
 
@@ -806,7 +806,7 @@ Nomi:
 
 Il suffisso `ruscalinux` nel nome del file indica che il pacchetto appartiene alla distribuzione RuscaLinux. L’architettura è `all` perché i tool sono in Python puro e non contengono codice compilato.
 
-**Eccezione: ruscapinball.** È un gioco: `Section: games`, il comando è `/usr/games/ruscapinball` (Debian Policy, 11.11) e la pagina di manuale sta nella sezione 6. Dipende da `python3 (>= 3.10)` e `python3-pygame (>= 2.1)`, raccomanda `fonts-dejavu-core`. Le `Categories` del `.desktop` sono `Game;ArcadeGame;X-RuscaLinux-Tools;`: il gioco sta sia fra i giochi sia nella cartella RuscaLinux Apps.
+**Eccezione: ruscapinball.** È un gioco: `Section: games`, il comando è `/usr/games/ruscapinball` (Debian Policy, 11.11) e la pagina di manuale sta nella sezione 6. Dipende da `python3 (>= 3.10)` e `python3-pygame (>= 2.1)`, raccomanda `fonts-dejavu-core`. Le `Categories` del `.desktop` sono `Game;ArcadeGame;X-RuscaLinux-Apps;`: il gioco sta sia fra i giochi sia nella cartella RuscaLinux Apps.
 
 **Eccezione: ruscallama-engine.** È codice compilato, quindi:
 
@@ -1131,7 +1131,7 @@ Un tool è pronto quando:
 9. Ha la finestra “Informazioni” comune (sezione 3.10), con la riga “Nota di sviluppo” che apre la nota IA; la nota compare solo nei tre posti della sezione 12.2.
 10. Ha le traduzioni della sezione 9, con i ripieghi della sezione 9.2, fallback inglese e senza crash su chiavi mancanti; funziona in arabo (RTL).
 11. Ha identificatori coerenti tra loro (sezioni 1 e 5.2).
-12. Ha file `.desktop` e metainfo validi, con `StartupWMClass` uguale all’App ID e la categoria `X-RuscaLinux-Tools` (sezione 5.3).
+12. Ha file `.desktop` e metainfo validi, con `StartupWMClass` uguale all’App ID e la categoria `X-RuscaLinux-Apps` (sezione 5.3).
 13. Ha icona SVG e icona simbolica.
 14. Ha `make-deb.sh` che produce un solo `ruscafoo-ruscalinux_<versione>_all.deb` (o `_amd64.deb` per ruscallama-engine, ruscawhisper-engine e ruscadiffusion-engine) e `SHA256SUMS` in `build-deb/`.
 15. Ha la versione uguale a `VERSION` di `release.conf`.

@@ -110,7 +110,7 @@ Name=RuscaHub
 Exec=ruscahub
 Icon=org.ruscalinux.RuscaHub
 Terminal=false
-Categories=GTK;GNOME;Utility;X-RuscaLinux-Tools;
+Categories=GTK;GNOME;Utility;X-RuscaLinux-Apps;
 StartupNotify=true
 StartupWMClass=org.ruscalinux.RuscaHub
 EOF
