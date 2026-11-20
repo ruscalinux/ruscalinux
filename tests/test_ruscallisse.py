@@ -224,6 +224,7 @@ class TestTurno(unittest.TestCase):
         class Rec:
             def accept(self, d):
                 busy.set(); time.sleep(0.3); return False
+            def partial(self): return ""
             def result(self): return {}
             def reset(self): pass
 
@@ -331,6 +332,53 @@ class TestVoce(unittest.TestCase):
                 time.sleep(0.01)
             spk.close()
             self.assertEqual(errors, ["err_voice"])
+
+
+@unittest.skipUnless(HAVE_GI, "serve PyGObject")
+class TestFineFrase(unittest.TestCase):
+    """Con il rumore di fondo Vosk non chiude mai la frase: la chiude la pausa."""
+
+    def test_pausa_chiude_la_frase(self):
+        import conversation as cv
+        asked = []
+
+        class Rec:
+            calls = 0
+            def accept(self, d): return False          # Vosk non dichiara mai la fine
+            def partial(self):
+                Rec.calls += 1
+                return "spiegami la seconda" if Rec.calls < 3 else "spiegami la seconda guerra mondiale"
+            def final_result(self):
+                return {"result": [{"word": w, "conf": 0.95} for w in
+                                   "spiegami la seconda guerra mondiale".split()]}
+            def result(self): return {}
+            def reset(self): pass
+
+        class Engine:
+            def cancel(self): pass
+            def chat_stream(self, body, stop, timeout=0):
+                asked.append(body["messages"][-1]["content"])
+                yield "Certo.", ""
+
+        class Speaker:
+            first_audio = None
+            def say(self, *a): pass
+            def wait_idle(self, ev=None): return True
+            def stop(self): pass
+
+        c = cv.Conversation(Rec(), Speaker(), Engine(), lambda: "", lambda: 10,
+                            lambda s: False, lambda l: False, lambda k: False, pause=0.2)
+        c._start_mic = lambda: setattr(c, "_mic", type("M", (), {
+            "poll": lambda self: None,
+            "stdout": type("S", (), {"read": lambda self, n: (time.sleep(0.02), b"\0" * n)[1]})(),
+            "terminate": lambda self: None, "wait": lambda self, timeout=0: 0})())
+        c._drain_mic = lambda: None
+        c.start()
+        deadline = time.monotonic() + 5
+        while not asked and time.monotonic() < deadline:
+            time.sleep(0.05)
+        c.quit()
+        self.assertEqual(asked[:1], ["spiegami la seconda guerra mondiale"])
 
 
 class TestSicurezza(unittest.TestCase):

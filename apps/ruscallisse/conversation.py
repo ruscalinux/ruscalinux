@@ -35,6 +35,12 @@ HISTORY_TURNS = 20
 # deve lasciare spazio anche alla risposta (la sua lunghezza la tiene corta
 # il prompt, regola 2).
 MAX_TOKENS = 2048
+# Fine della frase: Vosk la dichiara da solo solo dopo un silenzio pulito, e
+# con un po' di rumore di fondo (una ventola) non lo fa mai. Per questo la
+# frase finisce anche quando il testo riconosciuto non cambia per PAUSE
+# secondi, come fa una persona che aspetta che l'altro abbia finito.
+PAUSE = 0.8
+PARTIAL_EVERY = 5                 # testo parziale ogni 5 blocchi (100 ms)
 
 
 def _log(*args):
@@ -58,7 +64,8 @@ class Conversation:
     rilegge a ogni turno, così le modifiche valgono subito)."""
 
     def __init__(self, recognizer, speaker, engine, get_prompt, max_tokens,
-                 on_state, on_level, on_error, greeting="", on_notice=None):
+                 on_state, on_level, on_error, greeting="", on_notice=None,
+                 pause=PAUSE):
         self.rec = recognizer
         self.speaker = speaker
         self.engine = engine
@@ -71,6 +78,9 @@ class Conversation:
         self.on_notice = on_notice or (lambda key: False)
         self._reasoning_said = False
         self._partial = ""
+        self._partial_since = 0.0
+        self._frames = 0
+        self.pause = pause
         self.history = []
         self.state = None
         self._paused = threading.Event()
@@ -224,16 +234,28 @@ class Conversation:
                 GLib.idle_add(self.on_level, level)
             if self._quit.is_set():
                 break
-            if not self.rec.accept(data):
-                if DEBUG >= 2:
-                    p = self.rec.partial() if hasattr(self.rec, "partial") else ""
-                    if p and p != self._partial:
-                        self._partial = p
+            if self.rec.accept(data):
+                raw = self.rec.result()
+                ended_by = "vosk"
+            else:
+                self._frames += 1
+                if self._frames % PARTIAL_EVERY:
+                    continue
+                now = time.monotonic()
+                p = self.rec.partial()
+                if p != self._partial:
+                    self._partial, self._partial_since = p, now
+                    if DEBUG >= 2 and p:
                         _log("sento:", p)
-                continue
+                    continue
+                if not p or now - self._partial_since < self.pause:
+                    continue
+                raw = self.rec.final_result()      # la frase è finita: si chiude
+                ended_by = "pausa"
             self._partial = ""
             t_end = time.monotonic()
-            raw = self.rec.result()
+            if DEBUG >= 2:
+                _log(f"fine della frase ({ended_by})")
             text, conf = st.listen_filter(raw)
             if not text:
                 if DEBUG >= 2 and raw.get("text"):

@@ -41,7 +41,7 @@ import speech_text as st  # noqa: E402
 APP_ID = "org.ruscalinux.RuscaLLisse"
 APP_NAME = "RuscaLLisse"
 APP_VERSION = "1.99.3"
-PROVA = "prova 4"            # versione di prova: motori precompilati
+PROVA = "prova 5"            # versione di prova: motori precompilati
 STYLE_SRC = os.path.join(BASE_DIR, "style.css")
 ICON_SRC = os.path.join(BASE_DIR, "ruscallisse.svg")
 LANG_DIR = os.path.join(BASE_DIR, "lang")
