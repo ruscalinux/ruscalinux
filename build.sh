@@ -125,14 +125,17 @@ elif [ -n "$(find branding apps -name build-deb -prune -o \
     ./make-debs.sh
 fi
 
-# Motori: il make-deb.sh di ruscallama-engine, ruscawhisper-engine e
-# ruscadiffusion-engine costruisce l'ultima release di llama.cpp, whisper.cpp
-# e stable-diffusion.cpp. Se ne e' uscita una piu' nuova di quella gia'
+# Motori: il make-deb.sh di ruscallama-engine, ruscawhisper-engine,
+# ruscadiffusion-engine e ruscapiper-engine costruisce l'ultima release di
+# llama.cpp, whisper.cpp, stable-diffusion.cpp e Piper (piper1-gpl).
+# ruscavosk-engine no: Vosk, Kaldi e OpenFst sono a versioni fissate nel suo
+# make-deb.sh. Se ne e' uscita una piu' nuova di quella gia'
 # impacchettata, si ricostruisce anche se in apps/ non e' cambiato nulla
 # (una volta sola: make-debs.sh rifa' tutti i motori). Senza rete il
 # controllo si salta e restano i pacchetti che ci sono.
 for coppia in ruscallama-engine:llama.cpp ruscawhisper-engine:whisper.cpp \
-              ruscadiffusion-engine:stable-diffusion.cpp; do
+              ruscadiffusion-engine:stable-diffusion.cpp \
+              ruscapiper-engine:piper1-gpl; do
     motore=${coppia%%:*}
     progetto=${coppia#*:}
     DEB=$(ls local/extra_debs/"$motore"-*.deb 2> /dev/null | head -n 1)

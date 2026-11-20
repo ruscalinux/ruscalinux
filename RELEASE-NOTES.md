@@ -96,6 +96,17 @@
   read with the same voice. Models
   are not included: copy a GGUF model with its mmproj (for example
   Qwen3-TTS) into `~/.local/share/ruscanarrator/models/`.
+- **A voice conversation.** RuscaLLisse lets you talk aloud with
+  Ellittica, a digital woman with glasses and short hair who explains things
+  simply and step by step. Only her animated face is on screen: nothing is
+  written and nothing is saved, as in a real conversation. She listens with
+  **ruscavosk-engine** (Vosk, with Kaldi and OpenFst), thinks with
+  ruscallama-engine and speaks with **ruscapiper-engine** (Piper with
+  espeak-ng), all three built from source, without network code. Her
+  personality is a text file you can edit. Models and voices are not
+  included: copy a Vosk model, a GGUF model and a Piper voice (for example
+  `vosk-model-it-0.22`, a Ministral model and `it_IT-paola-medium`) and import
+  them from the app.
 - **A pinball game.** RuscaPinball brings the “Amethyst” table, seen in
   perspective like the 1980s home computer pinball games: mushroom
   bumpers, the bonus trap, a ring of bonus lamps that counts down at the

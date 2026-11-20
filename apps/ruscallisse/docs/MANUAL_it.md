@@ -2,7 +2,7 @@
 
 Una conversazione a voce con Ellittica, una donna digitale intellettuale, dolce e sensibile, che ti spiega le cose in modo semplice. È un dialogo come nella vita: sullo schermo c'è solo il suo volto, niente viene scritto e la conversazione non si salva.
 
-**Versione di prova.** RuscaLLisse non è ancora nella ISO di RuscaLinux. I motori per ascoltare (ruscavosk-engine: Vosk), pensare (ruscallama-engine: llama.cpp) e parlare (ruscapiper-engine: Piper) sono pacchetti a parte, compilati dal sorgente, che si installano insieme a RuscaLLisse.
+I motori per ascoltare (ruscavosk-engine: Vosk), pensare (ruscallama-engine: llama.cpp) e parlare (ruscapiper-engine: Piper) sono pacchetti a parte, compilati dal sorgente, installati con RuscaLinux.
 
 ## Prima volta
 

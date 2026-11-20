@@ -41,7 +41,6 @@ import speech_text as st  # noqa: E402
 APP_ID = "org.ruscalinux.RuscaLLisse"
 APP_NAME = "RuscaLLisse"
 APP_VERSION = "1.99.3"
-PROVA = "prova 12"            # versione di prova: motori precompilati
 STYLE_SRC = os.path.join(BASE_DIR, "style.css")
 ICON_SRC = os.path.join(BASE_DIR, "ruscallisse.svg")
 LANG_DIR = os.path.join(BASE_DIR, "lang")
@@ -787,7 +786,7 @@ class LisseWindow(Adw.ApplicationWindow):
         Adw.Dialog(title=_("shortcuts"), content_width=420, child=view).present(self)
 
     def show_about(self):
-        show_about_dialog(self, _, APP_ID, APP_NAME, f"{APP_VERSION} ({PROVA})",
+        show_about_dialog(self, _, APP_ID, APP_NAME, APP_VERSION,
                           _("app_description"), theme_has_icon(), COMPONENTS)
 
     def _on_close(self, *_a):

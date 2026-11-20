@@ -4,23 +4,20 @@
 #
 #   ./make-deb.sh
 #
-# VERSIONE DI PROVA. Le regole delle specifiche valgono tutte (un solo .deb
-# in build-deb/ con suffisso -ruscalinux e SHA256SUMS accanto, versione =
-# VERSION di release.conf, Architecture: all); la versione ha il suffisso
-# ~prova finché RuscaLLisse non entra nella ISO. I motori sono i pacchetti
-# ruscavosk-engine, ruscallama-engine e ruscapiper-engine, compilati dal
-# sorgente.
+# Regole delle specifiche: un solo .deb in build-deb/ con suffisso
+# -ruscalinux e SHA256SUMS accanto, versione = VERSION di release.conf,
+# Architecture: all. I motori sono i pacchetti ruscavosk-engine,
+# ruscallama-engine e ruscapiper-engine, compilati dal sorgente.
 # ---------------------------------------------------------------------------
 set -euo pipefail
 cd "$(dirname "$0")"
 
 VER="1.99.3"
-PROVA="13"
 PKG="ruscallisse"
 NAME="RuscaLLisse"
 APP_ID="org.ruscalinux.RuscaLLisse"
 ARCH="all"
-DEBVER="${VER}~prova${PROVA}"
+DEBVER="${VER}"
 MAINT="Nunzio Curcuruto <info@ruscalinux.org>"
 HOMEPAGE="https://www.ruscalinux.org/"
 LANGS="en $(cd lang && ls -1 -- *.json | sed 's/\.json$//' | grep -vx en | sort | tr '\n' ' ')"
@@ -165,14 +162,12 @@ Installed-Size: $SIZE
 Depends: python3 (>= 3.10), python3-gi, python3-gi-cairo, gir1.2-gtk-4.0 (>= 4.18), gir1.2-adw-1 (>= 1.7), python3-markdown-it (>= 3.0), python3-mdit-py-plugins (>= 0.4), python3-linkify-it (>= 2.0), pipewire-bin, ruscallama-engine, ruscavosk-engine, ruscapiper-engine
 Maintainer: $MAINT
 Homepage: $HOMEPAGE
-Description: Voice conversation with a digital entity (test version)
+Description: Voice conversation with a digital entity
  Talk aloud with Ellittica, an intellectual, gentle and sensitive digital
  woman who explains things simply. Only her face is on screen: nothing is
  written and the conversation is not saved. Listens with Vosk, thinks with
  ruscallama-engine on 127.0.0.1, speaks with Piper. Everything stays on the
  computer.
- .
- TEST VERSION, not yet part of the RuscaLinux ISO.
 CONTROL
 
 dpkg-deb --root-owner-group -Zxz --build "$ROOT" "$OUT/${PKG}-ruscalinux_${DEBVER}_${ARCH}.deb" >/dev/null
