@@ -252,10 +252,16 @@ class Conversation:
                     continue
                 raw = self.rec.final_result()      # la frase è finita: si chiude
                 ended_by = "pausa"
+                if not (raw.get("text") or "").strip():
+                    # Con alcuni modelli (il rescoring del modello italiano
+                    # grande) il risultato finale arriva vuoto: il testo
+                    # parziale è già la frase intera, e la domanda non si perde.
+                    raw = {"text": p}
+                    ended_by = "pausa, testo parziale"
             self._partial = ""
             t_end = time.monotonic()
             if DEBUG >= 2:
-                _log(f"fine della frase ({ended_by})")
+                _log(f"fine della frase ({ended_by}): {raw.get('text', '')!r}")
             text, conf = st.listen_filter(raw)
             if not text:
                 if DEBUG >= 2 and raw.get("text"):
