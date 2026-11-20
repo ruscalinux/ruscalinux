@@ -147,6 +147,15 @@ spirv-headers
 # Vedi apps/ruscapiper-engine/README.md
 libonnxruntime-dev
 libsonic-dev
+# Compilare ruscavosk-engine (Vosk con Kaldi e OpenFst): OpenFst si configura
+# con autotools; calcolo con l'OpenBLAS di Debian senza thread, e lapacke.h.
+# Vedi apps/ruscavosk-engine/README.md
+autoconf
+automake
+libtool
+zlib1g-dev
+libopenblas-serial-dev
+liblapacke-dev
 
 # ===========================================================================
 # LIBS SUPPORT

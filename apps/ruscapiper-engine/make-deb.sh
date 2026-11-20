@@ -589,7 +589,8 @@ Description: speech synthesis engine for RuscaLLisse
  read from standard input into audio with phoneme timings.
  .
  This is Piper (piper1-gpl) $TAG and espeak-ng, external components
- (GPL-3.0), built from unmodified source with the ONNX Runtime of Debian.
+ (GPL-3.0), built from source with the ONNX Runtime of Debian and two small
+ fixes to libpiper (see /usr/share/doc/ruscapiper-engine/).
  It has no network code: no server and no downloads, voices are files
  copied by the user.
 CONTROL

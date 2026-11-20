@@ -1,0 +1,24 @@
+--- a/src/matrix/kaldi-blas.h
++++ b/src/matrix/kaldi-blas.h
+@@ -110,6 +110,21 @@
+   #undef bit_test
+   #undef bit_clear
+   #undef bit_set
++  // RuscaLinux: con LAPACK >= 3.9 lapack.h dichiara le funzioni Fortran con
++  // le lunghezze nascoste degli argomenti stringa in fondo
++  // (LAPACK_FORTRAN_STRLEN_END), e cblas-wrappers.h le chiama senza. Si
++  // passa dalle macro LAPACK_xxx(), che le aggiungono. (Una macro non si
++  // riespande dentro se stessa: il nome della funzione resta quello.)
++  #ifdef LAPACK_FORTRAN_STRLEN_END
++    #define sgesvd_(...) LAPACK_sgesvd(__VA_ARGS__)
++    #define dgesvd_(...) LAPACK_dgesvd(__VA_ARGS__)
++    #define ssptri_(...) LAPACK_ssptri(__VA_ARGS__)
++    #define dsptri_(...) LAPACK_dsptri(__VA_ARGS__)
++    #define ssptrf_(...) LAPACK_ssptrf(__VA_ARGS__)
++    #define dsptrf_(...) LAPACK_dsptrf(__VA_ARGS__)
++    #define stptri_(...) LAPACK_stptri(__VA_ARGS__)
++    #define dtptri_(...) LAPACK_dtptri(__VA_ARGS__)
++  #endif
+ #else
+   #error "You need to define (using the preprocessor) either HAVE_CLAPACK or HAVE_ATLAS or HAVE_MKL (but not more than one)"
+ #endif
