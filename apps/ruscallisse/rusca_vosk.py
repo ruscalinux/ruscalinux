@@ -57,6 +57,11 @@ def _load():
     path = find_library()
     if not path:
         raise VoskError("err_no_vosk")
+    # ruscavosk-engine usa l'OpenBLAS di Debian: se la variante scelta dal
+    # sistema e' quella con i thread, Vosk ne userebbe tanti quanti i
+    # processori per matrici piccole (la ricetta di Vosk compila OpenBLAS
+    # senza thread). OpenBLAS legge la variabile quando viene caricato.
+    os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
     try:
         lib = ctypes.CDLL(path)
     except OSError as e:
