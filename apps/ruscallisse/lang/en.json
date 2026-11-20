@@ -86,5 +86,9 @@
  "pref_look": "Appearance",
  "err_play": "No sound: the audio output does not respond (see the terminal)",
  "err_voice": "The voice does not work (see the terminal)",
- "err_internal": "Something got stuck: listening again"
+ "err_internal": "Something got stuck: listening again",
+ "gpu_device": "Graphics Card to Use",
+ "gpu_device_auto": "Automatic",
+ "gpu_device_sub": "Vulkan acceleration of the thinking model",
+ "notice_reasoning": "This model reasons before answering, so it is slower. For a quick conversation choose an “Instruct” version."
 }

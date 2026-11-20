@@ -29,6 +29,7 @@ SIMBOLI_VOSK = (
     "vosk_recognizer_new", "vosk_recognizer_free", "vosk_recognizer_set_words",
     "vosk_recognizer_accept_waveform", "vosk_recognizer_result",
     "vosk_recognizer_final_result", "vosk_recognizer_reset",
+    "vosk_recognizer_partial_result",
 )
 
 _lib = None
@@ -72,6 +73,7 @@ def _load():
         "vosk_recognizer_result": ([vp], cp),
         "vosk_recognizer_final_result": ([vp], cp),
         "vosk_recognizer_reset": ([vp], None),
+        "vosk_recognizer_partial_result": ([vp], cp),
     }
     for name, (args, res) in sig.items():
         fn = getattr(lib, name)
@@ -163,6 +165,10 @@ class Recognizer:
 
     def final_result(self):
         return self._json(self._lib.vosk_recognizer_final_result(self._rec))
+
+    def partial(self):
+        """Testo della frase in corso (per il terminale, in modalità debug)."""
+        return self._json(self._lib.vosk_recognizer_partial_result(self._rec)).get("partial", "")
 
     def reset(self):
         self._lib.vosk_recognizer_reset(self._rec)

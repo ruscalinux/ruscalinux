@@ -31,6 +31,10 @@ PW_RECORD = "/usr/bin/pw-record"
 DEBUG = int(os.environ.get("RUSCALLISSE_DEBUG", "0") or 0)
 FRAME = 640                       # 20 ms a 16 kHz, 16 bit
 HISTORY_TURNS = 20
+# I modelli che ragionano scrivono prima il ragionamento: il limite di token
+# deve lasciare spazio anche alla risposta (la sua lunghezza la tiene corta
+# il prompt, regola 2).
+MAX_TOKENS = 2048
 
 
 def _log(*args):
@@ -54,7 +58,7 @@ class Conversation:
     rilegge a ogni turno, così le modifiche valgono subito)."""
 
     def __init__(self, recognizer, speaker, engine, get_prompt, max_tokens,
-                 on_state, on_level, on_error, greeting=""):
+                 on_state, on_level, on_error, greeting="", on_notice=None):
         self.rec = recognizer
         self.speaker = speaker
         self.engine = engine
@@ -64,6 +68,9 @@ class Conversation:
         self.on_level = on_level
         self.on_error = on_error
         self.greeting = greeting
+        self.on_notice = on_notice or (lambda key: False)
+        self._reasoning_said = False
+        self._partial = ""
         self.history = []
         self.state = None
         self._paused = threading.Event()
@@ -218,10 +225,19 @@ class Conversation:
             if self._quit.is_set():
                 break
             if not self.rec.accept(data):
+                if DEBUG >= 2:
+                    p = self.rec.partial() if hasattr(self.rec, "partial") else ""
+                    if p and p != self._partial:
+                        self._partial = p
+                        _log("sento:", p)
                 continue
+            self._partial = ""
             t_end = time.monotonic()
-            text, conf = st.listen_filter(self.rec.result())
+            raw = self.rec.result()
+            text, conf = st.listen_filter(raw)
             if not text:
+                if DEBUG >= 2 and raw.get("text"):
+                    _log("ignorato (solo rumore):", raw.get("text"))
                 continue
             self._turn(text, conf, t_end)
             if self._quit.is_set():
@@ -238,15 +254,21 @@ class Conversation:
         self._set_state("thinking")
         self.history.append({"role": "user", "content": text})
         messages = [{"role": "system", "content": self.get_prompt()}] + self.history[-HISTORY_TURNS:]
-        body = {"messages": messages, "max_tokens": self.max_tokens(), "temperature": 0.7,
+        body = {"messages": messages, "max_tokens": MAX_TOKENS, "temperature": 0.7,
                 "cache_prompt": True, "reasoning_effort": "none",
                 "chat_template_kwargs": {"enable_thinking": False}}
         sentences = st.Sentences()
         answer = ""
         t_token = t_first = None
+        reasoning = 0
         self.speaker.first_audio = None
         try:
-            for piece, _reasoning in self.engine.chat_stream(body, self._interrupt, timeout=300):
+            for piece, thought in self.engine.chat_stream(body, self._interrupt, timeout=300):
+                if thought:
+                    reasoning += len(thought)
+                    if not self._reasoning_said:
+                        self._reasoning_said = True
+                        GLib.idle_add(self.on_notice, "notice_reasoning")
                 if not piece:
                     continue
                 if t_token is None:
@@ -267,7 +289,9 @@ class Conversation:
         else:
             self.history.pop()
         if DEBUG >= 2:
-            _log("risposta:", answer.strip())
+            if reasoning:
+                _log(f"ragionamento: {reasoning} caratteri, non detti")
+            _log("risposta:", answer.strip() or "(vuota)")
         self.speaker.wait_idle(self._interrupt)
         if DEBUG:
             def ms(t):

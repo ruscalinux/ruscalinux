@@ -26,7 +26,7 @@ import threading
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
+from gi.repository import Adw, Gdk, Gio, GLib, GObject, Gtk  # noqa: E402
 
 BASE_DIR = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, BASE_DIR)
@@ -41,7 +41,7 @@ import speech_text as st  # noqa: E402
 APP_ID = "org.ruscalinux.RuscaLLisse"
 APP_NAME = "RuscaLLisse"
 APP_VERSION = "1.99.3"
-PROVA = "prova 3"            # versione di prova: motori precompilati
+PROVA = "prova 4"            # versione di prova: motori precompilati
 STYLE_SRC = os.path.join(BASE_DIR, "style.css")
 ICON_SRC = os.path.join(BASE_DIR, "ruscallisse.svg")
 LANG_DIR = os.path.join(BASE_DIR, "lang")
@@ -67,7 +67,7 @@ GUIDE = (
 )
 DEFAULTS = {
     "entity": "ellittica.md", "vosk_model": "", "model": "", "voice": "", "speed": 0.0,
-    "max_words": 80, "emotions": True, "gpu": True, "theme": "system",
+    "max_words": 80, "emotions": True, "gpu": True, "gpu_device": "", "theme": "system",
     "width": 520, "height": 640, "maximized": False,
 }
 THEMES = ("system", "light", "dark")
@@ -273,6 +273,9 @@ class LisseWindow(Adw.ApplicationWindow):
         self.lexicon = {}
         self._loading = False
         self._monitors = []
+        self.devices = []               # schede grafiche viste dal motore
+        self._device_row = None
+        threading.Thread(target=self._load_devices, daemon=True).start()
 
         # ── barra del titolo ──
         header = Adw.HeaderBar()
@@ -357,6 +360,43 @@ class LisseWindow(Adw.ApplicationWindow):
         if key == "err_mic":
             self._set_mic_paused(True)
         return False
+
+    def _on_notice(self, key):
+        self.toasts.add_toast(Adw.Toast(title=_(key), timeout=8))
+        return False
+
+    # ── schede grafiche (come in RuscaLLama: si salva la descrizione) ────
+    def _load_devices(self):
+        devices = eng.list_devices()
+        GLib.idle_add(self._devices_loaded, devices)
+
+    def _devices_loaded(self, devices):
+        self.devices = devices
+        self._fill_device_row()
+        return False
+
+    def _fill_device_row(self):
+        row = self._device_row
+        if row is None:
+            return
+        items = [_("gpu_device_auto")] + [
+            f"{desc} ({max(1, round(mib / 1024))} GB)" for _n, desc, mib in self.devices]
+        descs = [d[1] for d in self.devices]
+        self._device_updating = True
+        row.set_model(Gtk.StringList.new(items))
+        row.set_selected(descs.index(self.cfg["gpu_device"]) + 1
+                         if self.cfg["gpu_device"] in descs else 0)
+        self._device_updating = False
+
+    def _on_device(self, row, _pspec):
+        if getattr(self, "_device_updating", False):
+            return
+        i = row.get_selected()
+        value = self.devices[i - 1][1] if 0 < i <= len(self.devices) else ""
+        if value != self.cfg["gpu_device"]:
+            self.cfg["gpu_device"] = value
+            save_settings(self.cfg)
+            self._restart_session()
 
     def _on_engine_state(self, state, detail=""):
         if state == "error" and self.conv is not None:
@@ -471,9 +511,16 @@ class LisseWindow(Adw.ApplicationWindow):
         if self.lang not in st.REGOLE:
             self.lang = "en"
         speed = self.ent.get("speed") or self.cfg["speed"] or 1.0
+        args = ["-c", "8192", "-t", str(eng.physical_cores()),
+                "--reasoning-format", "deepseek"]
+        if self.cfg["gpu"]:
+            if not self.devices and self.cfg["gpu_device"]:
+                self.devices = eng.list_devices()
+            device = eng.device_name(self.cfg["gpu_device"], self.devices)
+            if device:
+                args += ["--device", device]
         try:
-            self.engine.start(gm, ["-c", "4096", "-t", str(eng.physical_cores())],
-                              gpu=self.cfg["gpu"])
+            self.engine.start(gm, args, gpu=self.cfg["gpu"])
         except eng.EngineError as e:
             self._loading = False
             self._on_error(e.key if e.key in _STRINGS else "err_engine")
@@ -520,7 +567,8 @@ class LisseWindow(Adw.ApplicationWindow):
         self.conv = conv_mod.Conversation(
             rec, spk, self.engine, self._prompt, lambda: self.cfg["max_words"] * 2,
             self._on_state, self._on_level, self._on_error,
-            greeting=GREETING.get(self.lang, GREETING["en"]).format(name=self.ent["name"]))
+            greeting=GREETING.get(self.lang, GREETING["en"]).format(name=self.ent["name"]),
+            on_notice=self._on_notice)
         self.conv.lexicon_apply = lambda text: st.apply_lexicon(text, self.lexicon)
         self.conv.start()
         return False
@@ -686,6 +734,13 @@ class LisseWindow(Adw.ApplicationWindow):
             self._restart_session()
         gpu.connect("notify::active", set_gpu)
         g.add(gpu)
+        self._device_row = Adw.ComboRow(title=_("gpu_device"), subtitle=_("gpu_device_sub"))
+        self._fill_device_row()
+        self._device_row.connect("notify::selected", self._on_device)
+        gpu.bind_property("active", self._device_row, "sensitive",
+                          GObject.BindingFlags.SYNC_CREATE)
+        g.add(self._device_row)
+        dlg.connect("closed", lambda *_a: setattr(self, "_device_row", None))
         page.add(g)
 
         g = Adw.PreferencesGroup(title=_("pref_look"))

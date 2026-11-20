@@ -16,7 +16,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 VER="1.99.3"
-PROVA="3"
+PROVA="4"
 PKG="ruscallisse"
 NAME="RuscaLLisse"
 APP_ID="org.ruscalinux.RuscaLLisse"

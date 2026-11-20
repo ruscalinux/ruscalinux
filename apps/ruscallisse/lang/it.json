@@ -86,5 +86,9 @@
  "pref_look": "Aspetto",
  "err_play": "La voce non esce: l’uscita audio non risponde (vedi il terminale)",
  "err_voice": "La voce non funziona (vedi il terminale)",
- "err_internal": "Qualcosa si è inceppato: ascolto di nuovo"
+ "err_internal": "Qualcosa si è inceppato: ascolto di nuovo",
+ "gpu_device": "Scheda da usare",
+ "gpu_device_auto": "Automatica",
+ "gpu_device_sub": "Accelerazione Vulkan del modello per pensare",
+ "notice_reasoning": "Questo modello ragiona prima di rispondere: è più lento. Per una conversazione veloce scegli una versione «Instruct»."
 }

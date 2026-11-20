@@ -208,7 +208,7 @@ class TestTurno(unittest.TestCase):
         c._turn("come [funziona] la luce", 0.7, time.monotonic())
         self.assertEqual(eng.body["messages"][0], {"role": "system", "content": "SISTEMA"})
         self.assertEqual(eng.body["messages"][-1]["content"], "come [funziona] la luce")
-        self.assertEqual(eng.body["max_tokens"], 160)
+        self.assertEqual(eng.body["max_tokens"], cv.MAX_TOKENS)
         self.assertEqual(spk.said[0], ("Certo, te lo spiego con calma.", "sorride"))
         self.assertEqual(spk.said[1], ("Prima una cosa, poi l'altra.", None))
         self.assertEqual(states, ["thinking", "speaking"])
