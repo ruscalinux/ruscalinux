@@ -1,0 +1,5 @@
+# Lessico delle pronunce di RuscaLLisse: parola<TAB>fonemi IPA, come li scrive
+# espeak-ng con --ipa (sono quelli che Piper accetta fra [[ ]]).
+# Il file dell'utente (~/.local/share/ruscallisse/pronunce.tsv) vale di più.
+# espeak-ng italiano rispetta già l'accento grafico (ancóra, àncora,
+# princìpi, prìncipi): qui vanno solo le parole che sbaglia anche così.

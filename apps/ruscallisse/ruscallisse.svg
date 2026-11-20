@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- RuscaLLisse — Ellittica: capelli corti, occhiali ovali, matita, orbita. GPL-3.0 -->
+  <ellipse cx="64" cy="122" rx="40" ry="12" fill="#8a2b5f"/>
+  <ellipse cx="64" cy="104" rx="11" ry="14" fill="#f8d7e6"/>
+  <ellipse cx="64" cy="54" rx="38" ry="35" fill="#7a2357"/>
+  <ellipse cx="31" cy="70" rx="8" ry="16" fill="#7a2357"/>
+  <ellipse cx="97" cy="70" rx="8" ry="16" fill="#7a2357"/>
+  <ellipse cx="64" cy="64" rx="31" ry="38" fill="#f6e4ec"/>
+  <g transform="translate(97 60) rotate(35)">
+    <rect x="-3" y="-24" width="6" height="40" fill="#e8b04a"/>
+    <rect x="-3" y="-28" width="6" height="5" fill="#f5b8d3"/>
+    <path d="M-3 16 L3 16 L0 24 Z" fill="#3a1028"/>
+  </g>
+  <path d="M31 66 C30 40 44 25 66 25 C88 25 98 42 97 64 C93 50 86 42 74 40 C64 46 50 49 40 48 C35 52 32 58 31 66 Z" fill="#7a2357"/>
+  <ellipse cx="64" cy="58" rx="58" ry="16" transform="rotate(-15 64 58)" fill="none" stroke="#f2a7c8" stroke-width="2.5"/>
+  <circle cx="117" cy="44" r="4" fill="#7a2357" stroke="#fff7f0" stroke-width="1.5"/>
+  <ellipse cx="52" cy="66" rx="6" ry="5" fill="#fff7f0"/>
+  <ellipse cx="76" cy="66" rx="6" ry="5" fill="#fff7f0"/>
+  <circle cx="52" cy="66" r="3" fill="#2d0a1d"/>
+  <circle cx="76" cy="66" r="3" fill="#2d0a1d"/>
+  <ellipse cx="52" cy="66" rx="10" ry="8" fill="none" stroke="#2d0a1d" stroke-width="2"/>
+  <ellipse cx="76" cy="66" rx="10" ry="8" fill="none" stroke="#2d0a1d" stroke-width="2"/>
+  <path d="M61 65 Q64 62 67 65" fill="none" stroke="#2d0a1d" stroke-width="2"/>
+  <ellipse cx="46" cy="78" rx="5" ry="3" fill="#f2a7c8"/>
+  <ellipse cx="82" cy="78" rx="5" ry="3" fill="#f2a7c8"/>
+  <path d="M57 86 Q64 91 71 86" fill="none" stroke="#7a2357" stroke-width="2.4" stroke-linecap="round"/>
+</svg>
