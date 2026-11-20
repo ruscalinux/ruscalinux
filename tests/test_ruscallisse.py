@@ -419,6 +419,60 @@ class TestFineFrase(unittest.TestCase):
         self.assertEqual(asked[:1], ["spiegami la seconda guerra mondiale"])
 
 
+@unittest.skipUnless(HAVE_GI, "serve PyGObject")
+class TestTurniAlternati(unittest.TestCase):
+    """Il chat template di Mistral rifiuta un assistente prima della prima
+    domanda e due turni dello stesso ruolo (errore 500 di llama-server)."""
+
+    def check(self, msgs):
+        self.assertEqual(msgs[0]["role"], "system")
+        roles = [m["role"] for m in msgs[1:]]
+        self.assertEqual(roles[0], "user")
+        for a, b in zip(roles, roles[1:]):
+            self.assertNotEqual(a, b)
+
+    def test_saluto_nel_sistema(self):
+        import conversation as cv
+        h = [{"role": "assistant", "content": "Ciao, sono Ellittica."},
+             {"role": "user", "content": "spiegami la seconda guerra mondiale"}]
+        msgs = cv.alternate("SISTEMA", h)
+        self.check(msgs)
+        self.assertIn("Ciao, sono Ellittica.", msgs[0]["content"])
+        self.assertEqual(len(msgs), 2)
+
+    def test_due_domande_di_fila(self):
+        import conversation as cv
+        h = [{"role": "user", "content": "uno"}, {"role": "assistant", "content": "a"},
+             {"role": "user", "content": "due"}, {"role": "user", "content": "tre"}]
+        msgs = cv.alternate("S", h)
+        self.check(msgs)
+        self.assertEqual(msgs[-1]["content"], "due\ntre")
+
+    def test_turno_dopo_il_saluto(self):
+        import conversation as cv
+
+        class Engine:
+            def __init__(self): self.body = None
+            def cancel(self): pass
+            def chat_stream(self, body, stop, timeout=0):
+                self.body = body
+                yield "Certo.", ""
+
+        class Speaker:
+            first_audio = None
+            def say(self, *a): pass
+            def wait_idle(self, ev=None): return True
+            def stop(self): pass
+
+        eng = Engine()
+        c = cv.Conversation(None, Speaker(), eng, lambda: "S", lambda: 10,
+                            lambda s: False, lambda l: False, lambda k: False)
+        c._set_state = lambda st: None
+        c.history.append({"role": "assistant", "content": "Ciao, sono Ellittica."})
+        c._turn("come stai", 1.0, time.monotonic())
+        self.check(eng.body["messages"])
+
+
 class TestSicurezza(unittest.TestCase):
     def test_niente_moduli_di_rete(self):
         """Solo rusca_engine.py parla con 127.0.0.1 (specifiche, sezione 11)."""

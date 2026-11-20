@@ -47,6 +47,33 @@ def _log(*args):
     print("ruscallisse:", *args, file=sys.stderr, flush=True)
 
 
+def alternate(system, history):
+    """Messaggi per il modello con i turni che si alternano utente,
+    assistente, utente... Alcuni chat template (Mistral, Ministral) rifiutano
+    tutta la richiesta se dopo il messaggio di sistema c'è un turno
+    dell'assistente o due turni dello stesso ruolo. Due messaggi consecutivi
+    dello stesso ruolo si uniscono; ciò che l'assistente ha detto prima della
+    prima domanda (il saluto) va nel messaggio di sistema come nota."""
+    turns = []
+    for m in history:
+        text = (m.get("content") or "").strip()
+        if not text:
+            continue
+        if turns and turns[-1]["role"] == m["role"]:
+            turns[-1]["content"] += "\n" + text
+        else:
+            turns.append({"role": m["role"], "content": text})
+    said = []
+    while turns and turns[0]["role"] == "assistant":
+        said.append(turns.pop(0)["content"])
+    if said:
+        system = system + "\n\n" + SAID_NOTE + " " + " ".join(said)
+    return [{"role": "system", "content": system}] + turns
+
+
+SAID_NOTE = "Hai già detto:"
+
+
 def _rms(data):
     a = array.array("h")
     a.frombytes(data[: len(data) // 2 * 2])
@@ -281,7 +308,7 @@ class Conversation:
             _log(f"capito (fiducia {conf:.2f}): {text}")
         self._set_state("thinking")
         self.history.append({"role": "user", "content": text})
-        messages = [{"role": "system", "content": self.get_prompt()}] + self.history[-HISTORY_TURNS:]
+        messages = alternate(self.get_prompt(), self.history[-HISTORY_TURNS:])
         body = {"messages": messages, "max_tokens": MAX_TOKENS, "temperature": 0.7,
                 "cache_prompt": True, "reasoning_effort": "none",
                 "chat_template_kwargs": {"enable_thinking": False}}
