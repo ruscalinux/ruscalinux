@@ -63,6 +63,9 @@ Si trova nel repository in `docs/SPECIFICHE-RUSCALINUX-OS-APPS.md`. Durante lo s
 | ruscadiffusion-engine | Motore di generazione delle immagini e dei video di RuscaLLama: **stable-diffusion.cpp, software esterno** | Componente di sistema, senza interfaccia | — | `ruscadiffusion-engine` | — |
 | RuscaNarrator | Lettura ad alta voce di documenti Markdown e di sottotitoli SRT (rispettandone i tempi) | Sintesi vocale | `org.ruscalinux.RuscaNarrator` | `ruscanarrator` | No |
 | RuscaPinball | Flipper in stile anni ’80, con il tavolo «Amethyst» in prospettiva | Gioco | `org.ruscalinux.RuscaPinball` | `ruscapinball` | No |
+| RuscaLLisse | Conversazione a voce con un’entità digitale animata, con la personalità decisa dall’utente (la prima è Ellittica) | Assistente vocale | `org.ruscalinux.RuscaLLisse` | `ruscallisse` | No |
+| ruscavosk-engine | Motore di riconoscimento vocale in tempo reale di RuscaLLisse: **Vosk, software esterno** | Componente di sistema, senza interfaccia | — | `ruscavosk-engine` | — |
+| ruscapiper-engine | Motore di sintesi vocale di RuscaLLisse: **Piper (piper1-gpl), software esterno** | Componente di sistema, senza interfaccia | — | `ruscapiper-engine` | — |
 
 ### 1.1 Gli strumenti di intelligenza artificiale
 
@@ -72,8 +75,8 @@ RuscaLLama e RuscaTranslator usano modelli linguistici in formato GGUF che giran
 - Il pacchetto del motore non ha interfaccia, quindi non ha traduzioni, icona né finestra Informazioni: lo dichiarano le finestre Informazioni di RuscaLLama e RuscaTranslator, nel gruppo “Componenti esterni”.
 - Programmi del pacchetto, in `/usr/lib/ruscallama-engine/`: `llama-server`, che avviano RuscaLLama e RuscaTranslator; `llama-cli` e `llama-bench` per diagnosticare e misurare dal terminale; `llama-tts` per la sintesi vocale, con modelli TTS in GGUF e il loro mmproj (per esempio Qwen3-TTS, Pocket TTS, Soprano): lo avvia RuscaNarrator (sezione 1.4), e si può usare dal terminale. La build controlla che `llama-tts` accetti le opzioni usate da RuscaNarrator (`OPZIONI_TTS`). L’elenco (`KEEP_BINARIES` in `make-deb.sh`) fa parte della firma della cache di compilazione: aggiungere un programma ricompila llama.cpp.
 - I modelli non fanno parte dei pacchetti: l’utente li copia in `~/.local/share/ruscallama/models/` o l’amministratore in `/usr/share/ruscallama/models/`. Ogni modello ha la propria licenza, che l’utente deve rispettare.
-- Il modulo `rusca_engine.py`, che avvia e interroga il motore, è identico in RuscaLLama e RuscaTranslator, come `style.css` (si modifica una volta e si copia).
-- Il modulo `rusca_markdown.py`, motore Markdown comune (sezione 1.2), è identico in RuscaLLama, RuscaMark, RuscaWriter (`src/ruscawriter/`), RuscaTranslator e RuscaNarrator, con la stessa regola; accanto c’è `markdown_it_mark.py`, componente esterno usato dal motore (sezione 6), anch’esso identico nei cinque programmi. RuscaTranslator mostra il Markdown come sorgente: il motore gli serve per dividere i documenti da tradurre senza spezzare un blocco.
+- Il modulo `rusca_engine.py`, che avvia e interroga il motore, è identico in RuscaLLama, RuscaTranslator e RuscaLLisse, come `style.css` (si modifica una volta e si copia).
+- Il modulo `rusca_markdown.py`, motore Markdown comune (sezione 1.2), è identico in RuscaLLama, RuscaMark, RuscaWriter (`src/ruscawriter/`), RuscaTranslator, RuscaNarrator e RuscaLLisse, con la stessa regola; accanto c’è `markdown_it_mark.py`, componente esterno usato dal motore (sezione 6), anch’esso identico nei sei programmi. RuscaTranslator mostra il Markdown come sorgente: il motore gli serve per dividere i documenti da tradurre senza spezzare un blocco.
 - Gli editor di RuscaMark e RuscaWriter mostrano tabelle, formule e immagini come Markdown sorgente; la resa completa è nell’anteprima. RuscaWriter usa il modulo `rusca_liveblocks.py` per i riquadri delle immagini dell’anteprima.
 
 ### 1.2 Il motore Markdown
@@ -258,6 +261,255 @@ La vista **Video** (Alt+3) crea brevi video, di qualche secondo, da una descrizi
 
 **Test.** `tests/test_ruscallama_diffusion.py` controlla anche i ruoli dei file video, 8 cartelle di modelli video (Wan 2.1 e 2.2, HunyuanVideo, LingBot, S2V), i fotogrammi `4n+1`, la lettura dei fotogrammi di un AVI e l’intero percorso di un video con il `sd-cli` finto, che scrive AVI in Motion JPEG come quelli veri: `-M vid_gen`, fotogrammi e fps, immagine di partenza copiata, HighNoise, errori di partenza.
 
+### 1.7 La conversazione a voce
+
+**Stato: in sviluppo.** RuscaLLisse non è ancora nella ISO né nei pacchetti pubblicati.
+
+RuscaLLisse fa parlare l’utente, a voce, con un’**entità**: un personaggio con un volto animato, una voce e una personalità scritta in un file che l’utente può modificare. La prima entità è **Ellittica**, una donna digitale intellettuale, dolce e sensibile, che spiega ogni cosa in modo chiaro, semplice e lineare.
+
+Tutto gira sul computer dell’utente, con tre motori:
+
+| Passo | Motore | Programma o libreria |
+|---|---|---|
+| Ascolta | **ruscavosk-engine** (Vosk) | `libvosk.so`, caricata nel processo di RuscaLLisse con `ctypes` |
+| Pensa | **ruscallama-engine** (llama.cpp) | `llama-server`, su 127.0.0.1, avviato con `rusca_engine.py` |
+| Parla | **ruscapiper-engine** (Piper) | `ruscapiper-stream`, un processo che resta aperto |
+
+Durante lo sviluppo era stato provato RuscaCat (whisper.cpp e `llama-tts`), poi cancellato perché troppo lento: ogni frase ricaricava il modello di Whisper e quello della voce, e ogni passo aspettava che il precedente finisse. RuscaLLisse nasce per evitare proprio questi due errori.
+
+**Perché questi motori.** Il riconoscimento vocale usa Vosk e non Whisper: Whisper lavora su blocchi interi di audio e, con `whisper-cli`, ricarica il modello a ogni frase; Vosk riconosce mentre si parla. La sintesi vocale usa Piper e non `llama-tts` con Qwen3-TTS: Piper è piccolo, resta caricato ed è molto più veloce del tempo reale anche sul processore; in più l’accento tonico lo decide espeak-ng, quindi è prevedibile e si corregge con il lessico delle pronunce, mentre Qwen3-TTS lo indovina e in italiano spesso sbaglia. Il volto è disegnato dal programma e non animato da una rete neurale, che occuperebbe la scheda grafica e aggiungerebbe secondi di ritardo.
+
+#### 1.7.1 La regola della velocità
+
+Il tempo che conta è quello fra la fine della frase dell’utente e la prima sillaba dell’entità. Per tenerlo il più basso possibile valgono quattro regole, senza eccezioni:
+
+1. **Nessun modello si ricarica durante la conversazione.** Il modello Vosk resta in memoria nel processo; `llama-server` resta acceso con il modello caricato; `ruscapiper-stream` resta aperto con la voce caricata. Si caricano all’apertura della finestra (o al cambio di modello, entità o voce), mai a ogni frase.
+2. **Ogni passo comincia prima che il precedente finisca.** Vosk trascrive mentre l’utente parla; la risposta di `llama-server` arriva in streaming; ogni frase della risposta va a Piper appena è completa, mentre il modello scrive ancora; l’audio di ogni frase si riproduce appena arriva.
+3. **Il prompt dell’entità si elabora una volta sola.** Il prompt di sistema (personalità e regole del parlato) è sempre lo stesso all’inizio del contesto: `llama-server` lo tiene in cache (`cache_prompt`), così ogni domanda paga solo le parole nuove. All’apertura RuscaLLisse manda una richiesta di riscaldamento con il solo prompt di sistema e `n_predict` 0.
+4. **Risposte brevi.** Le regole del parlato chiedono frasi brevi; il numero massimo di parole per risposta (Preferenze, 80 se non cambiato) diventa `n_predict` (circa 2 token per parola).
+
+Con `RUSCALLISSE_DEBUG=1` il programma scrive sul terminale, per ogni turno, i tempi di ogni passo: fine del parlato → testo finale di Vosk → primo token → prima frase a Piper → primo campione audio riprodotto. Sono i numeri da guardare prima di cambiare qualunque cosa.
+
+#### 1.7.2 Moduli
+
+| Modulo | Compito | Usa GTK |
+|---|---|---|
+| `ruscallisse.py` | Applicazione, finestra, preferenze, menu | Sì |
+| `conversation.py` | Il turno: stati (a riposo, in ascolto, pensa, parla), interruzione, storia della conversazione | No |
+| `rusca_vosk.py` | `ctypes` su `libvosk.so`: modello, riconoscitore, testo parziale e finale | No |
+| `rusca_piper.py` | Avvia e tiene aperto `ruscapiper-stream`, manda le frasi, riceve l’audio | No |
+| `audio_io.py` | Microfono (`pw-record`) e altoparlanti (`pw-play`), livello del segnale | No |
+| `speech_text.py` | Dalla risposta del modello alle frasi da dire: Markdown, lessico delle pronunce, etichette d’emozione | No |
+| `entity.py` | Legge e scrive i file delle entità, costruisce il prompt di sistema | No |
+| `face.py` | Il volto: disegno con Cairo, stati, visemi, espressioni | Sì (`Gtk.DrawingArea`) |
+| `rusca_engine.py` | Avvia e interroga `llama-server` | No |
+| `rusca_markdown.py`, `markdown_it_mark.py` | Motore Markdown comune (sezione 1.2), per `speech_blocks()` | No |
+
+`rusca_engine.py`, `rusca_markdown.py`, `markdown_it_mark.py` e `style.css` sono **identici** a quelli degli altri tool, con la regola della sezione 1.1 (si modificano una volta e si copiano); il test delle copie identiche include RuscaLLisse. I moduli senza GTK si provano senza interfaccia.
+
+#### 1.7.3 Ascoltare: Vosk
+
+- **Microfono.** `audio_io.py` avvia `/usr/bin/pw-record --rate 16000 --channels 1 --format s16 -` (pacchetto Debian `pipewire-bin`) e legge l’audio dallo standard output a blocchi di 20 ms. L’audio **non si scrive mai su disco**: passa in memoria da `pw-record` a Vosk.
+- **Riconoscimento.** `rusca_vosk.py` usa l’API in C di Vosk: `vosk_model_new()`, `vosk_recognizer_new()` a 16 kHz, `vosk_recognizer_accept_waveform()` a ogni blocco, `vosk_recognizer_partial_result()` per il testo parziale, `vosk_recognizer_result()` e `vosk_recognizer_final_result()` per quello finale, `vosk_set_log_level(-1)` per il silenzio sul terminale. I nomi delle funzioni usate sono in `SIMBOLI_VOSK` e la build del motore controlla che la libreria li esporti.
+- **Fine della frase.** La dichiara Vosk (`accept_waveform` restituisce 1); in più, una frase finisce dopo il silenzio impostato nelle Preferenze («Pausa prima di rispondere»: 0,5 s se non cambiata; da 0,3 a 1,5 s). Un risultato vuoto o di una sola parola corta («eh», «mh») non fa partire un turno.
+- **Testo parziale.** Mentre l’utente parla, il testo parziale compare sotto il volto (se «Mostra il testo» è attivo): così si vede subito se l’entità sta capendo.
+- **Modelli.** Non fanno parte dei pacchetti. Ogni modello è una **cartella** (come esce dallo zip ufficiale) in `~/.local/share/ruscavosk/models/` o, per tutti, in `/usr/share/ruscavosk/models/`. Una cartella è un modello se contiene `am/final.mdl` e `conf/`. Fra più modelli della stessa lingua si propone il più grande. Le cartelle si guardano con `Gio.FileMonitor`. Modelli di riferimento per l’italiano: `vosk-model-it-0.22` (1,2 GB, più preciso) e `vosk-model-small-it-0.22` (48 MB, per computer con poca memoria), entrambi Apache 2.0. Ogni modello ha la propria licenza: alcuni modelli Vosk di altre lingue sono AGPL o CC-BY-NC-SA.
+- **Lingua.** Il modello decide la lingua dell’ascolto. La lingua si ricava dal nome della cartella (`vosk-model-it-…`, `vosk-model-small-it-…`); «Lingua della conversazione» nelle Preferenze filtra modelli e voci (al primo avvio: la lingua dell’interfaccia, se c’è un modello; altrimenti la prima disponibile).
+
+#### 1.7.4 Pensare: il modello linguistico
+
+- Il modello è un GGUF della cartella di RuscaLLama (`~/.local/share/ruscallama/models/`, `/usr/share/ruscallama/models/`): chi usa già RuscaLLama non copia niente. RuscaLLisse ha un proprio `llama-server`, con le stesse regole della sezione 11 (127.0.0.1, porta libera, chiave casuale, `--no-webui`).
+- La conversazione resta in memoria e si manda al modello a ogni turno, con il prompt di sistema in testa. Quando il contesto si riempie si tolgono i turni più vecchi, mai il prompt di sistema.
+- La scheda grafica si sceglie come in RuscaLLama (Preferenze, «Scheda grafica»).
+
+#### 1.7.5 Le entità e il «quid»
+
+Un’entità è un file Markdown in `~/.local/share/ruscallisse/entities/`, con il nome dell’entità (`ellittica.md`). Il file si scrive a mano o dal menu principale → **Modifica la personalità…**, che lo apre in un editor della finestra (`Gtk.TextView`, monospazio, Ctrl+S per salvare); le modifiche valgono dalla risposta successiva.
+
+Struttura (i titoli sono fissi, il testo è libero):
+
+```markdown
+# Ellittica
+
+## Quid
+Il tratto centrale che decide l’utente, in una o due frasi.
+
+## Carattere
+## Modo di parlare
+## Non fa mai
+## Volto
+## Voce
+```
+
+- **Quid**: è il centro della personalità. Il prompt di sistema lo mette per primo, prima del carattere.
+- **Carattere**, **Modo di parlare**, **Non fa mai**: testo libero, che entra nel prompt di sistema così com’è.
+- **Volto**: per ora un solo volto, `ellittica` (sezione 1.7.8). Riga `volto: ellittica`.
+- **Voce**: righe `voce: <nome del file .onnx senza estensione>` e `velocità: <da 0,7 a 1,3>`. Se la voce non c’è, si usa quella scelta nelle Preferenze.
+
+Il file si legge con il motore Markdown comune (`parser()` di `rusca_markdown.py`), cercando i titoli di secondo livello; un titolo mancante vale come vuoto, e un file senza titolo di primo livello prende il nome dal file.
+
+Il pacchetto installa l’entità predefinita in `/usr/share/ruscallisse/entities/ellittica.md`. Al primo avvio si copia in `~/.local/share/ruscallisse/entities/` se lì non c’è: da quel momento è dell’utente, e un aggiornamento del pacchetto non la sovrascrive. Il quid di Ellittica è lasciato all’utente: il file predefinito contiene la riga «Il tratto centrale che decidi tu» e la finestra, finché la sezione Quid contiene questa riga, mostra un `Adw.Banner` «Ellittica non ha ancora un quid» con il pulsante **Scrivi il quid…**.
+
+L’entità attiva si sceglie dal selettore nella barra del titolo. **Nuova entità…** nel menu principale crea un file da un modello vuoto e lo apre nell’editor. Un’entità si toglie solo spostandone il file nel cestino (`Gio.File.trash`), con «Annulla» in un `Adw.Toast`.
+
+**Il file predefinito di Ellittica:**
+
+```markdown
+# Ellittica
+
+## Quid
+Il tratto centrale che decidi tu.
+
+## Carattere
+Intellettuale: ama le idee e i libri. Dolce e sensibile: ascolta prima
+di rispondere, si accorge di come stai, non fa mai sentire nessuno
+ignorante.
+
+## Modo di parlare
+Chiaro e semplice, sempre.
+- Una sola idea per frase. Frasi brevi.
+- Parole di tutti i giorni. Se serve una parola difficile, la spiega subito.
+- Spiega in ordine lineare: prima, poi, infine. Un passo alla volta.
+- Quando aiuta, un esempio concreto della vita quotidiana.
+- Niente giri di parole, niente citazioni per fare colpo.
+- Se l’argomento è lungo, dice l’essenziale e chiede se vuoi andare avanti.
+
+## Non fa mai
+Non giudica, non fa lezioni non richieste, non finge certezze che non ha.
+
+## Volto
+volto: ellittica
+
+## Voce
+velocità: 0,95
+```
+
+**Il prompt di sistema** (`entity.system_prompt()`) è fatto di tre parti, in quest’ordine: la personalità (quid, carattere, modo di parlare, non fa mai); le **regole del parlato**, scritte da RuscaLinux e uguali per tutte le entità; le **etichette d’emozione**, se attive. Le regole del parlato:
+
+1. Stai parlando a voce, non scrivendo: niente Markdown, niente elenchi puntati, niente tabelle, niente emoji, niente link.
+2. Frasi brevi. Al massimo {max_words} parole per risposta, salvo che l’utente chieda di più.
+3. Scrivi i numeri, le sigle e i simboli come si dicono a voce.
+4. Sulle parole che si scrivono uguali ma si dicono diverse metti l’accento grafico dove cade: ancòra o àncora, princìpi o prìncipi, sùbito o subìto.
+5. Rispondi nella lingua della conversazione: {language}.
+
+#### 1.7.6 Dal testo alla voce
+
+`speech_text.py` trasforma la risposta che arriva in streaming in frasi da dire:
+
+1. **Markdown.** Se il modello scrive comunque formattazione, il testo passa da `speech_blocks()` del motore comune (sezione 1.2): niente marcatori, il testo dei link e non l’indirizzo, formule in parole. Gli elenchi non si saltano: ogni voce diventa una frase («Primo, …», «Secondo, …» per gli elenchi numerati). I blocchi di codice non si leggono: al loro posto l’entità dice una frase fissa per lingua («Ti ho scritto del codice: lo trovi nel testo.»).
+2. **Etichette d’emozione.** Un’etichetta all’inizio della risposta o di una frase (`[sorride]`, `[pensierosa]`, `[commossa]`, `[divertita]`, `[perplessa]`, `[seria]`) si toglie dal testo e va al volto. Un’etichetta sconosciuta si toglie e si ignora.
+3. **Divisione in frasi.** Si taglia a fine frase (`.`, `?`, `!`, `…`, due punti seguiti da spazio). Se una frase supera 120 caratteri si taglia anche alla prima virgola dopo 40 caratteri. La **prima** frase si manda appena ha 25 caratteri e incontra una virgola: è quella che decide quanto si aspetta.
+4. **Lessico delle pronunce.** File `~/.local/share/ruscallisse/pronunce.tsv`, una riga per parola: `parola<TAB>fonemi`, con i fonemi nell’alfabeto di espeak-ng. Prima di mandare la frase a Piper, ogni parola del lessico (confronto senza maiuscole, parola intera) si sostituisce con `[[fonemi]]`, la sintassi di Piper per i fonemi scritti a mano. Il pacchetto installa un lessico di partenza in `/usr/share/ruscallisse/pronunce.tsv` con le parole italiane che espeak-ng accentua male o che portano l’accento grafico della regola 4 (`ancòra`, `àncora`, `princìpi`, `prìncipi`…); quello dell’utente vale di più. Ogni riga del lessico di partenza ha un test.
+5. **Controllo dell’accento.** Il menu principale ha **Come la pronuncia?…**: si scrive una parola, la finestra mostra i fonemi con la sillaba accentata in evidenza (`espeak-ng -v it -q -x`, pacchetto Debian `espeak-ng`), la fa dire all’entità e offre **Correggi la pronuncia…**, che scrive la riga nel lessico dell’utente.
+
+#### 1.7.7 Parlare: Piper
+
+- `rusca_piper.py` avvia `/usr/lib/ruscapiper-engine/ruscapiper-stream --voice <file.onnx>` all’apertura (e al cambio di voce) e lo tiene aperto. Sullo standard input riceve una riga JSON per frase (`{"id": n, "text": "…", "length_scale": 1.05}`); sullo standard output scrive, per ogni frase, un’intestazione di 12 byte (identificativo, frequenza, numero di campioni) e l’audio PCM a 16 bit. Così la voce si carica una volta sola e RuscaLLisse sa dove finisce ogni frase.
+- `length_scale` viene dalla velocità dell’entità: velocità 0,95 → `length_scale` 1/0,95.
+- **Riproduzione.** `audio_io.py` tiene aperto `/usr/bin/pw-play --rate <frequenza della voce> --channels 1 --format s16 -` e gli scrive i campioni appena arrivano. Fra due frasi c’è una pausa di 0,2 s (0,35 s dopo un punto interrogativo).
+- **Voci.** Non fanno parte dei pacchetti. Ogni voce è la coppia `nome.onnx` e `nome.onnx.json`, in `~/.local/share/ruscapiper/voices/` o in `/usr/share/ruscapiper/voices/`. **Importa una voce…** (menu principale e pagina di benvenuto) chiede il file `.onnx`, controlla che accanto ci sia il `.onnx.json` (altrimenti lo dice: «Manca il file nome.onnx.json, che descrive la voce: va scaricato insieme al modello.»), e copia la coppia; se accanto c’è il file `MODEL_CARD`, copia anche quello come `nome.MODEL_CARD`. La lingua della voce si legge dal `.onnx.json` (`language.code`).
+- **Licenza della voce.** Le Preferenze mostrano, sotto la voce scelta, il dataset e la licenza letti dal MODEL_CARD, oppure «Licenza non indicata». Il manuale ricorda che ogni voce ha la sua licenza e che molte voci Piper sono derivate dalla voce inglese «lessac», distribuita per la sola ricerca non commerciale: per video pubblicati o usi commerciali va scelta una voce con una licenza libera verificata.
+
+#### 1.7.8 Il volto
+
+Il volto è disegnato da `face.py` con Cairo in un `Gtk.DrawingArea`, aggiornato con `add_tick_callback()` (al ritmo dello schermo, senza timer propri). Niente immagini, niente modelli: solo forme, quasi tutte ellissi.
+
+**Ellittica.** Una donna digitale, personaggio originale (nessun volto reale come modello):
+
+- volto ovale color Rosa 100 (`#f6e4ec`), capelli **corti** color Prugna 600 (`#7a2357`) con la frangia di lato e un riflesso Prugna 500 (`#8a2b5f`);
+- **occhiali** con lenti ovali e montatura sottile Prugna 900 (`#2d0a1d`), con un riflesso fisso in alto;
+- una **matita dietro l’orecchio** (legno `#e8b04a`, gomma Rosa 250, punta Prugna 800): è il suo segno di riconoscimento, ripreso nell’icona;
+- occhi grandi con l’iride Prugna 500 e due riflessi, sopracciglia morbide un po’ sollevate verso l’interno, guance Rosa 300;
+- intorno alla testa un’**orbita**: un’ellisse sottile Rosa 300 con un punto che la percorre (davanti alla testa Prugna 600 con il bordo crema, dietro Rosa 300).
+
+**Stati** (da `conversation.py`):
+
+| Stato | Volto |
+|---|---|
+| A riposo | Respiro lento, battito di ciglia ogni 2–5 s, sguardo che vaga appena, sorriso leggero, orbita lenta |
+| In ascolto | Testa inclinata di circa 5°, sopracciglia sollevate, occhi un po’ socchiusi in un sorriso; l’orbita si ispessisce con il livello del microfono, così si vede che sente |
+| Pensa | Sguardo in alto, oltre la montatura; il punto corre veloce sull’orbita |
+| Parla | Bocca dai visemi e dall’ampiezza dell’audio; sopracciglia che seguono l’intonazione; a fine frase una breve pausa con lo sguardo verso l’utente |
+| Microfono in pausa | Come a riposo, con gli occhi rivolti in basso e l’orbita senza punto |
+
+**La bocca.** Ogni frase, prima di andare a Piper, si trasforma in fonemi con `espeak-ng -v <lingua> -q -x` (lo stesso alfabeto del lessico); ogni fonema diventa un **visema** (`VISEMI` in `face.py`): *a* aperta, *e* media e larga, *i* larga e stretta, *o* tonda, *u* tonda e piccola, *m b p* chiusa, *f v* sul labbro, le altre consonanti socchiusa. I visemi della frase si distribuiscono sulla sua durata, che si conosce dal numero di campioni. In più, l’**ampiezza** dell’audio (valore efficace a blocchi di 20 ms) dice quanto si apre la bocca in quel momento. La bocca segue i due valori con un filtro, così non scatta.
+
+**Sincronia.** Il volto usa l’audio che `audio_io.py` sta mandando a `pw-play`, spostato in avanti della latenza di riproduzione (`--latency` di `pw-play`, 40 ms se non cambiata). La latenza si regola nelle Preferenze avanzate se la bocca anticipa o ritarda.
+
+**Espressioni.** Le etichette d’emozione (sezione 1.7.6) cambiano sopracciglia, occhi e angoli della bocca per la frase che segue: `sorride` (occhi socchiusi, angoli in alto), `pensierosa` (sguardo di lato, un sopracciglio alzato), `commossa` (sopracciglia sollevate all’interno, sguardo morbido), `divertita` (sorriso largo), `perplessa` (sopracciglia asimmetriche), `seria` (sopracciglia diritte, bocca neutra).
+
+**Eccezione alla sezione 3.11, regola 5.** Il volto è il contenuto del programma, non una decorazione: le sue animazioni sono ammesse. Con **Animazioni ridotte** attivo (`Gtk.Settings:gtk-enable-animations` spento) il volto non respira, non vaga con lo sguardo e l’orbita è ferma: cambiano solo l’espressione da uno stato all’altro, il battito di ciglia e la bocca mentre parla.
+
+**Colori e contrasti.** Il volto usa la palette della sezione 4.1, più il legno della matita (`#e8b04a`), solo decorativo. Il volto sta su un fondo che segue il tema (`--view-bg-color`): in modalità scura i contorni Prugna 900 su `#230716` non si vedrebbero, quindi in modalità scura la montatura, le ciglia e le sopracciglia passano a Crema (`#fff7f0`, 17,8:1 su `#230716`) e il volto resta uguale. Nessun testo è disegnato sul volto.
+
+**Accessibilità.** Il `Gtk.DrawingArea` ha un’etichetta accessibile che dice l’entità e lo stato («Ellittica, in ascolto»), aggiornata a ogni cambio di stato. Lo stato si legge anche nel sottotitolo della barra del titolo, quindi non è affidato solo al disegno.
+
+#### 1.7.9 L’interfaccia
+
+```text
+Adw.ApplicationWindow
+└── Adw.ToolbarView
+    ├── top: Adw.HeaderBar
+    │   ├── start: pulsante del microfono (Spazio) · selettore dell’entità
+    │   ├── title: Adw.WindowTitle (nome dell’entità + stato)
+    │   └── end: menu principale
+    └── content: Adw.ToastOverlay
+        └── Gtk.Box verticale
+            ├── volto (Gtk.DrawingArea, si allarga con la finestra, almeno 240 × 240)
+            └── Adw.Clamp: testo della conversazione (Gtk.ListBox), se «Mostra il testo»
+```
+
+- **Pagina di benvenuto.** Finché manca un pezzo, al posto del volto c’è un `Adw.StatusPage` con i tre pezzi che servono, ognuno su una riga (`Adw.ActionRow`) con lo stato («Pronto» o «Manca») e i pulsanti: **Modello per ascoltare** (Apri la cartella, Quali file scaricare?), **Modello per pensare** (Apri la cartella; se RuscaLLama ne ha già uno, è pronto), **Voce** (Importa una voce…, Quali file scaricare?). **Quali file scaricare?** (`GUIDE` in `ruscallisse.py`) elenca per ogni pezzo nome e pagina dei file, e si apre nel browser: RuscaLLisse non scarica niente.
+- **Il microfono.** Il pulsante (icona `audio-input-microphone-symbolic`, barrata quando è in pausa) e il tasto Spazio mettono in pausa e riprendono l’ascolto. In pausa `pw-record` è fermo, non solo ignorato.
+- **L’eco.** Con gli altoparlanti, il microfono sentirebbe l’entità. Per questo, per impostazione predefinita, **mentre l’entità parla RuscaLLisse non passa l’audio a Vosk**; la si interrompe con Spazio o con Esc. Nelle Preferenze, «Uso le cuffie» (spento se non cambiato) lascia il microfono aperto anche mentre parla: se l’utente parla per più di 0,4 s l’entità tace e ascolta. Se in PipeWire c’è una sorgente con cancellazione dell’eco (`echo-cancel`), le Preferenze la propongono come microfono e «Uso le cuffie» si può attivare anche con gli altoparlanti.
+- **L’interruzione.** Esc fa tacere subito l’entità: si svuota la coda delle frasi, si chiude il flusso verso `pw-play`, si ferma la generazione di `llama-server`. La risposta interrotta resta nella storia, troncata dove si è fermata.
+- **Menu principale:** Nuova conversazione (Ctrl+N), Salva la conversazione… (Ctrl+S, Markdown: un titolo con l’entità e la data, poi i turni), separatore, Modifica la personalità…, Nuova entità…, Come la pronuncia?…, Importa una voce…, Apri la cartella dei modelli per ascoltare, separatore, Preferenze, Scorciatoie da tastiera, Informazioni su RuscaLLisse.
+- **Scorciatoie:** Spazio (microfono), Esc (zitta), Ctrl+N, Ctrl+S, Ctrl+T (mostra o nasconde il testo), Ctrl++ / Ctrl+− / Ctrl+0 per il testo, più quelle della sezione 3.9.
+- **Preferenze** (`~/.config/ruscallisse/settings.json`): Conversazione (lingua della conversazione, mostra il testo, etichette d’emozione, parole massime per risposta, pausa prima di rispondere), Ascolto (modello Vosk, microfono, uso le cuffie), Voce (voce, velocità, licenza della voce), Modello (modello GGUF, scheda grafica), Aspetto (tema, sezione 4.5), Avanzate (latenza della riproduzione).
+- **Chiusura.** Con una conversazione non salvata di almeno due turni si chiede (`Adw.AlertDialog`, «Chiudi senza salvare» distruttivo, «Annulla» predefinito).
+
+#### 1.7.10 Dati
+
+| Cosa | Dove |
+|---|---|
+| Impostazioni | `~/.config/ruscallisse/settings.json` |
+| Entità | `~/.local/share/ruscallisse/entities/*.md` |
+| Lessico delle pronunce | `~/.local/share/ruscallisse/pronunce.tsv` |
+| Modelli Vosk | `~/.local/share/ruscavosk/models/`, `/usr/share/ruscavosk/models/` |
+| Voci Piper | `~/.local/share/ruscapiper/voices/`, `/usr/share/ruscapiper/voices/` |
+| Modelli linguistici | Quelli di RuscaLLama (sezione 1.1) |
+| Conversazione | Solo in memoria; su disco solo con «Salva la conversazione…» |
+| Audio | Mai su disco |
+
+**Test.** `tests/test_ruscallisse.py` controlla, senza motori veri: la lettura e la scrittura dei file delle entità e il prompt di sistema; la divisione in frasi (compresa la prima frase corta), le etichette d’emozione, gli elenchi letti come frasi, il lessico delle pronunce con la sintassi `[[…]]`; i visemi da una stringa di fonemi; i passaggi di stato di `conversation.py` (ascolto → pensa → parla → ascolto, interruzione con Esc, microfono in pausa, eco senza cuffie) con un riconoscitore finto al posto di `libvosk`, un `ruscapiper-stream` finto che scrive PCM vero con le intestazioni, e un `llama-server` finto in streaming; l’assenza di moduli di rete fuori da `rusca_engine.py`. Le prove del volto disegnano ogni stato su una superficie Cairo in memoria e controllano che l’etichetta accessibile cambi. Senza PyGObject si saltano le prove con GTK.
+
+```bash
+python3 -m unittest tests/test_ruscallisse.py
+```
+
+### 1.8 ruscavosk-engine e ruscapiper-engine
+
+**ruscavosk-engine è Vosk** (<https://github.com/alphacep/vosk-api>), software esterno con licenza Apache 2.0, copyright Alpha Cephei Inc., con il fork di Kaldi di Alpha Cephei (<https://github.com/alphacep/kaldi>, Apache 2.0) e le librerie che vi si compilano dentro (OpenFST, Apache 2.0; OpenBLAS, BSD-3-Clause; CLAPACK, licenza BSD; le licenze esatte si verificano alla prima build e si scrivono nel file `copyright`). RuscaLinux lo compila dal sorgente senza modificarne il codice.
+
+- Il pacchetto contiene solo `libvosk.so`, in `/usr/lib/ruscavosk-engine/`, con l’intestazione `vosk_api.h` per riferimento in `/usr/share/doc/ruscavosk-engine/`. Niente vosk-server, niente modulo Python da PyPI: RuscaLLisse usa la libreria con `ctypes`.
+- **Nessun processo e nessuna porta.** La libreria lavora dentro il processo di RuscaLLisse, sull’audio che riceve in memoria.
+- Il pacchetto del motore non ha interfaccia: lo dichiara la finestra Informazioni di RuscaLLisse, nel gruppo «Componenti esterni».
+
+**ruscapiper-engine è Piper** (<https://github.com/OHF-Voice/piper1-gpl>), software esterno con licenza GPL-3.0, copyright Michael Hansen e gli autori di Piper, con espeak-ng (<https://github.com/espeak-ng/espeak-ng>, GPL-3.0) compilato dentro per i fonemi. È la continuazione del Piper originale (`rhasspy/piper`, MIT), archiviato nell’ottobre 2025. RuscaLinux lo compila dal sorgente senza modificarne il codice, con l’**ONNX Runtime di Debian** (`libonnxruntime-dev`, in trixie 1.21) al posto di quello che la build di Piper scaricherebbe.
+
+- Il pacchetto contiene, in `/usr/lib/ruscapiper-engine/`: `libpiper.so` (la libreria C di Piper), i dati di espeak-ng che Piper usa, e **`ruscapiper-stream`**, un piccolo programma in C scritto da RuscaLinux (GPL-3.0, file a sé in `apps/ruscapiper-engine/ruscapiper-stream.c`, sezione 6, regola 6) che apre una voce con l’API di libpiper, legge una riga JSON per frase dallo standard input e scrive intestazione e PCM sullo standard output (sezione 1.7.7). È il programma che avvia RuscaLLisse. Se la release di Piper include anche la sua CLI, la si impacchetta per l’uso dal terminale.
+- I nomi delle funzioni dell’API di libpiper che `ruscapiper-stream` usa (per esempio `piper_create()`) si fissano sul tag della release costruita: la build controlla che la libreria li esporti (`SIMBOLI_PIPER`).
+- **Nessuna porta.** `ruscapiper-stream` legge e scrive solo i propri flussi standard: niente server HTTP di Piper.
+- Le voci non fanno parte dei pacchetti (sezione 1.7.7).
+
+**Da verificare alla prima build** (prima di scriverli come fatti):
+
+1. **libpiper.** I nomi esatti delle funzioni dell’API C sul tag costruito, e che la build di piper1-gpl accetti l’ONNX Runtime 1.21 di Debian e un espeak-ng locale senza scaricare niente.
+2. **Vosk e Kaldi.** Quale commit del fork di Kaldi vuole l’ultima release di vosk-api, e se si compila con OpenBLAS, LAPACK e OpenFST di Debian o servono le loro copie.
+3. **Accenti grafici.** Che espeak-ng italiano metta l’accento giusto su `ancòra`, `princìpi`, `sùbito` scritti con l’accento grafico; dove non lo fa, la riga va nel lessico di partenza.
+4. **Voci italiane.** La licenza di `it_IT-riccardo-x_low` (dal suo MODEL_CARD) e l’origine del dataset sintetico di `it_IT-serena`, prima di consigliarle nel manuale.
+5. **Latenza.** I tempi veri sui due computer di prova (checklist, punto 19): se il primo campione arriva oltre circa un secondo e mezzo, si guarda prima la soglia di silenzio, poi la dimensione del modello linguistico.
+
 Gli identificatori di ogni tool devono coincidere tra loro (vedi sezione 5.2).
 
 Fino alla versione 1.99.1 RuscaMark usava l’App ID `org.ruscalinux.ruscamark`. Dalla 1.99.2 usa `org.ruscalinux.RuscaMark`: l’aggiornamento del pacchetto rimuove il vecchio file `.desktop`, e la metainfo dichiara il vecchio identificativo con `<replaces>` perché GNOME Software riconosca l’applicazione. Le impostazioni restano in `~/.config/ruscamark/`, che prende il nome dal comando e non dall’App ID. Il nome del tool e la parte finale dell’App ID usano la stessa grafia CamelCase: `RuscaMark` → `org.ruscalinux.RuscaMark`.
@@ -274,7 +526,7 @@ Fino alla versione 1.99.1 RuscaMark usava l’App ID `org.ruscalinux.ruscamark`.
 | Libreria GNOME | libadwaita (>= 1.7) |
 | Markdown | CommonMark 0.30 con le estensioni della sezione 1.2, tramite `python3-markdown-it` (>= 3.0), `python3-mdit-py-plugins` (>= 0.4) e `python3-linkify-it` (>= 2.0) |
 | Distro base | Debian Stable |
-| Formato pacchetti | deb, `Architecture: all` (`amd64` per ruscallama-engine, ruscawhisper-engine e ruscadiffusion-engine, che sono compilati) |
+| Formato pacchetti | deb, `Architecture: all` (`amd64` per ruscallama-engine, ruscawhisper-engine, ruscadiffusion-engine, ruscavosk-engine e ruscapiper-engine, che sono compilati) |
 | Versione tool | 1.99.3 |
 
 Regole tecniche:
@@ -441,6 +693,7 @@ Se un tool include componenti esterni (sezione 6), si aggiunge una riga “Compo
 3. Ogni elemento interattivo ha un’etichetta accessibile (`update_property` con `Gtk.AccessibleProperty.LABEL` se non ha testo visibile).
 4. Con **contrasto elevato** attivo, il foglio di stile RuscaLinux non deve aggiungere effetti: libadwaita gestisce bordi e colori.
 5. Rispettare “Animazioni ridotte”: niente animazioni personalizzate oltre a quelle di libadwaita.
+   Eccezione: il volto di RuscaLLisse (sezione 1.7.8), che è il contenuto del programma e con «Animazioni ridotte» si limita a espressioni, ciglia e bocca.
 6. Verificare l’interfaccia con dimensione del testo grande (Impostazioni → Accessibilità) e con il lettore Orca.
 
 ---
@@ -724,7 +977,7 @@ StartupWMClass=org.ruscalinux.RuscaFoo
 
 `Comment` e `Keywords` vanno tradotti in tutte le lingue della sezione 9 (`Comment[xx]=`), presi dai file di `lang/`. Il file va validato con `desktop-file-validate`.
 
-Fra le `Categories` di ogni tool c’è sempre **`X-RuscaLinux-Apps`**: è la categoria della cartella **RuscaLinux Apps** della griglia delle applicazioni di GNOME, che raccoglie tutti i tool. La cartella la crea, una volta per utente e dopo le cartelle di GNOME, lo script `/usr/lib/ruscalinux/ruscalinux-apps-folder` della ISO (scritto da `steps/30-custom.sh`, avviato da `/etc/xdg/autostart/`): un elenco di cartelle predefinito con dconf impedirebbe a GNOME Shell 48 di creare le sue (Sistema, Utilità). Un tool nuovo entra nella cartella da solo, grazie alla categoria. GNOME Shell salva la posizione di ogni icona (`org.gnome.shell app-picker-layout`) e non la ricompatta: quando un aggiornamento toglie, rinomina o sposta in una cartella delle applicazioni restano dei buchi, e quelle nuove finiscono in una pagina in più. Succede anche al primo accesso, quando i tool entrano nella cartella: azzerare la disposizione non basta, perché GNOME ha già le icone in memoria e non le ridispone. Per questo `/usr/lib/ruscalinux/ruscalinux-app-grid` (sempre da `steps/30-custom.sh`, avviato a ogni accesso, 25 e 90 secondi dopo) scrive una disposizione completa e compatta: le voci salvate nel loro ordine, senza quelle che non esistono più, che stanno in una cartella o nel dash, poi le altre in ordine alfabetico, a pagine da 24 (tutte le griglie di GNOME Shell 48 ne tengono 24). Scrive solo se cambia qualcosa. I componenti senza interfaccia (ruscallama-engine, ruscawhisper-engine) non hanno file `.desktop`. L’identificativo della cartella per dconf è `RuscaLinux-Apps` (con il trattino: dconf non ammette spazi). Durante lo sviluppo della 1.99.3 la cartella si chiamava «RuscaLinux-Tools», con la categoria `X-RuscaLinux-Tools`.
+Fra le `Categories` di ogni tool c’è sempre **`X-RuscaLinux-Apps`**: è la categoria della cartella **RuscaLinux Apps** della griglia delle applicazioni di GNOME, che raccoglie tutti i tool. La cartella la crea, una volta per utente e dopo le cartelle di GNOME, lo script `/usr/lib/ruscalinux/ruscalinux-apps-folder` della ISO (scritto da `steps/30-custom.sh`, avviato da `/etc/xdg/autostart/`): un elenco di cartelle predefinito con dconf impedirebbe a GNOME Shell 48 di creare le sue (Sistema, Utilità). Un tool nuovo entra nella cartella da solo, grazie alla categoria. GNOME Shell salva la posizione di ogni icona (`org.gnome.shell app-picker-layout`) e non la ricompatta: quando un aggiornamento toglie, rinomina o sposta in una cartella delle applicazioni restano dei buchi, e quelle nuove finiscono in una pagina in più. Succede anche al primo accesso, quando i tool entrano nella cartella: azzerare la disposizione non basta, perché GNOME ha già le icone in memoria e non le ridispone. Per questo `/usr/lib/ruscalinux/ruscalinux-app-grid` (sempre da `steps/30-custom.sh`, avviato a ogni accesso, 25 e 90 secondi dopo) scrive una disposizione completa e compatta: le voci salvate nel loro ordine, senza quelle che non esistono più, che stanno in una cartella o nel dash, poi le altre in ordine alfabetico, a pagine da 24 (tutte le griglie di GNOME Shell 48 ne tengono 24). Scrive solo se cambia qualcosa. I componenti senza interfaccia (ruscallama-engine, ruscawhisper-engine, ruscadiffusion-engine, ruscavosk-engine, ruscapiper-engine) non hanno file `.desktop`. L’identificativo della cartella per dconf è `RuscaLinux-Apps` (con il trattino: dconf non ammette spazi). Durante lo sviluppo della 1.99.3 la cartella si chiamava «RuscaLinux-Tools», con la categoria `X-RuscaLinux-Tools`.
 
 ### 5.4 Metainfo AppStream
 
@@ -778,6 +1031,8 @@ Componenti esterni in uso:
 | llama.cpp (con ggml e le librerie che include: nlohmann/json e cpp-httplib MIT, xxHash BSD-2-Clause, stb, miniaudio, sha1 e sha256 di pubblico dominio) | ultima release stabile al momento della build (1.99.2: 0.9.0; 1.99.3: 1.0.0), scritta nella descrizione del pacchetto e in `/usr/share/doc/ruscallama-engine/README.md.gz` | MIT | Compilato nel pacchetto `ruscallama-engine`, in `/usr/lib/ruscallama-engine/` | RuscaLLama, RuscaTranslator, RuscaNarrator (`llama-tts`) |
 | whisper.cpp (con ggml e le librerie compilate nei programmi impacchettati: sgemm di llamafile, MIT; miniaudio, pubblico dominio o MIT-0; stb_vorbis, pubblico dominio o MIT) | ultima release stabile al momento della build (1.99.3: 1.9.5), scritta nella descrizione del pacchetto e in `/usr/share/doc/ruscawhisper-engine/README.md.gz` | MIT | Compilato nel pacchetto `ruscawhisper-engine`, in `/usr/lib/ruscawhisper-engine/` | RuscaTranscriber |
 | stable-diffusion.cpp (con la sua copia di ggml, leejet/ggml, e le librerie compilate in `sd-cli`: nlohmann/json, miniz e sgemm di llamafile, MIT; zip di kuba--, Unlicense; stb, pubblico dominio o MIT; darts-clone, BSD-3-Clause; Oniguruma, BSD-2-Clause; utf8proc, MIT e licenza dei dati Unicode) | ultima release al momento della build (tag `master-<numero>-<commit>`; 1.99.3: master-1106-532d2c1), scritta nella descrizione del pacchetto e in `/usr/share/doc/ruscadiffusion-engine/README.md.gz` | MIT | Compilato nel pacchetto `ruscadiffusion-engine`, in `/usr/lib/ruscadiffusion-engine/` | RuscaLLama (viste Immagini e Video) |
+| Vosk (vosk-api), con il fork di Kaldi di Alpha Cephei e le librerie compilate in `libvosk.so` (OpenFST, OpenBLAS, CLAPACK: licenze da verificare alla prima build) | ultima release al momento della build, scritta nella descrizione del pacchetto e in `/usr/share/doc/ruscavosk-engine/README.md.gz` | Apache 2.0 (Vosk, Kaldi, OpenFST), BSD (OpenBLAS, CLAPACK) | Compilato nel pacchetto `ruscavosk-engine`, in `/usr/lib/ruscavosk-engine/` | RuscaLLisse |
+| Piper (piper1-gpl), con espeak-ng | ultima release stabile al momento della build, scritta nella descrizione del pacchetto e in `/usr/share/doc/ruscapiper-engine/README.md.gz` | GPL-3.0 | Compilato nel pacchetto `ruscapiper-engine`, in `/usr/lib/ruscapiper-engine/` | RuscaLLisse |
 | Regola dell’evidenziato, porting del plugin markdown-it-mark (© Vitaly Puzrin e Alex Kocharin) con la struttura della regola del barrato di markdown-it-py (© ExecutableBookProject) | — | MIT (Expat) | `markdown_it_mark.py`, file a sé accanto a `rusca_markdown.py`; dichiarato nel file `copyright` del pacchetto, nella finestra Informazioni e nei manuali | RuscaLLama, RuscaMark, RuscaWriter, RuscaTranslator, RuscaNarrator |
 | Esempi della specifica CommonMark (© John MacFarlane) | 0.30 | CC BY-SA 4.0 | `tests/data/commonmark-0.30-spec.json`, con `README.md`; solo per i test, non installati da nessun pacchetto | Test di `rusca_markdown.py` |
 
@@ -786,6 +1041,8 @@ markdown-it-py, mdit-py-plugins e linkify-it-py (licenza MIT) non sono inclusi: 
 I file `copyright` di `ruscallama-engine`, `ruscawhisper-engine` e `ruscadiffusion-engine` riportano tutte queste licenze; solo gli script di costruzione e i profili AppArmor sono di RuscaLinux (GPL-3.0).
 
 FFmpeg non è incluso: RuscaTranscriber e RuscaNarrator usano il comando `ffmpeg` del pacchetto Debian, che è una loro dipendenza.
+
+ONNX Runtime non è incluso: ruscapiper-engine usa la libreria del pacchetto Debian (`libonnxruntime1.21` in trixie, licenza MIT), che è una sua dipendenza. Lo stesso vale per `pw-record` e `pw-play` (`pipewire-bin`) ed `espeak-ng`, che RuscaLLisse usa come comandi.
 
 ---
 
@@ -834,6 +1091,37 @@ Il suffisso `ruscalinux` nel nome del file indica che il pacchetto appartiene al
 2. si compila solo `sd-cli`, con ggml dentro (`BUILD_SHARED_LIBS=OFF`), con `SD_RPC=OFF`, `GGML_RPC=OFF`, `SD_SERVER_BUILD_FRONTEND=OFF`, `SD_WEBP=OFF` e `SD_WEBM=OFF`; stessi controlli di rete sui simboli;
 3. le librerie di altri autori stanno in `thirdparty/`: la build si ferma se compare un file che non è in `TERZI_DICHIARATI`;
 4. il sorgente non ha un modello di prova: la build controlla che `sd-cli` dica la sua versione, elenchi le schede nel formato `nome<TAB>descrizione`, accetti le opzioni usate da RuscaLLama (`OPZIONI_USATE`, anche quelle dei video) e abbia il modo `vid_gen` con l’uscita `.avi`.
+
+**Il pacchetto `ruscallisse`** aggiunge a `Depends`, oltre alle dipendenze comuni:
+
+```text
+Package: ruscallisse
+Architecture: all
+Depends: python3 (>= 3.10), python3-gi, python3-gi-cairo, gir1.2-gtk-4.0 (>= 4.18), gir1.2-adw-1 (>= 1.7),
+ python3-markdown-it (>= 3.0), python3-mdit-py-plugins (>= 0.4), python3-linkify-it (>= 2.0),
+ pipewire-bin, espeak-ng, ruscallama-engine, ruscavosk-engine, ruscapiper-engine
+```
+
+`python3-gi-cairo` serve per disegnare il volto con Cairo. Tutte le dipendenze nuove (`python3-gi-cairo`, `pipewire-bin`, `espeak-ng`, `libonnxruntime1.21`) vanno anche nell’elenco dei pacchetti della ISO (`steps/20-packages.sh`).
+
+**Eccezione: ruscavosk-engine.** È fatto come ruscawhisper-engine e segue gli stessi nove punti di ruscallama-engine: file `ruscavosk-engine-ruscalinux_<versione>_amd64.deb`, variabile `RUSCAVOSK_VOSK_VERSION`, libreria in `/usr/lib/ruscavosk-engine/`, cache in `~/.cache/ruscalinux/ruscavosk-engine/`. Cambiano quattro cose:
+
+1. Il sorgente sono **più archivi**: vosk-api al tag della release, il fork di Kaldi di Alpha Cephei al commit che vosk-api indica nei suoi file di costruzione, e le librerie che Kaldi vuole (OpenFST, e OpenBLAS e CLAPACK se servono). Ogni archivio ha il suo commit atteso e la sua impronta in `checksums/`. Si prova prima con le librerie di Debian (`libopenblas-dev`, `liblapack-dev`, e OpenFST di Debian se la versione coincide): ogni libreria presa da Debian è una libreria in meno compilata e dichiarata.
+2. Si compila solo `libvosk.so`, con Kaldi statico dentro, senza CUDA (`HAVE_CUDA=0`); stessi controlli di rete sui simboli di ruscawhisper-engine.
+3. La build controlla che `libvosk.so` esporti le funzioni usate da RuscaLLisse (`SIMBOLI_VOSK`).
+4. Il sorgente non ha un modello di prova: la build carica la libreria con `ctypes`, chiama `vosk_set_log_level()` e controlla che `vosk_model_new()` su una cartella vuota restituisca NULL senza bloccarsi.
+
+Dipendenze di costruzione in più: `gfortran`, `autoconf`, `automake`, `libtool`, `zlib1g-dev`, più le librerie di Debian usate al punto 1. La prima compilazione di Kaldi è lunga: per questo la cache (punto 8 di ruscallama-engine) conta più che negli altri motori.
+
+**Eccezione: ruscapiper-engine.** È fatto come ruscawhisper-engine: file `ruscapiper-engine-ruscalinux_<versione>_amd64.deb`, variabile `RUSCAPIPER_PIPER_VERSION` (tag `vX.Y.Z` indicato da GitHub come «Latest»), binari e librerie in `/usr/lib/ruscapiper-engine/`, cache in `~/.cache/ruscalinux/ruscapiper-engine/`. Cambiano cinque cose:
+
+1. Il sorgente sono **due archivi**: piper1-gpl al tag della release ed espeak-ng al commit che piper1-gpl fissa nella sua build. La build di Piper non scarica niente da sé (compilazione senza rete, `unshare -rn`): l’archivio di espeak-ng si passa come cartella locale.
+2. ONNX Runtime è quello di Debian (`libonnxruntime-dev`): la build si ferma se trova un ONNX Runtime scaricato o incluso.
+3. Si compilano `libpiper.so` e `ruscapiper-stream`; stessi controlli di rete sui simboli. Niente server HTTP, niente Python.
+4. La build controlla che `libpiper.so` esporti le funzioni usate da `ruscapiper-stream` (`SIMBOLI_PIPER`) e, se il sorgente contiene una voce di prova, fa dire una frase a `ruscapiper-stream` e controlla intestazione e campioni.
+5. `Depends` comprende `libonnxruntime1.21` (calcolato da `dpkg-shlibdeps`).
+
+Dipendenze di costruzione in più: `libonnxruntime-dev`.
 
 Esempio di output:
 
@@ -988,7 +1276,7 @@ Tedesco, russo e francese possono essere fino al 40% più lunghi dell’inglese;
 |---|---|
 | RuscaWriter | Sì, sempre (ortografia e sillabazione del PDF) |
 | RuscaMark | Sì, se è presente il controllo ortografico |
-| RuscaCleaner, RuscaHub, RuscaLLama, RuscaTranslator, RuscaTranscriber, RuscaNarrator, RuscaPinball | No |
+| RuscaCleaner, RuscaHub, RuscaLLama, RuscaTranslator, RuscaTranscriber, RuscaNarrator, RuscaPinball, RuscaLLisse | No |
 
 Pacchetti: `hunspell-en-gb` (ortografia) e `hyphen-en-gb` (sillabazione, particolarmente consigliato per RuscaWriter, che lo usa con `python3-pyphen`).
 
@@ -1015,7 +1303,7 @@ Recommends: hunspell-en-gb, hyphen-en-gb (RuscaWriter)
 
 Regole tecniche:
 
-1. Nessun modulo di rete nel codice (`urllib`, `http`, `socket`, `requests`, `Gio.SocketClient` e simili). **Unica eccezione:** RuscaLLama e RuscaTranslator parlano con il proprio motore tramite `http.client` e `socket`, solo verso `127.0.0.1`, attraverso `rusca_engine.py` (vedi sotto).
+1. Nessun modulo di rete nel codice (`urllib`, `http`, `socket`, `requests`, `Gio.SocketClient` e simili). **Unica eccezione:** RuscaLLama, RuscaTranslator e RuscaLLisse parlano con il proprio motore tramite `http.client` e `socket`, solo verso `127.0.0.1`, attraverso `rusca_engine.py` (vedi sotto).
 2. Nessuna esecuzione di comandi tramite shell (`shell=True`, `os.system`). Se serve un programma esterno, usare `subprocess` con lista di argomenti, percorsi assoluti e nessun input dell’utente non validato.
 3. Nessun privilegio di amministratore, salvo necessità reale documentata; in quel caso usare `pkexec` con una policy polkit dedicata e limitata.
 4. Preferire lo spostamento nel cestino all’eliminazione definitiva.
@@ -1071,6 +1359,19 @@ Regole aggiuntive per la sintesi vocale (RuscaNarrator):
 | Il documento di partenza | Mai modificato; l’audio si salva solo su richiesta, dove sceglie l’utente |
 | Voci create | In `~/.local/share/ruscanarrator/voices/`, solo quando l’utente sceglie «Tieni questa voce»; le prove scartate si cancellano |
 | Voci altrui | Il manuale chiede di usare come voce di riferimento la propria, o una voce che si ha il permesso di usare |
+
+Regole aggiuntive per la conversazione a voce (RuscaLLisse):
+
+| Regola | Come è applicata |
+|---|---|
+| Rete solo verso il proprio motore | `llama-server` su 127.0.0.1 con le regole degli strumenti di intelligenza artificiale; Vosk e Piper non hanno codice di rete (lo controlla la build dei motori) |
+| Il microfono | Aperto solo durante l’ascolto; in pausa `pw-record` è fermo. Lo stato è sempre visibile: pulsante nella barra del titolo, sottotitolo, volto |
+| L’audio | Mai scritto su disco: passa in memoria da `pw-record` a Vosk e da `ruscapiper-stream` a `pw-play` |
+| La conversazione | Solo in memoria; su disco solo con «Salva la conversazione…», dove sceglie l’utente |
+| Programmi esterni | `/usr/bin/pw-record`, `/usr/bin/pw-play`, `/usr/bin/espeak-ng`, `/usr/lib/ruscapiper-engine/ruscapiper-stream`, `/usr/lib/ruscallama-engine/llama-server`, con percorso assoluto e lista di argomenti; il testo delle frasi passa a `ruscapiper-stream` e a `espeak-ng` dallo standard input, mai sulla riga di comando |
+| Confinamento | Profilo AppArmor per `ruscapiper-stream`, in modalità complain: nega la rete, `.ssh`, `.gnupg`, `.config`, profili di Firefox e Thunderbird; legge solo le cartelle delle voci |
+| Modelli e voci | Solo file locali, importati dall’utente; la licenza della voce scelta è mostrata nelle Preferenze |
+| Avviso all’utente | Il manuale ricorda che l’entità è un personaggio e che le sue risposte vanno verificate |
 
 Regole aggiuntive per il flipper (RuscaPinball):
 
@@ -1135,11 +1436,12 @@ Un tool è pronto quando:
 11. Ha identificatori coerenti tra loro (sezioni 1 e 5.2).
 12. Ha file `.desktop` e metainfo validi, con `StartupWMClass` uguale all’App ID e la categoria `X-RuscaLinux-Apps` (sezione 5.3).
 13. Ha icona SVG e icona simbolica.
-14. Ha `make-deb.sh` che produce un solo `ruscafoo-ruscalinux_<versione>_all.deb` (o `_amd64.deb` per ruscallama-engine, ruscawhisper-engine e ruscadiffusion-engine) e `SHA256SUMS` in `build-deb/`.
+14. Ha `make-deb.sh` che produce un solo `ruscafoo-ruscalinux_<versione>_all.deb` (o `_amd64.deb` per ruscallama-engine, ruscawhisper-engine, ruscadiffusion-engine, ruscavosk-engine e ruscapiper-engine) e `SHA256SUMS` in `build-deb/`.
 15. Ha la versione uguale a `VERSION` di `release.conf`.
 16. È licenziato GPL-3.0, con componenti esterni dichiarati.
-17. Non usa rete, telemetria o comandi pericolosi (per RuscaLLama e RuscaTranslator: rete solo verso 127.0.0.1, sezione 11, e le viste Immagini e Video di RuscaLLama non la usano in nessun modo; RuscaTranscriber e RuscaNarrator non usano la rete in nessun modo).
+17. Non usa rete, telemetria o comandi pericolosi (per RuscaLLama, RuscaTranslator e RuscaLLisse: rete solo verso 127.0.0.1, sezione 11, e le viste Immagini e Video di RuscaLLama non la usano in nessun modo; RuscaTranscriber e RuscaNarrator non usano la rete in nessun modo).
 18. Se mostra, converte o divide Markdown, usa `rusca_markdown.py` (sezione 1.2), e i test di `tests/` passano.
+19. Per RuscaLLisse: con `RUSCALLISSE_DEBUG=1`, su ciascuno dei due computer di prova, il tempo fra la fine del parlato e il primo campione audio è misurato e scritto nelle note di rilascio, con il modello Vosk, il modello linguistico e la voce usati.
 
 Per RuscaPinball i punti 2–5, 8 e 9 valgono nella forma della sezione 1.5: è un gioco pygame, con i colori, i contrasti e la nota IA di RuscaLinux disegnati dal gioco stesso.
 
@@ -1289,6 +1591,20 @@ Lettura ad alta voce di documenti e sottotitoli, con un modello di sintesi vocal
 
 Con i sottotitoli ogni frase parte all’ora del suo sottotitolo. RuscaNarrator usa `llama-tts` di **ruscallama-engine** (llama.cpp, licenza MIT) e FFmpeg. Non usa la rete.
 
+## 🗣️ RuscaLLisse
+
+Una conversazione a voce con Ellittica, una donna digitale che ti ascolta, ti risponde e ti spiega le cose in modo semplice. La sua personalità la decidi tu.
+
+1. Servono tre cose, che RuscaLLisse non scarica: un modello Vosk per ascoltare (per esempio la cartella `vosk-model-it-0.22`, da copiare in `~/.local/share/ruscavosk/models/`), un modello linguistico GGUF (lo stesso di RuscaLLama) e una voce Piper (un file `.onnx` con il suo `.onnx.json`: menu principale → “Importa una voce…”). La pagina di benvenuto dice cosa manca e, con “Quali file scaricare?”, da dove prenderlo.
+2. Dal menu principale, “Modifica la personalità…”: scrivi il quid di Ellittica, il tratto centrale del suo carattere.
+3. Parla: Ellittica ascolta, pensa e risponde a voce. Spazio mette in pausa il microfono, Esc la fa tacere.
+4. Se sbaglia l’accento di una parola: menu principale → “Come la pronuncia?…” → “Correggi la pronuncia…”. Da quel momento la dirà giusta.
+5. La conversazione si salva in Markdown dal menu principale (Ctrl+S).
+
+Con gli altoparlanti, mentre Ellittica parla il microfono non ascolta, per non farle sentire la sua voce; con le cuffie puoi attivare “Uso le cuffie” nelle Preferenze e interromperla parlando.
+
+RuscaLLisse usa **ruscavosk-engine** (Vosk, licenza Apache 2.0), **ruscallama-engine** (llama.cpp, licenza MIT) e **ruscapiper-engine** (Piper, licenza GPL-3.0). Non usa la rete: il modello linguistico ascolta solo su 127.0.0.1 e l’audio non viene mai salvato. Ogni modello e ogni voce hanno la propria licenza, mostrata nelle Preferenze: molte voci Piper sono solo per uso non commerciale. Le risposte vanno verificate: Ellittica è un personaggio, non un’esperta.
+
 ## 🎱 RuscaPinball
 
 Flipper con il tavolo «Amethyst», visto in prospettiva come nei flipper per home computer degli anni ’80.
@@ -1350,6 +1666,9 @@ Tutti i dati elaborati dalle RuscaLinux OS Apps rimangono in locale. Nessun dato
 | ruscadiffusion-engine | Image and video generation engine of RuscaLLama: stable-diffusion.cpp, an external component (MIT) |
 | RuscaNarrator | Reading Markdown documents and SRT subtitles (following their timing) aloud |
 | RuscaPinball | 1980s-style pinball, with the “Amethyst” table seen in perspective |
+| RuscaLLisse | Voice conversation with an animated digital entity whose personality you decide (the first one is Ellittica) |
+| ruscavosk-engine | Real-time speech recognition engine of RuscaLLisse: Vosk, an external component (Apache 2.0) |
+| ruscapiper-engine | Speech synthesis engine of RuscaLLisse: Piper (piper1-gpl), an external component (GPL-3.0) |
 
 ## 🚀 Requirements
 
@@ -1492,6 +1811,20 @@ Reading documents and subtitles aloud, with a speech synthesis model that runs o
 4. Listen to the result and save it as WAV (Ctrl+S), FLAC, Opus or MP3.
 
 With subtitles every sentence starts at the time of its subtitle. RuscaNarrator uses `llama-tts` from **ruscallama-engine** (llama.cpp, MIT license) and FFmpeg. It does not use the network.
+
+## 🗣️ RuscaLLisse
+
+A voice conversation with Ellittica, a digital woman who listens, answers and explains things simply. You decide her personality.
+
+1. Three things are needed, and RuscaLLisse does not download them: a Vosk model to listen (for example the `vosk-model-en-us-0.22` folder, copied into `~/.local/share/ruscavosk/models/`), a GGUF language model (the same as RuscaLLama) and a Piper voice (an `.onnx` file with its `.onnx.json`: main menu → "Import a Voice…"). The welcome page shows what is missing and, with "Which Files to Download?", where to get it.
+2. From the main menu, "Edit Personality…": write Ellittica's quid, the core trait of her character.
+3. Talk: Ellittica listens, thinks and answers aloud. Space pauses the microphone, Esc makes her stop.
+4. If she stresses a word wrongly: main menu → "How Does She Say It?…" → "Fix Pronunciation…". From then on she says it right.
+5. Save the conversation as Markdown from the main menu (Ctrl+S).
+
+With speakers, the microphone does not listen while Ellittica speaks, so she does not hear herself; with headphones you can turn on "I Use Headphones" in Preferences and interrupt her by speaking.
+
+RuscaLLisse uses **ruscavosk-engine** (Vosk, Apache 2.0 license), **ruscallama-engine** (llama.cpp, MIT license) and **ruscapiper-engine** (Piper, GPL-3.0 license). It does not use the network: the language model listens only on 127.0.0.1 and audio is never saved. Every model and voice has its own license, shown in Preferences: many Piper voices are for non-commercial use only. Answers must be checked: Ellittica is a character, not an expert.
 
 ## 🎱 RuscaPinball
 
