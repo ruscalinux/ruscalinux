@@ -508,6 +508,11 @@ out = sys.stdout.buffer
 args = sys.argv[1:]
 if "--voice" not in args or args[args.index("--voice") + 1].endswith("rotta.onnx"):
     sys.stderr.write("non riesco ad aprire la voce\n"); sys.exit(1)
+if args[args.index("--voice") + 1].endswith("chiacchierona.onnx"):
+    # come l'ONNX Runtime di Debian: centinaia di righe prima di essere pronto
+    for i in range(3000):
+        sys.stderr.write(f"Schema error: Trying to register schema with name Op{i} (domain:  version: 1), but it is already registered\n\n")
+    sys.stderr.flush()
 out.write(b"RPS1" + struct.pack("<I", 1)); out.flush()
 for line in sys.stdin.buffer:
     cid, scale, text = line.decode().rstrip("\n").split("\t", 2)
@@ -570,6 +575,18 @@ class TestRuscapiperStream(unittest.TestCase):
         self.assertIn(struct.pack("<h", 4000) * 1600, data)
         # 1600 campioni a 16 kHz = 5 blocchi da 20 ms: A A? M O O secondo le durate
         self.assertEqual(vis[:5], ["A", "M", "O", "O", "O"])
+
+    def test_stderr_pieno_non_blocca(self):
+        """L'ONNX Runtime di Debian scrive oltre 64 KB su stderr prima che la
+        voce sia pronta: RuscaLLisse deve leggerlo, o resta ad aspettare."""
+        voce = os.path.join(self.d, "chiacchierona.onnx")
+        open(voce, "wb").close()
+        esito = []
+        t = threading.Thread(target=lambda: esito.append(self.rp.Speaker(voce, 1.0)), daemon=True)
+        t.start()
+        t.join(10)
+        self.assertTrue(esito, "Speaker bloccato: stderr di ruscapiper-stream non letto")
+        esito[0].close()
 
     def test_errore_e_voce_rotta(self):
         spk = self.rp.Speaker(self.voice, 1.0)

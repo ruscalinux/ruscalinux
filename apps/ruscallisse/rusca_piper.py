@@ -203,13 +203,29 @@ class _StreamVoice:
             pass
         self.proc = subprocess.Popen([STREAM, "--voice", onnx], stdin=subprocess.PIPE,
                                      stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        # Lo standard error va letto sempre, in un thread: l'ONNX Runtime di
+        # Debian vi scrive centinaia di righe "Schema error" a ogni voce
+        # (bug Debian #1092898). Senza lettura il tubo si riempie,
+        # ruscapiper-stream si ferma e RuscaLLisse resta ad aspettare RPS1.
+        self._last_err = collections.deque(maxlen=5)
+        threading.Thread(target=self._drain_stderr, daemon=True).start()
         try:
             read_hello(self.proc.stdout)
         except (EOFError, ValueError) as e:
-            err = self.proc.stderr.read().decode("utf-8", "replace").strip()
             self.proc.kill()
-            raise RuntimeError(err or str(e)) from e
+            self.proc.wait()
+            time.sleep(0.05)       # le ultime righe dal thread
+            raise RuntimeError("\n".join(self._last_err) or str(e)) from e
         self._id = 0
+
+    def _drain_stderr(self):
+        for raw in self.proc.stderr:
+            line = raw.decode("utf-8", "replace").rstrip()
+            if not line or line.startswith("Schema error"):
+                continue
+            self._last_err.append(line)
+            print(f"ruscapiper-stream: {line}" if not line.startswith("ruscapiper-stream")
+                  else line, file=sys.stderr, flush=True)
 
     def synthesize(self, text, length_scale):
         """Genera (pcm, segmenti) per una frase. Legge sempre fino all'ultimo
