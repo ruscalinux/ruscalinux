@@ -25,7 +25,7 @@ moment it boots.
 - **E-books and files** — Calibre, Foliate, Sigil, gImageReader (OCR with Tesseract in all languages), GPRename
 - **Internet** — Firefox ESR 153, Thunderbird 140, qBittorrent
 - **Languages** — 40+ localizations bundled in the base image
-- **In-house tools** (in the RuscaLinux-Tools folder of the app grid) — RuscaMark (Markdown editor), RuscaWriter (book writing), RuscaHub (AppImage manager), RuscaCleaner (privacy cleanup), RuscaLLama and RuscaTranslator (local AI chat, images, short videos and translation)
+- **In-house tools** (in the RuscaLinux Tools folder of the app grid) — RuscaMark (Markdown editor), RuscaWriter (book writing), RuscaHub (AppImage manager), RuscaCleaner (privacy cleanup), RuscaLLama and RuscaTranslator (local AI chat, images, short videos and translation)
 - **Graphics** — free drivers by default; NVIDIA driver @NVIDIA@ (GTX 16, RTX 20 and later) as an option in the boot menu
 - **Security** — AppArmor mandatory access control enabled by default
 - **Image** — hybrid ISO with live system + installer (including speech-synthesis option)

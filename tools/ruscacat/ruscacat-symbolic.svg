@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
-  <!-- RuscaCat, icona simbolica: testa di gatto con gli occhiali tondi. Un solo colore. -->
-  <g fill="#2e3436">
-    <path d="M1.6 7.6L2.4 1l4 3.4zM14.4 7.6L13.6 1l-4 3.4z"/>
-    <path d="M8 4a6.6 5.6 0 1 0 0.01 0zM5.2 6.6a2.4 2.4 0 1 0 0.01 0zM5.2 7.8a1.2 1.2 0 1 1-0.01 0zM10.8 6.6a2.4 2.4 0 1 0 0.01 0zM10.8 7.8a1.2 1.2 0 1 1-0.01 0z" fill-rule="evenodd"/>
-  </g>
-</svg>
