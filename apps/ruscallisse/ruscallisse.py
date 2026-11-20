@@ -41,7 +41,7 @@ import speech_text as st  # noqa: E402
 APP_ID = "org.ruscalinux.RuscaLLisse"
 APP_NAME = "RuscaLLisse"
 APP_VERSION = "1.99.3"
-PROVA = "prova 7"            # versione di prova: motori precompilati
+PROVA = "prova 8"            # versione di prova: motori precompilati
 STYLE_SRC = os.path.join(BASE_DIR, "style.css")
 ICON_SRC = os.path.join(BASE_DIR, "ruscallisse.svg")
 LANG_DIR = os.path.join(BASE_DIR, "lang")
@@ -272,6 +272,7 @@ class LisseWindow(Adw.ApplicationWindow):
         self.lang = "it"
         self.lexicon = {}
         self._loading = False
+        self._appeared = False
         self._monitors = []
         self.devices = []               # schede grafiche viste dal motore
         self._device_row = None
@@ -506,6 +507,9 @@ class LisseWindow(Adw.ApplicationWindow):
     def _start_session(self, vm, gm, vc):
         self._loading = True
         self.face.set_state("paused")
+        if not self._appeared:          # la prima volta si materializza dal nulla
+            self._appeared = True
+            self.face.model.start_appear()
         self._set_subtitle("sub_waking")
         self.lang = vosk.model_language(vm) or LANG.split("_")[0]
         if self.lang not in st.REGOLE:

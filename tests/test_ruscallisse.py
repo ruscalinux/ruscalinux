@@ -133,6 +133,7 @@ class TestVosk(unittest.TestCase):
         self.assertEqual(rv.model_language("/x/vosk-model-en-us-0.22"), "en")
 
 
+@unittest.skipIf(cairo is None, "serve pycairo")
 class TestVolto(unittest.TestCase):
     def test_stati_e_bocca(self):
         import face
@@ -152,6 +153,31 @@ class TestVolto(unittest.TestCase):
         for _ in range(80):
             m.step(1 / 60)
         self.assertIsNone(m.emotion)
+
+    def test_materializzazione(self):
+        import face
+        m = face.FaceModel()
+        self.assertEqual(m.appear, 1.0)                 # senza richiesta è già comparsa
+        m.start_appear()
+        self.assertEqual(m.appear, 0.0)
+        self.assertEqual(m.orbit_sweep, 0.0)
+        for _ in range(int(face.APPEAR_TIME * 60) + 5):
+            m.step(1 / 60)
+        self.assertEqual(m.appear, 1.0)
+        self.assertEqual(m.orbit_sweep, 1.0)
+        r = face.FaceModel(reduce_motion=True)
+        r.start_appear()
+        self.assertEqual(r.appear, 1.0)                 # animazioni ridotte: compare subito
+
+    @unittest.skipIf(cairo is None, "serve pycairo")
+    def test_disegno_durante_la_comparsa(self):
+        import face
+        m = face.FaceModel()
+        m.start_appear()
+        for a in (0.0, .2, .5, .8, .99):
+            m.appear = a
+            surf = cairo.ImageSurface(cairo.FORMAT_ARGB32, 120, 120)
+            face.draw(cairo.Context(surf), 120, 120, m)
 
     def test_animazioni_ridotte(self):
         import face

@@ -436,6 +436,10 @@ Il volto è disegnato da `face.py` con Cairo in un `Gtk.DrawingArea`, aggiornato
 - occhi grandi con l’iride Prugna 500 e due riflessi, sopracciglia morbide un po’ sollevate verso l’interno, guance Rosa 300;
 - intorno alla testa un’**orbita**: un’ellisse sottile Rosa 300 con un punto che la percorre (davanti alla testa Prugna 600 con il bordo crema, dietro Rosa 300).
 
+**Disegno.** Spazio di disegno di 400 × 400 punti, scalato sulla finestra. Forme definite con sfumature leggere dello stesso colore (luce sulla frangia, ombra sotto il mento, iride con riflessi, labbra con il labbro superiore ad arco di Cupido): il volto resta pulito, senza contorni pesanti. Occhi a mandorla con due ciglia morbide all’angolo esterno; un maglione prugna con una camicetta a V e un piccolo ciondolo a forma d’orbita. L’orbita passa davvero dietro la testa (metà disegnata prima dei capelli) e davanti (metà disegnata dopo il volto).
+
+**La materializzazione.** La prima volta che il volto compare, mentre i modelli si caricano, Ellittica si materializza dal nulla in circa 2,8 secondi (`APPEAR_TIME`): scie di luce rosa arrivano a spirale da ogni parte e si raccolgono nella sua sagoma (contorno dei capelli e del volto, occhiali, bocca, spalle); poi il volto compare dal basso dietro una linea di luce, e alla fine l’orbita si disegna da sola intorno alla testa. Con «Animazioni ridotte» compare subito, senza effetto.
+
 **Stati** (da `conversation.py`):
 
 | Stato | Volto |
