@@ -191,6 +191,22 @@ def segments(phonemes, alignments):
     return out
 
 
+def group_visemes(phonemes):
+    """Visemi dai soli fonemi di libpiper, senza durate: un visema per gruppo
+    di codepoint. Serve con le voci senza allineamenti (quasi tutte quelle
+    pubblicate): il volto li distribuisce in parti uguali sulla frase."""
+    out, prev = [], None
+    for cp in phonemes:
+        if not cp:
+            prev = None
+            continue
+        if cp == prev:
+            continue
+        prev = cp
+        out.extend(st.visemes([chr(cp)]))
+    return out
+
+
 class _StreamVoice:
     """La voce dentro ruscapiper-stream, sempre caricata."""
 
@@ -241,7 +257,8 @@ class _StreamVoice:
             if c["rate"]:
                 self.rate = c["rate"]
             if c["pcm"]:
-                yield c["pcm"], segments(c["phonemes"], c["alignments"])
+                vis = segments(c["phonemes"], c["alignments"]) if c["alignments"] else []
+                yield c["pcm"], vis or group_visemes(c["phonemes"])
             if c["flags"] & FLAG_LAST:
                 return
 

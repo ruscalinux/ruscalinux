@@ -523,6 +523,8 @@ for line in sys.stdin.buffer:
     pcm = struct.pack(f"<{n}h", *([4000] * n))
     ph = [ord("a"), ord("a"), 0, ord("m"), ord("m"), 0, ord("o"), ord("o")]
     al = [400, 0, 400, 0, 800, 0]
+    if args[args.index("--voice") + 1].endswith("senza_allineamenti.onnx"):
+        al = []            # come quasi tutte le voci pubblicate
     out.write(struct.pack("<4s6I", b"RPSC", cid, 1, 16000, n, len(ph), len(al)))
     out.write(pcm + struct.pack(f"<{len(ph)}I", *ph) + struct.pack(f"<{len(al)}i", *al))
     out.flush()
@@ -575,6 +577,23 @@ class TestRuscapiperStream(unittest.TestCase):
         self.assertIn(struct.pack("<h", 4000) * 1600, data)
         # 1600 campioni a 16 kHz = 5 blocchi da 20 ms: A A? M O O secondo le durate
         self.assertEqual(vis[:5], ["A", "M", "O", "O", "O"])
+
+    def test_bocca_senza_allineamenti(self):
+        """Le voci pubblicate non danno gli allineamenti: la bocca segue lo
+        stesso i fonemi, in parti uguali."""
+        self.assertEqual(self.rp.group_visemes([ord("a"), ord("a"), 0, ord("m"), 0, ord(" "), 0, ord("o")]),
+                         ["A", "M", "", "O"])
+        voce = os.path.join(self.d, "senza_allineamenti.onnx")
+        open(voce, "wb").close()
+        open(voce + ".json", "w").write('{"audio": {"sample_rate": 16000}}')
+        spk = self.rp.Speaker(voce, 1.0)
+        spk.say("Ciao.")
+        deadline = time.monotonic() + 5
+        while spk.busy and time.monotonic() < deadline:
+            time.sleep(0.02)
+        vis = [v for _t, _a, v in spk.timeline if v]
+        spk.close()
+        self.assertEqual(sorted(set(vis)), ["A", "M", "O"])
 
     def test_stderr_pieno_non_blocca(self):
         """L'ONNX Runtime di Debian scrive oltre 64 KB su stderr prima che la
