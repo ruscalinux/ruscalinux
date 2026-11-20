@@ -273,9 +273,13 @@ BIN="$STAGE_CACHE/bin"
 [ -f "$BIN/libvosk.so" ] || die "libvosk.so mancante nella compilazione"
 
 # ── Controlli ────────────────────────────────────────────────────────────────
+# L'elenco dei simboli si legge una volta: con pipefail, "nm | grep -q"
+# puo' fallire anche quando il simbolo c'e' (grep chiude il tubo e nm
+# riceve SIGPIPE).
+ESPORTATI=$(nm -D --defined-only "$BIN/libvosk.so" | awk '{print $NF}')
 MANCANO=""
 for s in $SIMBOLI_VOSK; do
-    nm -D --defined-only "$BIN/libvosk.so" | awk '{print $NF}' | grep -qx "$s" || MANCANO="$MANCANO $s"
+    grep -qx "$s" <<< "$ESPORTATI" || MANCANO="$MANCANO $s"
 done
 [ -z "$MANCANO" ] || die "libvosk di Vosk $VOSK_TAG non esporta:$MANCANO"
 say "libvosk esporta tutte le funzioni usate da RuscaLLisse"

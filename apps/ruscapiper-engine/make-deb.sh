@@ -342,9 +342,13 @@ for f in $KEEP; do [ -f "$BIN/$f" ] || die "$f mancante nella compilazione"; don
 
 # ── Controlli ────────────────────────────────────────────────────────────────
 # Funzioni esportate da libpiper.
+# L'elenco dei simboli si legge una volta: con pipefail, "nm | grep -q"
+# puo' fallire anche quando il simbolo c'e' (grep chiude il tubo e nm
+# riceve SIGPIPE).
+ESPORTATI=$(nm -D --defined-only "$BIN/libpiper.so" | awk '{print $NF}')
 MANCANO=""
 for s in $SIMBOLI_PIPER; do
-    nm -D --defined-only "$BIN/libpiper.so" | awk '{print $NF}' | grep -qx "$s" || MANCANO="$MANCANO $s"
+    grep -qx "$s" <<< "$ESPORTATI" || MANCANO="$MANCANO $s"
 done
 [ -z "$MANCANO" ] || die "libpiper di Piper $TAG non esporta:$MANCANO
         Adatta ruscapiper-stream.c, oppure costruisci la versione precedente:
