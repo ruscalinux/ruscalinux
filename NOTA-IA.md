@@ -14,12 +14,12 @@ Questa nota vale per tutto il progetto: per questo non viene ripetuta nei singol
 
 ### Il lavoro in dettaglio
 
-RuscaLinux e i RuscaLinux OS Tools (RuscaCleaner, RuscaHub, RuscaMark, RuscaWriter, RuscaLLama, RuscaTranslator, RuscaTranscriber, RuscaNarrator, RuscaPinball) sono progettati e mantenuti da Nunzio Curcuruto. I motori ruscallama-engine (llama.cpp), ruscawhisper-engine (whisper.cpp) e ruscadiffusion-engine (stable-diffusion.cpp), il driver NVIDIA e i caratteri inclusi in RuscaWriter (EB Garamond, Courier Prime) sono di altri autori: la nota non li riguarda.
+RuscaLinux e le RuscaLinux OS Apps (RuscaCleaner, RuscaHub, RuscaMark, RuscaWriter, RuscaLLama, RuscaTranslator, RuscaTranscriber, RuscaNarrator, RuscaPinball) sono progettati e mantenuti da Nunzio Curcuruto. I motori ruscallama-engine (llama.cpp), ruscawhisper-engine (whisper.cpp) e ruscadiffusion-engine (stable-diffusion.cpp), il driver NVIDIA e i caratteri inclusi in RuscaWriter (EB Garamond, Courier Prime) sono di altri autori: la nota non li riguarda.
 
 - **Dell’autore:** l’idea e lo scopo di ogni programma, le specifiche tecniche e grafiche, le scelte di comportamento e di aspetto, la verifica dei programmi e delle ISO prima di ogni pubblicazione, e la decisione su cosa entra nel repository.
 - **Con l’assistenza di strumenti di intelligenza artificiale:** la scrittura di gran parte del codice e della documentazione, a partire dalle specifiche e dalle indicazioni dell’autore.
 
-Le regole che i programmi devono rispettare sono pubbliche, in [`docs/SPECIFICHE-RUSCALINUX-OS-TOOLS.md`](docs/SPECIFICHE-RUSCALINUX-OS-TOOLS.md): aspetto, accessibilità, lingue, privacy, pacchetti.
+Le regole che i programmi devono rispettare sono pubbliche, in [`docs/SPECIFICHE-RUSCALINUX-OS-APPS.md`](docs/SPECIFICHE-RUSCALINUX-OS-APPS.md): aspetto, accessibilità, lingue, privacy, pacchetti.
 
 La nota breve compare in tre posti: nella finestra “Informazioni” di ogni programma, nel file `copyright` di ogni pacchetto deb e in questo file.
 
@@ -39,12 +39,12 @@ This note covers the whole project: that is why it is not repeated in individual
 
 ### The work in detail
 
-RuscaLinux and the RuscaLinux OS Tools (RuscaCleaner, RuscaHub, RuscaMark, RuscaWriter, RuscaLLama, RuscaTranslator, RuscaTranscriber, RuscaNarrator, RuscaPinball) are designed and maintained by Nunzio Curcuruto. The ruscallama-engine (llama.cpp), ruscawhisper-engine (whisper.cpp) and ruscadiffusion-engine (stable-diffusion.cpp) engines, the NVIDIA driver and the fonts bundled with RuscaWriter (EB Garamond, Courier Prime) are by other authors: this note does not cover them.
+RuscaLinux and the RuscaLinux OS Apps (RuscaCleaner, RuscaHub, RuscaMark, RuscaWriter, RuscaLLama, RuscaTranslator, RuscaTranscriber, RuscaNarrator, RuscaPinball) are designed and maintained by Nunzio Curcuruto. The ruscallama-engine (llama.cpp), ruscawhisper-engine (whisper.cpp) and ruscadiffusion-engine (stable-diffusion.cpp) engines, the NVIDIA driver and the fonts bundled with RuscaWriter (EB Garamond, Courier Prime) are by other authors: this note does not cover them.
 
 - **By the author:** the idea and purpose of each program, the technical and visual specifications, the decisions on behaviour and appearance, the testing of the programs and of the ISO images before every release, and the decision on what goes into the repository.
 - **With the assistance of AI tools:** writing most of the code and documentation, starting from the author’s specifications and directions.
 
-The rules the programs must follow are public, in [`docs/SPECIFICHE-RUSCALINUX-OS-TOOLS.md`](docs/SPECIFICHE-RUSCALINUX-OS-TOOLS.md) (in Italian, with an English user guide): appearance, accessibility, languages, privacy, packaging.
+The rules the programs must follow are public, in [`docs/SPECIFICHE-RUSCALINUX-OS-APPS.md`](docs/SPECIFICHE-RUSCALINUX-OS-APPS.md) (in Italian, with an English user guide): appearance, accessibility, languages, privacy, packaging.
 
 The short note appears in three places: in the “About” window of each program, in the `copyright` file of each deb package, and in this file.
 

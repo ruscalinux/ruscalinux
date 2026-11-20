@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# rusca_diffusion.py — RuscaLinux OS Tools 1.99.3 — GPL-3.0-or-later
+# rusca_diffusion.py — RuscaLinux OS Apps 1.99.3 — GPL-3.0-or-later
 #
 # Generazione delle immagini e dei video di RuscaLLama con
 # ruscadiffusion-engine (sd-cli, cioe' stable-diffusion.cpp: software

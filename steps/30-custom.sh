@@ -194,9 +194,9 @@ glib-compile-schemas /usr/share/glib-2.0/schemas/
 EOF
 
 # ---------------------------------------------------------------------------
-# CARTELLA "RuscaLinux Tools" NELLA GRIGLIA DELLE APPLICAZIONI
+# CARTELLA "RuscaLinux Apps" NELLA GRIGLIA DELLE APPLICAZIONI
 #
-# Tutti i RuscaLinux OS Tools stanno in una cartella. GNOME Shell 48 crea le
+# Tutte le RuscaLinux OS Apps stanno in una cartella. GNOME Shell 48 crea le
 # sue cartelle (Sistema, Utilita') al primo accesso di ogni utente, ma solo
 # se l'elenco delle cartelle e' vuoto (js/ui/appDisplay.js,
 # _ensureDefaultFolders): un elenco predefinito messo con dconf gli
@@ -214,7 +214,7 @@ mkdir -p .work/config/includes.chroot_after_packages/usr/lib/ruscalinux \
          .work/config/includes.chroot_after_packages/etc/xdg/autostart
 cat <<'EOF' > .work/config/includes.chroot_after_packages/usr/lib/ruscalinux/ruscalinux-tools-folder
 #!/bin/sh
-# RuscaLinux — mette i RuscaLinux OS Tools nella cartella "RuscaLinux Tools"
+# RuscaLinux — mette le RuscaLinux OS Apps nella cartella "RuscaLinux Apps"
 # della griglia delle applicazioni di GNOME, una volta per utente. Scritto da
 # steps/30-custom.sh; avviato da
 # /etc/xdg/autostart/ruscalinux-tools-folder.desktop.
@@ -222,7 +222,7 @@ cat <<'EOF' > .work/config/includes.chroot_after_packages/usr/lib/ruscalinux/rus
 # ID e' il nome della cartella per dconf (niente spazi); NOME e' quello che
 # si vede nella griglia.
 ID=RuscaLinux-Tools
-NOME="RuscaLinux Tools"
+NOME="RuscaLinux Apps"
 CARTELLE=org.gnome.desktop.app-folders
 CARTELLA="org.gnome.desktop.app-folders.folder:/org/gnome/desktop/app-folders/folders/$ID/"
 FATTO="${XDG_CONFIG_HOME:-$HOME/.config}/ruscalinux/ruscalinux-tools-folder.fatto"
@@ -273,8 +273,8 @@ chmod +x .work/config/includes.chroot_after_packages/usr/lib/ruscalinux/ruscalin
 cat <<'EOF' > .work/config/includes.chroot_after_packages/etc/xdg/autostart/ruscalinux-tools-folder.desktop
 [Desktop Entry]
 Type=Application
-Name=RuscaLinux Tools folder
-Comment=Puts the RuscaLinux OS Tools in their folder of the app grid, once per user
+Name=RuscaLinux Apps folder
+Comment=Puts the RuscaLinux OS Apps in their folder of the app grid, once per user
 Exec=/usr/lib/ruscalinux/ruscalinux-tools-folder
 OnlyShowIn=GNOME;
 NoDisplay=true
@@ -285,8 +285,8 @@ EOF
 # GRIGLIA DELLE APPLICAZIONI SENZA BUCHI
 #
 # GNOME Shell tiene la posizione di ogni icona e non la ricompatta: quando
-# delle applicazioni spariscono da una pagina (i RuscaLinux OS Tools che al
-# primo accesso entrano nella cartella RuscaLinux Tools, o applicazioni tolte
+# delle applicazioni spariscono da una pagina (le RuscaLinux OS Apps che al
+# primo accesso entrano nella cartella RuscaLinux Apps, o applicazioni tolte
 # o rinominate da un aggiornamento) restano dei posti vuoti e la pagina dopo
 # non scala (pagina 2 con quattro posti vuoti, pagina 3 con quattro icone).
 # Azzerare la disposizione salvata non basta: GNOME ha gia' le icone in
@@ -303,8 +303,8 @@ cat <<'EOF' > .work/config/includes.chroot_after_packages/usr/lib/ruscalinux/rus
 #
 # GNOME Shell tiene la posizione di ogni icona (org.gnome.shell
 # app-picker-layout) e non la ricompatta. Quando delle applicazioni spariscono
-# da una pagina (tolte, rinominate o spostate in una cartella, come i
-# RuscaLinux OS Tools che entrano nella cartella RuscaLinux Tools al primo
+# da una pagina (tolte, rinominate o spostate in una cartella, come le
+# RuscaLinux OS Apps che entrano nella cartella RuscaLinux Apps al primo
 # accesso) restano dei posti vuoti, e la pagina dopo non scala: pagina 2 con
 # quattro posti vuoti, pagina 3 con quattro icone. Succede anche quando la
 # disposizione salvata e' vuota (azzerata al primo accesso): GNOME ha gia'

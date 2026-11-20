@@ -155,7 +155,7 @@ EOF
 
 # ------------------------------------------------------------------ pagina di manuale
 cat <<EOF | gzip -9n > "$STAGE/usr/share/man/man1/ruscahub.1.gz"
-.TH RUSCAHUB 1 "$(LC_ALL=C date -u '+%B %Y')" "RuscaHub $VER" "RuscaLinux OS Tools"
+.TH RUSCAHUB 1 "$(LC_ALL=C date -u '+%B %Y')" "RuscaHub $VER" "RuscaLinux OS Apps"
 .SH NAME
 ruscahub \\- manage AppImage applications
 .SH SYNOPSIS

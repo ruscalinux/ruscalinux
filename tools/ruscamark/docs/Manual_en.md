@@ -1,6 +1,6 @@
 # RuscaMark 1.99.3 Manual
 
-RuscaMark is the Markdown editor of the RuscaLinux OS Tools. It is designed for writing articles, reports, notes and documentation: formatting appears as you type, the page stays centred like a sheet of paper and all work happens on your own computer.
+RuscaMark is the Markdown editor of the RuscaLinux OS Apps. It is designed for writing articles, reports, notes and documentation: formatting appears as you type, the page stays centred like a sheet of paper and all work happens on your own computer.
 
 | Field | Value |
 |---|---|
@@ -270,7 +270,7 @@ PDF and HTML share the **same style**, whatever the editor's light or dark style
 
 | Theme | Look |
 |---|---|
-| **RuscaLinux – Guide** (default) | The style of the RuscaLinux OS Tools reference guides: level-1 heading in a **banner** with a pink-to-plum gradient, plum level-2 headings with a pink rule, code on dark plum with a pink bar, tables with a plum header, DejaVu Sans. |
+| **RuscaLinux – Guide** (default) | The style of the RuscaLinux OS Apps reference guides: level-1 heading in a **banner** with a pink-to-plum gradient, plum level-2 headings with a pink rule, code on dark plum with a pink bar, tables with a plum header, DejaVu Sans. |
 | **Neutral** | Plain greys: heading with a rule, code on light grey, blue links. Prints well in black and white too. |
 | **RuscaLinux – Strip** | The RuscaLinux palette, lighter: a gradient strip at the top of the first page, plum heading without a box, code on dark plum, split footer (title on the left, pages on the right). |
 | **Classic** | A serif typeface (Noto Serif or DejaVu Serif) and sepia tones, like a book. |

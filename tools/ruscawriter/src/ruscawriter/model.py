@@ -44,10 +44,10 @@ import shutil
 import tarfile
 import tempfile
 
-# EN: the common Markdown engine of the RuscaLinux OS Tools (CommonMark,
+# EN: the common Markdown engine of the RuscaLinux OS Apps (CommonMark,
 #     specifications section 1.2), identical in RuscaLLama, RuscaMark and
 #     RuscaWriter.
-# IT: il motore Markdown comune dei RuscaLinux OS Tools (CommonMark,
+# IT: il motore Markdown comune delle RuscaLinux OS Apps (CommonMark,
 #     specifiche sezione 1.2), identico in RuscaLLama, RuscaMark e RuscaWriter.
 from markdown_it.tree import SyntaxTreeNode
 from .rusca_markdown import (parser as md_parser, parse_source, inline_mapper,
@@ -127,7 +127,7 @@ APP_NAME = "RuscaWriter"
 
 # ---------------------------------------------------------------------------
 # UNICA FONTE della versione / SINGLE SOURCE of the version.
-# IT: la versione e' quella di RuscaLinux (specifiche dei RuscaLinux OS Tools,
+# IT: la versione e' quella di RuscaLinux (specifiche delle RuscaLinux OS Apps,
 #     sezione 8). Titolo, finestra Informazioni e pacchetto ne derivano.
 # EN: the version is RuscaLinux's. Title, About window and package derive
 #     from it.
@@ -3861,7 +3861,7 @@ def write_pdf(path, chapters, title="",
 # NB: "PLUM" qui e' il COLORE prugna ("plum" in inglese), il tema cromatico
 # storico dell'applicazione: non un residuo del vecchio nome del programma.
 
-# Palette ufficiale RuscaLinux (specifiche dei RuscaLinux OS Tools, 4.1)
+# Palette ufficiale RuscaLinux (specifiche delle RuscaLinux OS Apps, 4.1)
 PLUM        = "#7A2357"   # prugna 600: accento nel chiaro
 PLUM_DARK   = "#5C1A40"   # prugna scuro
 PLUM_LIGHT  = "#F8D7E6"   # rosa chiaro
@@ -4359,7 +4359,7 @@ def build_css(dark=False, theme=DEFAULT_THEME):
     """Foglio di stile della PAGINA: area di scrittura, anteprima e note.
 
     Barre, menu, pulsanti e dialoghi sono quelli di libadwaita, colorati dal
-    tema comune dei RuscaLinux OS Tools (style.css): il tema di RuscaWriter
+    tema comune delle RuscaLinux OS Apps (style.css): il tema di RuscaWriter
     (Ametista, Classico) colora solo la carta su cui si scrive.
     """
     p = theme_palette(theme, dark)

@@ -1,4 +1,4 @@
-"""RuscaLinux OS Tools — test di RuscaTranscriber — 1.99.3 — GPL-3.0
+"""RuscaLinux OS Apps — test di RuscaTranscriber — 1.99.3 — GPL-3.0
 
 rusca_whisper.py avvia ffmpeg e whisper-cli (ruscawhisper-engine) e scrive
 la trascrizione in Markdown e in SRT. Qui si controllano i formati di

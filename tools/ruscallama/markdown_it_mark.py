@@ -1,6 +1,6 @@
 """markdown_it_mark.py — regola dell'evidenziato ==testo== per markdown-it-py
 
-COMPONENTE ESTERNO dei RuscaLinux OS Tools (specifiche, sezione 6). Questo
+COMPONENTE ESTERNO delle RuscaLinux OS Apps (specifiche, sezione 6). Questo
 file non è codice di RuscaLinux: è un porting in Python della regola del
 plugin markdown-it-mark per markdown-it (JavaScript), scritto seguendo la
 regola del barrato di markdown-it-py 3.0 (rules_inline/strikethrough.py), di

@@ -1,6 +1,6 @@
-"""RuscaLinux OS Tools — rusca_markdown.py — 1.99.3 — GPL-3.0
+"""RuscaLinux OS Apps — rusca_markdown.py — 1.99.3 — GPL-3.0
 
-Motore Markdown comune dei RuscaLinux OS Tools.
+Motore Markdown comune delle RuscaLinux OS Apps.
 
 Il Markdown segue la specifica CommonMark (https://spec.commonmark.org/),
 con le estensioni di GitHub Flavored Markdown per tabelle, barrato e liste di

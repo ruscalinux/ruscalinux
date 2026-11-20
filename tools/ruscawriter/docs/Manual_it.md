@@ -4,7 +4,7 @@
 |---|---|
 | Programma | RuscaWriter |
 | Versione | 1.99.3 |
-| Progetto | RuscaLinux OS Tools |
+| Progetto | RuscaLinux OS Apps |
 | Sito | https://www.ruscalinux.org |
 | Sorgenti | https://github.com/ruscalinux/ruscalinux (cartella `tools/ruscawriter`) |
 | Contatti | info@ruscalinux.org |
@@ -66,7 +66,7 @@ La finestra:
 - **Tre colonne**: capitoli (con le frecce per spostarli), testo, note del capitolo.
 - **Barra in basso**: parole del capitolo, caratteri e pagine stimate, totale del progetto, lingua del controllo ortografico e dimensione del testo.
 
-La lingua dell'interfaccia è quella del sistema (Impostazioni → Sistema → Regione e lingua), fra le lingue in cui sono tradotti i RuscaLinux OS Tools. Chi usa lo slovacco vede il ceco; se manca una traduzione si usa l'inglese.
+La lingua dell'interfaccia è quella del sistema (Impostazioni → Sistema → Regione e lingua), fra le lingue in cui sono tradotte le RuscaLinux OS Apps. Chi usa lo slovacco vede il ceco; se manca una traduzione si usa l'inglese.
 
 ---
 
@@ -158,7 +158,7 @@ Il Markdown segue lo standard CommonMark, come in RuscaMark e RuscaLLama: antepr
 
 Dal sottomenu Visualizza si sceglie anche il carattere di scrittura (Caratteri…) e la **larghezza della colonna**: *Normale* (68 caratteri per riga, la misura dei libri, predefinita) o *Larga* (80). La colonna resta della stessa larghezza quando sposti o nascondi le colonne laterali e quando ridimensioni la finestra: si ricentra soltanto. Se lo spazio è minore, il testo occupa tutto lo spazio disponibile.
 
-**Aspetto.** Il sottomenu Aspetto offre tre scelte. *Automatico* segue la modalità chiara o scura di GNOME (Impostazioni → Aspetto) e cambia insieme al sistema, anche mentre scrivi. *Chiaro* e *Scuro* fissano la scelta. Ctrl+Maiusc+D passa dall'uno all'altro. Barre, menu e dialoghi seguono il tema comune dei RuscaLinux OS Tools.
+**Aspetto.** Il sottomenu Aspetto offre tre scelte. *Automatico* segue la modalità chiara o scura di GNOME (Impostazioni → Aspetto) e cambia insieme al sistema, anche mentre scrivi. *Chiaro* e *Scuro* fissano la scelta. Ctrl+Maiusc+D passa dall'uno all'altro. Barre, menu e dialoghi seguono il tema comune delle RuscaLinux OS Apps.
 
 **Temi della pagina.** Nello stesso sottomenu si sceglie il colore della pagina di scrittura, dell'anteprima e delle note. Sono due, ciascuno in versione chiara e scura:
 

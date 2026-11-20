@@ -43,8 +43,8 @@
   on, and tables and formulas in every export; pictures next to an imported
   Markdown file come into the project with it, and the PDF prints
   Greek, Cyrillic and every other script the chosen font contains.
-- **A folder for the in-house tools.** All RuscaLinux OS Tools are gathered
-  in the **RuscaLinux Tools** folder of the GNOME app grid. The folder is
+- **A folder for the in-house tools.** All RuscaLinux OS Apps are gathered
+  in the **RuscaLinux Apps** folder of the GNOME app grid. The folder is
   created at the first login of each user; you can rename, empty or delete
   it like any other folder.
 - **New applications.** darktable (raw photo development), gImageReader
@@ -101,7 +101,7 @@
   bumpers, the bonus trap, a ring of bonus lamps that counts down at the
   end of each ball, the SPECIAL for an extra ball and the R-U-S-C-A
   letters. Original table, graphics and sounds; keyboard or gamepad. It is
-  in the RuscaLinux Tools folder and in the Games category.
+  in the RuscaLinux Apps folder and in the Games category.
 - **NVIDIA graphics, optional.** The image includes the NVIDIA driver
   @NVIDIA@, with open kernel modules, for GTX 16, RTX 20 and later cards,
   RTX 50 included. RuscaLinux still starts and installs with the free

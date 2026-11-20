@@ -119,7 +119,7 @@ la voce di menu viene riscritta con l'icona trovata.
 | `/usr/share/ruscahub/lang/*.json` | Traduzioni dell'interfaccia |
 
 ## 10. Lingue supportate
-RuscaHub è tradotto nelle lingue dei RuscaLinux OS Tools: sono i file della cartella
+RuscaHub è tradotto nelle lingue delle RuscaLinux OS Apps: sono i file della cartella
 `lang/`. Le traduzioni diverse da italiano e inglese sono fatte con l'assistenza di
 strumenti di intelligenza artificiale: le correzioni dei madrelingua sono benvenute
 (info@ruscalinux.org).

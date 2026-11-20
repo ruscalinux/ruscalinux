@@ -1,4 +1,4 @@
-"""RuscaLinux OS Tools — test della generazione di immagini di RuscaLLama —
+"""RuscaLinux OS Apps — test della generazione di immagini di RuscaLLama —
 1.99.3 — GPL-3.0
 
 rusca_diffusion.py riconosce i modelli per immagini e per video (un file

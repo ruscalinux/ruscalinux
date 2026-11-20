@@ -119,7 +119,7 @@ is rewritten with the icon found.
 | `/usr/share/ruscahub/lang/*.json` | Interface translations |
 
 ## 10. Supported languages
-RuscaHub is translated into the languages of the RuscaLinux OS Tools: they are the
+RuscaHub is translated into the languages of the RuscaLinux OS Apps: they are the
 files in the `lang/` folder. Translations other than Italian and English are made
 with the assistance of AI tools: corrections from native speakers are welcome
 (info@ruscalinux.org).

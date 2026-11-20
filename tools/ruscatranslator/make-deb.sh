@@ -4,7 +4,7 @@
 #
 #   ./make-deb.sh
 #
-# Regole delle specifiche dei RuscaLinux OS Tools: un solo .deb in
+# Regole delle specifiche delle RuscaLinux OS Apps: un solo .deb in
 # build-deb/ con suffisso -ruscalinux e SHA256SUMS accanto; Python puro,
 # quindi Architecture: all; versione = VERSION di release.conf.
 # Il programma usa ruscallama-engine (llama.cpp, componente esterno MIT).
@@ -154,7 +154,7 @@ $(cat "$TMP/description")
 METAINFO
 
 cat <<MANPAGE | gzip -9n > "$ROOT/usr/share/man/man1/$PKG.1.gz"
-.TH $(echo "$PKG" | tr a-z A-Z) 1 "$(LC_ALL=C date -u -d "@$SOURCE_DATE_EPOCH" '+%B %Y')" "$NAME $VER" "RuscaLinux OS Tools"
+.TH $(echo "$PKG" | tr a-z A-Z) 1 "$(LC_ALL=C date -u -d "@$SOURCE_DATE_EPOCH" '+%B %Y')" "$NAME $VER" "RuscaLinux OS Apps"
 .SH NAME
 $PKG \\- translate Markdown documents with a local language model
 .SH SYNOPSIS
@@ -234,7 +234,7 @@ $PKG ($VER) unstable; urgency=medium
   * Memoria di traduzione e glossari in ~/.local/share/ruscatranslator.
   * raglin.py in /usr/share/ruscatranslator (prima in /usr/bin).
   * Interfaccia in 15 lingue; icona e icona simbolica nuove.
-  * Traduzione tra tutte le 26 lingue dei RuscaLinux OS Tools (prima 15):
+  * Traduzione tra tutte le 26 lingue delle RuscaLinux OS Apps (prima 15):
     aggiunti cinese tradizionale, portoghese europeo, olandese, ucraino,
     ceco, vietnamita, svedese, rumeno, ungherese, greco e finlandese, con
     rilevamento automatico anche delle varianti.

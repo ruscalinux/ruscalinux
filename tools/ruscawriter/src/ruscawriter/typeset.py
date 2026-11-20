@@ -87,7 +87,7 @@ class TypesetError(Exception):
 # Lingue: babel e caratteri per le scritture non latine
 # ---------------------------------------------------------------------------
 # Codice della lingua del libro (quello del controllo ortografico) → nome
-# babel. Le 26 lingue dei RuscaLinux OS Tools (specifiche, sezione 9).
+# babel. Le 26 lingue delle RuscaLinux OS Apps (specifiche, sezione 9).
 BABEL_NAMES = {
     "it": "italian", "en": "english", "en_GB": "british", "en_US": "american",
     "de": "german", "fr": "french", "es": "spanish", "pt": "portuguese",

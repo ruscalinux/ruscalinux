@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # make-deb.sh — pacchetto .deb di RuscaMark conforme alle specifiche
-# dei RuscaLinux OS Tools (SPECIFICHE-RUSCALINUX-OS-TOOLS.md).
+# delle RuscaLinux OS Apps (SPECIFICHE-RUSCALINUX-OS-APPS.md).
 #
 # Uso: bash make-deb.sh
 #   (dalla cartella con ruscamark.py, lang/, themes/, docs/, ruscamark.svg)
@@ -13,7 +13,7 @@
 #   * nome del pacchetto Debian: ruscamark; il suffisso -ruscalinux
 #     compare solo nel nome del file .deb (ruscamark-ruscalinux_*.deb);
 #   * versione identica a RuscaLinux (1.99.3);
-#   * le lingue dei RuscaLinux OS Tools (file lang/*.json), fallback en.json;
+#   * le lingue delle RuscaLinux OS Apps (file lang/*.json), fallback en.json;
 #   * Python >= 3.10, GTK >= 4.18, libadwaita >= 1.7, dipendenze minime;
 #   * tema comune RuscaLinux (style.css), icona simbolica, metainfo
 #     e voce del menu con testi tradotti presi da lang/;
@@ -214,7 +214,7 @@ METAINFO
 
 # ---- pagina di manuale -------------------------------------------------------
 cat <<MANPAGE | gzip -9n > "${ROOT}/usr/share/man/man1/${APP}.1.gz"
-.TH RUSCAMARK 1 "$(LC_ALL=C date -u '+%B %Y')" "RuscaMark ${VER}" "RuscaLinux OS Tools"
+.TH RUSCAMARK 1 "$(LC_ALL=C date -u '+%B %Y')" "RuscaMark ${VER}" "RuscaLinux OS Apps"
 .SH NAME
 ruscamark \\- Markdown editor with live formatting
 .SH SYNOPSIS
@@ -309,7 +309,7 @@ ${PKG} (${VER}) unstable; urgency=medium
   * Preferenze con applicazione immediata; la lingua dell'interfaccia
     segue sempre quella del sistema.
   * Finestra Informazioni e Scorciatoie da tastiera comuni ai
-    RuscaLinux OS Tools; notifiche con «Apri» dopo gli export.
+    RuscaLinux OS Apps; notifiche con «Apri» dopo gli export.
   * Identificativo org.ruscalinux.RuscaMark (prima ...ruscamark); icona
     simbolica, metainfo tradotta, pagina di manuale.
   * Export PDF diretto (Ctrl+Maiusc+P): solo il contenuto del documento,
@@ -342,7 +342,7 @@ ${PKG} (${VER}) unstable; urgency=medium
     (GTK 4 non espone più forward_search su Gtk.TextBuffer); la
     sostituzione singola ora raggiunge l'occorrenza anche senza
     selezione preventiva.
-  * Conformità alle specifiche RuscaLinux OS Tools: script make-deb.sh,
+  * Conformità alle specifiche RuscaLinux OS Apps: script make-deb.sh,
     cartella build-deb/, suffisso -ruscalinux nel nome del file,
     SHA256SUMS, 15 lingue ufficiali (varianti zh_CN e pt_BR), fallback
     inglese, Python >= 3.10,

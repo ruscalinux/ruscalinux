@@ -4,7 +4,7 @@
 #
 #   ./make-deb.sh
 #
-# Regole delle specifiche dei RuscaLinux OS Tools: un solo .deb in
+# Regole delle specifiche delle RuscaLinux OS Apps: un solo .deb in
 # build-deb/ con suffisso -ruscalinux e SHA256SUMS accanto; Python puro,
 # quindi Architecture: all; versione = VERSION di release.conf, uguale a
 # APP_VERSION_SHORT in src/ruscawriter/model.py.
@@ -170,7 +170,7 @@ $(cat "$TMP/description")
 METAINFO
 
 cat <<MANPAGE | gzip -9n > "$ROOT/usr/share/man/man1/$PKG.1.gz"
-.TH RUSCAWRITER 1 "$(LC_ALL=C date -u -d "@$SOURCE_DATE_EPOCH" '+%B %Y')" "$NAME $VER" "RuscaLinux OS Tools"
+.TH RUSCAWRITER 1 "$(LC_ALL=C date -u -d "@$SOURCE_DATE_EPOCH" '+%B %Y')" "$NAME $VER" "RuscaLinux OS Apps"
 .SH NAME
 ruscawriter \\- write a book and typeset it, in one program
 .SH SYNOPSIS
@@ -270,7 +270,7 @@ COPYRIGHT
 cat <<CHANGELOG | gzip -9n > "$DOC/changelog.gz"
 $PKG ($VER) unstable; urgency=medium
 
-  * RuscaWriter entra nei RuscaLinux OS Tools: interfaccia libadwaita con
+  * RuscaWriter entra nelle RuscaLinux OS Apps: interfaccia libadwaita con
     il tema comune, menu principale al posto della barra dei menu, dialoghi
     GNOME, finestra Informazioni comune con i componenti esterni.
   * Temi Ametista (palette ufficiale), Classico e Semplice limitati alla

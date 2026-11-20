@@ -4,7 +4,7 @@
 |---|---|
 | Program | RuscaWriter |
 | Version | 1.99.3 |
-| Project | RuscaLinux OS Tools |
+| Project | RuscaLinux OS Apps |
 | Website | https://www.ruscalinux.org |
 | Source | https://github.com/ruscalinux/ruscalinux (folder `tools/ruscawriter`) |
 | Contact | info@ruscalinux.org |
@@ -66,7 +66,7 @@ The window:
 - **Three columns**: chapters (with arrows to move them), text, chapter notes.
 - **Bottom bar**: chapter words, characters and estimated pages, project total, spell-check language and text size.
 
-The interface language is the system's (Settings → System → Region & Language), among the languages the RuscaLinux OS Tools are translated into. Slovak users see Czech; anything untranslated falls back to English.
+The interface language is the system's (Settings → System → Region & Language), among the languages the RuscaLinux OS Apps are translated into. Slovak users see Czech; anything untranslated falls back to English.
 
 ---
 
@@ -158,7 +158,7 @@ Markdown follows the CommonMark standard, as in RuscaMark and RuscaLLama: previe
 
 The View submenu also holds the writing font (Fonts…) and the **column width**: *Normal* (68 characters per line, the book measure, the default) or *Wide* (80). The column keeps its width when you move or hide the side columns and when you resize the window: it only re-centres. If there is less room, the text uses all the space available.
 
-**Appearance.** The Appearance submenu offers three choices. *Automatic* follows GNOME's light or dark mode (Settings → Appearance) and changes with the system, even while you write. *Light* and *Dark* fix the choice. Ctrl+Shift+D switches between the two. Bars, menus and dialogs follow the common theme of the RuscaLinux OS Tools.
+**Appearance.** The Appearance submenu offers three choices. *Automatic* follows GNOME's light or dark mode (Settings → Appearance) and changes with the system, even while you write. *Light* and *Dark* fix the choice. Ctrl+Shift+D switches between the two. Bars, menus and dialogs follow the common theme of the RuscaLinux OS Apps.
 
 **Page themes.** The same submenu sets the colours of the writing page, the preview and the notes. There are two, each in a light and a dark version:
 

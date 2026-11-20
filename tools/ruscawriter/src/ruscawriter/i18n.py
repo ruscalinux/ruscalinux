@@ -21,7 +21,7 @@ Translations are NOT written in the code: they live in JSON files inside
 the 'lang/' folder (one per language, e.g. it.json, en.json, ...). This
 keeps the program modular and translatable without touching the Python
 sources: to add or complete a language, just edit its JSON file.
-- LANGUAGES lists the languages of the RuscaLinux OS Tools (code and native
+- LANGUAGES lists the languages of the RuscaLinux OS Apps (code and native
   name), as defined in the specs, section 9.
 - load_language(code) loads a language dictionary, automatically falling
   back to English (and then to the key itself) for any missing entry.
@@ -37,7 +37,7 @@ Le traduzioni NON sono scritte nel codice: vivono in file JSON nella
 cartella 'lang/' (uno per lingua, es. it.json, en.json, ...). Questo rende
 il programma modulare e traducibile senza toccare il Python: per aggiungere
 o completare una lingua basta editare il suo file JSON.
-- LANGUAGES elenca le lingue dei RuscaLinux OS Tools (codice e nome
+- LANGUAGES elenca le lingue delle RuscaLinux OS Apps (codice e nome
   nativo), come definite nelle specifiche, sezione 9.
 - load_language(code) carica il dizionario di una lingua, con fallback
   automatico all'inglese (e poi alla chiave stessa) per le voci mancanti.
@@ -75,7 +75,7 @@ def lang_file(code):
     """EN: path of a language file. IT: percorso di un file di lingua."""
     return os.path.join(LANG_DIR, f"{code}.json")
 
-# Le lingue dei RuscaLinux OS Tools (SPECIFICHE-RUSCALINUX-OS-TOOLS, sezione 9).
+# Le lingue delle RuscaLinux OS Apps (SPECIFICHE-RUSCALINUX-OS-APPS, sezione 9).
 # Ogni voce: codice -> (nome nativo, nome inglese). Il nome nativo è ciò che
 # vede l'utente nel selettore, così riconosce la propria lingua.
 # Codici con variante locale dove richiesto dalle specifiche: zh_CN, zh_TW, pt_BR, pt_PT.

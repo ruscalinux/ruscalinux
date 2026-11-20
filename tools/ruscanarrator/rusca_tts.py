@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# rusca_tts.py — RuscaLinux OS Tools 1.99.3 — GPL-3.0-or-later
+# rusca_tts.py — RuscaLinux OS Apps 1.99.3 — GPL-3.0-or-later
 #
 # Sintesi vocale di RuscaNarrator: divide il testo in pezzi, li fa leggere a
 # llama-tts (pacchetto ruscallama-engine, cioe' llama.cpp: software esterno,

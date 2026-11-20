@@ -64,7 +64,7 @@ SAMPLING = dict(temperature=0.2, top_p=0.92, top_k=40, min_p=0.08,
 # Modelli preferiti per la traduzione, in ordine (parti del nome del file).
 PREFERRED_MODELS = ("gemma-4", "gemma4", "26b-a4b", "a4b")
 
-# Lingue dei documenti: le 26 lingue dei RuscaLinux OS Tools (specifiche,
+# Lingue dei documenti: le 26 lingue delle RuscaLinux OS Apps (specifiche,
 # sezione 9). Codice, nome nella lingua stessa, nome in inglese (per il
 # prompt). I codici gia' usati fino alla 1.99.2 ("zh", "pt-BR") restano
 # uguali, cosi' le impostazioni salvate continuano a valere; le lingue
@@ -359,7 +359,7 @@ def pick_model(saved):
 
 def show_about_dialog(parent, tr, app_id, app_name, version, description, has_icon,
                       components=()):
-    """Finestra «Informazioni» comune ai RuscaLinux OS Tools.
+    """Finestra «Informazioni» comune alle RuscaLinux OS Apps.
 
     Pagina principale: icona, nome, versione, descrizione (sempre visibile:
     in Adw.AboutDialog finirebbe in una sottopagina) e collegamenti. La nota

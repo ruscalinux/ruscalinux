@@ -19,7 +19,7 @@ One line per change.
   them
 - **Added** — shortcuts Ctrl+B (bold), Ctrl+I (italic), Ctrl+2 (section),
   Ctrl+3 (subsection), Ctrl+Alt+F (footnote); Ctrl+0 brings the text back to
-  the default size, as in the other RuscaLinux OS Tools
+  the default size, as in the other RuscaLinux OS Apps
 - **Changed** — *Import as chapters* moves from Ctrl+I to Ctrl+Shift+O,
   because Ctrl+I is italic in every word processor
 - **Changed** — chapter titles follow one rule everywhere: the title is the

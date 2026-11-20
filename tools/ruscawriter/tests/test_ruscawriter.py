@@ -881,7 +881,7 @@ def test_lingue_non_tradotte():
     check("le 26 lingue ufficiali sono tutte complete", non_tradotte == [])
 
     # La lingua dell'interfaccia segue quella del sistema (specifiche dei
-    # RuscaLinux OS Tools, 9.2): il selettore interno e le sue etichette
+    # RuscaLinux OS Apps, 9.2): il selettore interno e le sue etichette
     # non ci sono piu'.
     with open(os.path.join(ROOT, "src", "ruscawriter", "editor.py"),
               encoding="utf-8") as f:

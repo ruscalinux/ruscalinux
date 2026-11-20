@@ -10,7 +10,7 @@
 # backend Vulkan: un solo binario per NVIDIA, AMD e Intel, che ripiega sulla
 # CPU quando non trova una scheda.
 #
-# Regole delle specifiche dei RuscaLinux OS Tools:
+# Regole delle specifiche delle RuscaLinux OS Apps:
 #   * versione del pacchetto = versione di RuscaLinux (release.conf);
 #     la versione di llama.cpp e' scritta nella descrizione e nella
 #     documentazione del pacchetto;
@@ -411,7 +411,7 @@ fi
 cat > "$DOC/README.md" <<README
 # ruscallama-engine $VER
 
-Motore di inferenza dei RuscaLinux OS Tools RuscaLLama e RuscaTranslator.
+Motore di inferenza delle RuscaLinux OS Apps RuscaLLama e RuscaTranslator.
 
 **Componente esterno:** llama.cpp $TAG — $UPSTREAM — licenza MIT,
 copyright The ggml authors. RuscaLinux lo compila dal sorgente senza
@@ -585,7 +585,7 @@ Maintainer: $MAINT
 Homepage: $HOMEPAGE
 Installed-Size: $(du -sk --exclude=DEBIAN "$ROOT" | cut -f1)
 Description: language model engine for RuscaLLama and RuscaTranslator
- Runs local language models (GGUF files) for the RuscaLinux OS Tools
+ Runs local language models (GGUF files) for the RuscaLinux OS Apps
  RuscaLLama and RuscaTranslator. Contains llama-server, plus llama-cli
  and llama-bench for diagnostics and llama-tts for speech synthesis, used
  by RuscaNarrator.

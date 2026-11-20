@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# diffusion_view.py — RuscaLinux OS Tools 1.99.3 — GPL-3.0-or-later
+# diffusion_view.py — RuscaLinux OS Apps 1.99.3 — GPL-3.0-or-later
 #
 # Le viste «Immagini» e «Video» di RuscaLLama: una descrizione in basso, il
 # pulsante Genera, le immagini (o i video) creati al centro. Le impostazioni

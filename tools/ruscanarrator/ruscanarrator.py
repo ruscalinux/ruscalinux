@@ -232,7 +232,7 @@ def duration_text(ms):
 
 def show_about_dialog(parent, tr, app_id, app_name, version, description, has_icon,
                       components=()):
-    """Finestra «Informazioni» comune ai RuscaLinux OS Tools.
+    """Finestra «Informazioni» comune alle RuscaLinux OS Apps.
 
     Pagina principale: icona, nome, versione, descrizione (sempre visibile:
     in Adw.AboutDialog finirebbe in una sottopagina) e collegamenti. La nota

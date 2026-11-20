@@ -183,7 +183,7 @@ from . import mdict as pw_mdict
 from .mdict import MdxError
 
 APP_ID = "org.ruscalinux.RuscaWriter"
-# RuscaWriter fa parte dei RuscaLinux OS Tools: sito, sorgenti e
+# RuscaWriter fa parte delle RuscaLinux OS Apps: sito, sorgenti e
 # segnalazioni sono quelli di RuscaLinux (non c'e' piu' un progetto separato).
 APP_WEBSITE = "https://www.ruscalinux.org/"
 APP_SOURCE = "https://github.com/ruscalinux/ruscalinux"
@@ -224,7 +224,7 @@ def ensure_icon():
 
 def show_about_dialog(parent, tr, app_id, app_name, version, description, has_icon,
                       components=()):
-    """Finestra «Informazioni» comune ai RuscaLinux OS Tools.
+    """Finestra «Informazioni» comune alle RuscaLinux OS Apps.
 
     Pagina principale: icona, nome, versione, descrizione (sempre visibile:
     in Adw.AboutDialog finirebbe in una sottopagina) e collegamenti. La nota

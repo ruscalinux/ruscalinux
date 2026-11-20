@@ -4,7 +4,7 @@
 #
 #   ./make-deb.sh
 #
-# Regole delle specifiche dei RuscaLinux OS Tools: un solo .deb in
+# Regole delle specifiche delle RuscaLinux OS Apps: un solo .deb in
 # build-deb/ con suffisso -ruscalinux e SHA256SUMS accanto; Python puro,
 # quindi Architecture: all; versione = VERSION di release.conf.
 # Il programma usa llama-tts di ruscallama-engine (llama.cpp, componente
@@ -159,7 +159,7 @@ $(cat "$TMP/description")
 METAINFO
 
 cat <<MANPAGE | gzip -9n > "$ROOT/usr/share/man/man1/$PKG.1.gz"
-.TH $(echo "$PKG" | tr a-z A-Z) 1 "$(LC_ALL=C date -u -d "@$SOURCE_DATE_EPOCH" '+%B %Y')" "$NAME $VER" "RuscaLinux OS Tools"
+.TH $(echo "$PKG" | tr a-z A-Z) 1 "$(LC_ALL=C date -u -d "@$SOURCE_DATE_EPOCH" '+%B %Y')" "$NAME $VER" "RuscaLinux OS Apps"
 .SH NAME
 $PKG \\- read documents and subtitles aloud
 .SH SYNOPSIS

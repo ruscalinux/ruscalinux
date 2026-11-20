@@ -34,7 +34,7 @@ gi.require_version('Gdk', '4.0')
 gi.require_version('Adw', '1')
 from gi.repository import Adw, Gtk, Gdk, Gio, GLib, Pango, GdkPixbuf
 
-# Motore Markdown comune dei RuscaLinux OS Tools (CommonMark, specifiche
+# Motore Markdown comune delle RuscaLinux OS Apps (CommonMark, specifiche
 # sezione 1.2), identico in RuscaLLama, RuscaMark e RuscaWriter: si modifica
 # una volta e si copia. Formule LaTeX -> simboli Unicode (E = mc², ≈, √…).
 from markdown_it.tree import SyntaxTreeNode
@@ -79,10 +79,10 @@ if SPELL_BACKEND is None:
 HAVE_SPELL = SPELL_BACKEND is not None
 HAS_FILEDIALOG = hasattr(Gtk, "FileDialog")
 # ----------------------------------------------------------------------------
-# i18n integrato (ex i18n.py): le lingue dei RuscaLinux OS Tools (specifiche,
+# i18n integrato (ex i18n.py): le lingue delle RuscaLinux OS Apps (specifiche,
 # sezione 9). LANGUAGES da' il nome di ciascuna; e' tradotta se c'e' il suo
 # file lang/<codice>.json (language_available).
-# Regole (SPECIFICHE-RUSCALINUX-OS-TOOLS.md):
+# Regole (SPECIFICHE-RUSCALINUX-OS-APPS.md):
 #   - le traduzioni stanno in lang/<codice>.json (UTF-8);
 #   - fallback: inglese; se una chiave manca anche in inglese si mostra la
 #     chiave grezza, senza mai andare in crash;
@@ -1675,8 +1675,8 @@ class MarkdownDoc:
 # <cartella del programma>/themes, /usr/share/ruscamark/themes.
 #
 # Il tema «ruscalinux» è anche incorporato qui, così il programma funziona
-# senza cartella themes/: lo stile delle guide di riferimento dei RuscaLinux
-# OS Tools. Banner del titolo con sfumatura rosa → prugna, titoli prugna con
+# senza cartella themes/: lo stile delle guide di riferimento delle RuscaLinux
+# OS Apps. Banner del titolo con sfumatura rosa → prugna, titoli prugna con
 # filetto rosa, codice su fondo prugna scuro con barra rosa, citazioni su
 # rosa chiaro, tabelle con intestazione prugna e righe alternate,
 # DejaVu Sans / DejaVu Sans Mono (fonts-dejavu-core su Debian).
@@ -2716,7 +2716,7 @@ def ensure_elision_dictionaries(locales):
             pass
     return written
 # ----------------------------------------------------------------------------
-# Icona e finestra «Informazioni» comuni ai RuscaLinux OS Tools
+# Icona e finestra «Informazioni» comuni alle RuscaLinux OS Apps
 # ----------------------------------------------------------------------------
 def theme_has_icon(name=APP_ID):
     display = Gdk.Display.get_default()
@@ -2747,7 +2747,7 @@ COMPONENTS = (
 
 def show_about_dialog(parent, tr, app_id, app_name, version, description, has_icon,
                       components=()):
-    """Finestra «Informazioni» comune ai RuscaLinux OS Tools.
+    """Finestra «Informazioni» comune alle RuscaLinux OS Apps.
 
     Pagina principale: icona, nome, versione, descrizione (sempre visibile:
     in Adw.AboutDialog finirebbe in una sottopagina) e collegamenti. La nota

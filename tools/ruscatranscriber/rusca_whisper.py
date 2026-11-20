@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# rusca_whisper.py — RuscaLinux OS Tools 1.99.3 — GPL-3.0-or-later
+# rusca_whisper.py — RuscaLinux OS Apps 1.99.3 — GPL-3.0-or-later
 #
 # Avvio e sorveglianza di ruscawhisper-engine (whisper-cli, cioe'
 # whisper.cpp: software esterno, licenza MIT) per RuscaTranscriber, e scrittura
@@ -378,13 +378,13 @@ _MD_START = re.compile(r"^(?:[#>]|[-+](?=\s|$)|-(?=[- ]*$)|\d{1,9}(?=[.)](?:\s|$
 
 def escape_markdown(text):
     """Il parlato trascritto e' testo, non Markdown: i caratteri che
-    CommonMark (con le estensioni dei RuscaLinux OS Tools) leggerebbe come
+    CommonMark (con le estensioni delle RuscaLinux OS Apps) leggerebbe come
     formattazione vengono protetti con la barra rovesciata. Anche gli
     indirizzi restano testo: niente link automatici verso siti o caselle
     nominati a voce (o inventati dal modello). Le parentesi quadre restano
     come sono ("[Musica]" e' frequente nelle trascrizioni): si protegge solo
     la chiusa che formerebbe un link, e mai l'aperta, perche' "\\[" apre una
-    formula nelle estensioni dei RuscaLinux OS Tools."""
+    formula nelle estensioni delle RuscaLinux OS Apps."""
     text = _MD_INLINE.sub(r"\\\1", text.strip())
     text = _MD_AUTOLINK.sub(lambda m: m.group(1)[:-1] + "\\" + m.group(1)[-1], text)
     m = _MD_START.match(text)

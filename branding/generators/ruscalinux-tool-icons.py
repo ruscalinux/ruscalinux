@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""RuscaLinux OS Tools — generatore delle icone (GPL-3.0).
+"""RuscaLinux OS Apps — generatore delle icone (GPL-3.0).
 
 Ogni icona è l'emblema di RuscaLinux: l'anello prugna con l'apertura in basso.
 Al posto dell'aeroplanino di carta, dentro l'anello c'è il simbolo del tool.

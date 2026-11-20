@@ -170,7 +170,7 @@ METAINFO
 # Pagina di manuale: lintian la chiede per ogni comando in /usr/bin.
 mkdir -p "$STAGE/usr/share/man/man1"
 cat <<MANPAGE | gzip -9n > "$STAGE/usr/share/man/man1/$PKG_NAME.1.gz"
-.TH RUSCACLEANER 1 "$(LC_ALL=C date -u -d "@$SOURCE_DATE_EPOCH" '+%B %Y')" "RuscaCleaner $PKG_VERSION" "RuscaLinux OS Tools"
+.TH RUSCACLEANER 1 "$(LC_ALL=C date -u -d "@$SOURCE_DATE_EPOCH" '+%B %Y')" "RuscaCleaner $PKG_VERSION" "RuscaLinux OS Apps"
 .SH NAME
 ruscacleaner \- remove activity traces from your home folder
 .SH SYNOPSIS

@@ -11,7 +11,7 @@
 # CPU quando non trova una scheda. E' fatto come ruscallama-engine
 # (llama.cpp): stesse regole, stessi controlli.
 #
-# Regole delle specifiche dei RuscaLinux OS Tools:
+# Regole delle specifiche delle RuscaLinux OS Apps:
 #   * versione del pacchetto = versione di RuscaLinux (release.conf);
 #     la versione di whisper.cpp e' scritta nella descrizione e nella
 #     documentazione del pacchetto;

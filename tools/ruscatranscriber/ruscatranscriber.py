@@ -42,7 +42,7 @@ COMPONENTS = (
     ("whisper.cpp", "MIT — The ggml authors", "https://github.com/ggml-org/whisper.cpp"),
 )
 
-# Lingue del parlato: quelle dei RuscaLinux OS Tools (specifiche, sezione 9)
+# Lingue del parlato: quelle delle RuscaLinux OS Apps (specifiche, sezione 9)
 # con i codici di Whisper, che ha un solo cinese e un solo portoghese.
 # Codice e nome nella lingua stessa. Per le altre lingue che Whisper
 # conosce si usa «Rileva la lingua».
@@ -186,7 +186,7 @@ def pick_model(saved, models):
 
 def show_about_dialog(parent, tr, app_id, app_name, version, description, has_icon,
                       components=()):
-    """Finestra «Informazioni» comune ai RuscaLinux OS Tools.
+    """Finestra «Informazioni» comune alle RuscaLinux OS Apps.
 
     Pagina principale: icona, nome, versione, descrizione (sempre visibile:
     in Adw.AboutDialog finirebbe in una sottopagina) e collegamenti. La nota

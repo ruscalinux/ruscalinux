@@ -1,4 +1,4 @@
-"""RuscaLinux OS Tools — test di RuscaNarrator — 1.99.3 — GPL-3.0
+"""RuscaLinux OS Apps — test di RuscaNarrator — 1.99.3 — GPL-3.0
 
 rusca_tts.py divide un documento Markdown o un file SRT in pezzi, li fa
 leggere a llama-tts e monta l'audio. Qui si controllano la divisione, la

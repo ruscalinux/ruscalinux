@@ -1,6 +1,6 @@
 # Manuale di RuscaMark 1.99.3
 
-RuscaMark è l'editor Markdown dei RuscaLinux OS Tools. È pensato per scrivere articoli, report, appunti e documentazione: la formattazione compare mentre scrivi, la pagina resta centrata come un foglio e tutto il lavoro avviene sul tuo computer.
+RuscaMark è l'editor Markdown delle RuscaLinux OS Apps. È pensato per scrivere articoli, report, appunti e documentazione: la formattazione compare mentre scrivi, la pagina resta centrata come un foglio e tutto il lavoro avviene sul tuo computer.
 
 | Campo | Valore |
 |---|---|
@@ -270,7 +270,7 @@ PDF e HTML hanno lo **stesso stile**, indipendentemente dallo stile chiaro o scu
 
 | Tema | Aspetto |
 |---|---|
-| **RuscaLinux – Guida** (predefinito) | Lo stile delle guide di riferimento dei RuscaLinux OS Tools: titolo di livello 1 in un **banner** sfumato dal rosa al prugna, titoli di livello 2 prugna con filetto rosa, codice su prugna scuro con barra rosa, tabelle con intestazione prugna, DejaVu Sans. |
+| **RuscaLinux – Guida** (predefinito) | Lo stile delle guide di riferimento delle RuscaLinux OS Apps: titolo di livello 1 in un **banner** sfumato dal rosa al prugna, titoli di livello 2 prugna con filetto rosa, codice su prugna scuro con barra rosa, tabelle con intestazione prugna, DejaVu Sans. |
 | **Neutro** | Sobrio, in grigi: titolo con filetto, codice su grigio chiaro, link blu. Stampa bene anche in bianco e nero. |
 | **RuscaLinux – Fascia** | La palette RuscaLinux in forma leggera: fascia sfumata in cima alla prima pagina, titolo prugna senza riquadro, codice su prugna scuro, piè di pagina diviso (titolo a sinistra, pagine a destra). |
 | **Classico** | Carattere con grazie (Noto Serif o DejaVu Serif) e toni seppia, come un libro. |

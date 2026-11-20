@@ -1,9 +1,9 @@
-# DOCUMENTAZIONE UNICA - RUSCALINUX OS TOOLS
+# DOCUMENTAZIONE UNICA - RUSCALINUX OS APPS
 
-Questo è il file unico e completo dei RuscaLinux OS Tools.
+Questo è il file unico e completo delle RuscaLinux OS Apps.
 Contiene specifiche tecniche, linee guida d’interfaccia (GNOME), tema grafico RuscaLinux, pacchetti, supporto linguistico, privacy, sicurezza, nota IA e guida utente in italiano e inglese.
 
-Si trova nel repository in `docs/SPECIFICHE-RUSCALINUX-OS-TOOLS.md`. In caso di conflitto con altri documenti, questo file è il riferimento. Le convenzioni sui nomi riprendono `docs/NAMING.md` del repository, con una differenza: file `.desktop`, metainfo e icona prendono il nome dall’App ID (convenzione GNOME). `docs/NAMING.md` va aggiornato di conseguenza.
+Si trova nel repository in `docs/SPECIFICHE-RUSCALINUX-OS-APPS.md`. Durante lo sviluppo della 1.99.3 si chiamava `SPECIFICHE-RUSCALINUX-OS-TOOLS.md` e il progetto «RuscaLinux OS Tools». In caso di conflitto con altri documenti, questo file è il riferimento. Le convenzioni sui nomi riprendono `docs/NAMING.md` del repository, con una differenza: file `.desktop`, metainfo e icona prendono il nome dall’App ID (convenzione GNOME). `docs/NAMING.md` va aggiornato di conseguenza.
 
 ---
 
@@ -11,7 +11,7 @@ Si trova nel repository in `docs/SPECIFICHE-RUSCALINUX-OS-TOOLS.md`. In caso di 
 
 | Campo | Valore |
 |---|---|
-| Progetto | RuscaLinux OS Tools |
+| Progetto | RuscaLinux OS Apps |
 | Sistema operativo | RuscaLinux |
 | Sito web | https://www.ruscalinux.org |
 | Repository | https://github.com/ruscalinux/ruscalinux |
@@ -514,7 +514,7 @@ Il gradiente rosa chiaro → prugna scuro è il segno distintivo di RuscaLinux, 
 | `--accent-fg-color` | `#ffffff` | `#2d0a1d` |
 | `--accent-color` | `#7a2357` | `#f5b8d3` |
 
-Nota: da GNOME 47 l’utente può scegliere un colore d’accento di sistema. I RuscaLinux OS Tools lo sostituiscono intenzionalmente con l’accento prugna/rosa per coerenza con l’identità della distribuzione.
+Nota: da GNOME 47 l’utente può scegliere un colore d’accento di sistema. Le RuscaLinux OS Apps lo sostituiscono intenzionalmente con l’accento prugna/rosa per coerenza con l’identità della distribuzione.
 
 ### 4.5 Foglio di stile di riferimento
 
@@ -523,7 +523,7 @@ Ogni tool include lo stesso file `style.css`, installato in `/usr/share/ruscafoo
 La palette chiara e quella scura sono legate alle classi `rusca-light` e `rusca-dark`, che il programma mette sulle proprie finestre seguendo `Adw.StyleManager:dark` (sezione 4.6). Non si usa `@media (prefers-color-scheme: dark)`: il modo in cui GTK valuta questa condizione per i fogli di stile delle applicazioni cambia tra GTK 4.18 (trixie) e GTK 4.20 e successivi, e nelle versioni recenti la palette scura non verrebbe applicata. Con le classi il risultato è identico su tutte le versioni.
 
 ```css
-/* RuscaLinux OS Tools — style.css — 1.99.3 — GPL-3.0
+/* RuscaLinux OS Apps — style.css — 1.99.3 — GPL-3.0
  * Tema comune Prugna/Rosa. File identico in tutti i tool: si modifica una
  * volta sola e si copia. Ridefinisce solo i colori di libadwaita (>= 1.6),
  * non la forma dei widget. Contrasti verificati: vedi le specifiche, sez. 4.2.
@@ -722,7 +722,7 @@ StartupWMClass=org.ruscalinux.RuscaFoo
 
 `Comment` e `Keywords` vanno tradotti in tutte le lingue della sezione 9 (`Comment[xx]=`), presi dai file di `lang/`. Il file va validato con `desktop-file-validate`.
 
-Fra le `Categories` di ogni tool c’è sempre **`X-RuscaLinux-Tools`**: è la categoria della cartella **RuscaLinux Tools** della griglia delle applicazioni di GNOME, che raccoglie tutti i tool. La cartella la crea, una volta per utente e dopo le cartelle di GNOME, lo script `/usr/lib/ruscalinux/ruscalinux-tools-folder` della ISO (scritto da `steps/30-custom.sh`, avviato da `/etc/xdg/autostart/`): un elenco di cartelle predefinito con dconf impedirebbe a GNOME Shell 48 di creare le sue (Sistema, Utilità). Un tool nuovo entra nella cartella da solo, grazie alla categoria. GNOME Shell salva la posizione di ogni icona (`org.gnome.shell app-picker-layout`) e non la ricompatta: quando un aggiornamento toglie, rinomina o sposta in una cartella delle applicazioni restano dei buchi, e quelle nuove finiscono in una pagina in più. Succede anche al primo accesso, quando i tool entrano nella cartella: azzerare la disposizione non basta, perché GNOME ha già le icone in memoria e non le ridispone. Per questo `/usr/lib/ruscalinux/ruscalinux-app-grid` (sempre da `steps/30-custom.sh`, avviato a ogni accesso, 25 e 90 secondi dopo) scrive una disposizione completa e compatta: le voci salvate nel loro ordine, senza quelle che non esistono più, che stanno in una cartella o nel dash, poi le altre in ordine alfabetico, a pagine da 24 (tutte le griglie di GNOME Shell 48 ne tengono 24). Scrive solo se cambia qualcosa. I componenti senza interfaccia (ruscallama-engine, ruscawhisper-engine) non hanno file `.desktop`.
+Fra le `Categories` di ogni tool c’è sempre **`X-RuscaLinux-Tools`**: è la categoria della cartella **RuscaLinux Apps** della griglia delle applicazioni di GNOME, che raccoglie tutti i tool. La cartella la crea, una volta per utente e dopo le cartelle di GNOME, lo script `/usr/lib/ruscalinux/ruscalinux-tools-folder` della ISO (scritto da `steps/30-custom.sh`, avviato da `/etc/xdg/autostart/`): un elenco di cartelle predefinito con dconf impedirebbe a GNOME Shell 48 di creare le sue (Sistema, Utilità). Un tool nuovo entra nella cartella da solo, grazie alla categoria. GNOME Shell salva la posizione di ogni icona (`org.gnome.shell app-picker-layout`) e non la ricompatta: quando un aggiornamento toglie, rinomina o sposta in una cartella delle applicazioni restano dei buchi, e quelle nuove finiscono in una pagina in più. Succede anche al primo accesso, quando i tool entrano nella cartella: azzerare la disposizione non basta, perché GNOME ha già le icone in memoria e non le ridispone. Per questo `/usr/lib/ruscalinux/ruscalinux-app-grid` (sempre da `steps/30-custom.sh`, avviato a ogni accesso, 25 e 90 secondi dopo) scrive una disposizione completa e compatta: le voci salvate nel loro ordine, senza quelle che non esistono più, che stanno in una cartella o nel dash, poi le altre in ordine alfabetico, a pagine da 24 (tutte le griglie di GNOME Shell 48 ne tengono 24). Scrive solo se cambia qualcosa. I componenti senza interfaccia (ruscallama-engine, ruscawhisper-engine) non hanno file `.desktop`. La categoria conserva il nome `X-RuscaLinux-Tools` (come l’identificativo della cartella per dconf, `RuscaLinux-Tools`): non si vede, e cambiarla vorrebbe dire riscrivere il `.desktop` di ogni tool.
 
 ### 5.4 Metainfo AppStream
 
@@ -806,7 +806,7 @@ Nomi:
 
 Il suffisso `ruscalinux` nel nome del file indica che il pacchetto appartiene alla distribuzione RuscaLinux. L’architettura è `all` perché i tool sono in Python puro e non contengono codice compilato.
 
-**Eccezione: ruscapinball.** È un gioco: `Section: games`, il comando è `/usr/games/ruscapinball` (Debian Policy, 11.11) e la pagina di manuale sta nella sezione 6. Dipende da `python3 (>= 3.10)` e `python3-pygame (>= 2.1)`, raccomanda `fonts-dejavu-core`. Le `Categories` del `.desktop` sono `Game;ArcadeGame;X-RuscaLinux-Tools;`: il gioco sta sia fra i giochi sia nella cartella RuscaLinux Tools.
+**Eccezione: ruscapinball.** È un gioco: `Section: games`, il comando è `/usr/games/ruscapinball` (Debian Policy, 11.11) e la pagina di manuale sta nella sezione 6. Dipende da `python3 (>= 3.10)` e `python3-pygame (>= 2.1)`, raccomanda `fonts-dejavu-core`. Le `Categories` del `.desktop` sono `Game;ArcadeGame;X-RuscaLinux-Tools;`: il gioco sta sia fra i giochi sia nella cartella RuscaLinux Apps.
 
 **Eccezione: ruscallama-engine.** È codice compilato, quindi:
 
@@ -879,7 +879,7 @@ Controlli consigliati prima del rilascio: `lintian` sul pacchetto, `desktop-file
 
 ## 🔢 8. VERSIONE
 
-La versione di tutti i RuscaLinux OS Tools è identica alla versione di RuscaLinux, scritta in `release.conf` (`VERSION`). La stessa versione compare in `VER` di `make-deb.sh`, in `APP_VERSION` del programma, nel campo `Version` del pacchetto, nel nome del file deb e nella metainfo.
+La versione di tutte le RuscaLinux OS Apps è identica alla versione di RuscaLinux, scritta in `release.conf` (`VERSION`). La stessa versione compare in `VER` di `make-deb.sh`, in `APP_VERSION` del programma, nel campo `Version` del pacchetto, nel nome del file deb e nella metainfo.
 
 Versione attuale:
 
@@ -1080,7 +1080,7 @@ Regole aggiuntive per il flipper (RuscaPinball):
 
 Dichiarazione:
 
-Tutti i dati elaborati dai RuscaLinux OS Tools rimangono in locale.
+Tutti i dati elaborati dalle RuscaLinux OS Apps rimangono in locale.
 Nessun dato o file viene inviato a server remoti.
 Nessun dato o file viene inviato su internet.
 Nessun software contiene comandi pericolosi o dannosi per il sistema operativo.
@@ -1291,7 +1291,7 @@ Con i sottotitoli ogni frase parte all’ora del suo sottotitolo. RuscaNarrator 
 
 Flipper con il tavolo «Amethyst», visto in prospettiva come nei flipper per home computer degli anni ’80.
 
-1. Aprire RuscaPinball dalla cartella RuscaLinux Tools o fra i giochi; Spazio fa partire la partita.
+1. Aprire RuscaPinball dalla cartella RuscaLinux Apps o fra i giochi; Spazio fa partire la partita.
 2. Tenere premuto Spazio (o ↓) e rilasciare per lanciare: più a lungo si tiene, più forte parte la pallina.
 3. Flipper con Z e M (o Maiusc sinistro e destro, ← e →); N scuote il tavolo, ma al terzo colpo ravvicinato c’è il tilt.
 4. Accendere le lampade dell’anello del bonus fino allo SPECIAL, poi mandare la pallina nella trappola in alto a sinistra: pallina extra.
@@ -1312,7 +1312,7 @@ Supporto: info@ruscalinux.org
 
 ## 🔒 Privacy e sicurezza
 
-Tutti i dati elaborati dai RuscaLinux OS Tools rimangono in locale. Nessun dato o file viene inviato a server remoti o su internet. Nessun tool contiene telemetria o comandi pericolosi per il sistema.
+Tutti i dati elaborati dalle RuscaLinux OS Apps rimangono in locale. Nessun dato o file viene inviato a server remoti o su internet. Nessun tool contiene telemetria o comandi pericolosi per il sistema.
 
 ---
 
@@ -1322,7 +1322,7 @@ Tutti i dati elaborati dai RuscaLinux OS Tools rimangono in locale. Nessun dato 
 
 | Field | Value |
 |---|---|
-| Project | RuscaLinux OS Tools |
+| Project | RuscaLinux OS Apps |
 | Operating system | RuscaLinux |
 | Website | https://www.ruscalinux.org |
 | Email | info@ruscalinux.org |
@@ -1458,7 +1458,7 @@ The Images and Videos views use **ruscadiffusion-engine**, that is stable-diffus
 
 ## 🌐 RuscaTranslator
 
-Translation of Markdown documents between the 26 languages of RuscaLinux OS Tools: English, Italian, Simplified and Traditional Chinese, Spanish, Hindi, Arabic, Brazilian and European Portuguese, Russian, Japanese, German, French, Korean, Indonesian, Turkish, Polish, Dutch, Ukrainian, Czech, Vietnamese, Swedish, Romanian, Hungarian, Greek and Finnish.
+Translation of Markdown documents between the 26 languages of RuscaLinux OS Apps: English, Italian, Simplified and Traditional Chinese, Spanish, Hindi, Arabic, Brazilian and European Portuguese, Russian, Japanese, German, French, Korean, Indonesian, Turkish, Polish, Dutch, Ukrainian, Czech, Vietnamese, Swedish, Romanian, Hungarian, Greek and Finnish.
 
 1. Open a document (Ctrl+O) or drag it onto the "Original" pane.
 2. Choose the source language (or "Detect language"), the target language and the text type.
@@ -1495,7 +1495,7 @@ With subtitles every sentence starts at the time of its subtitle. RuscaNarrator 
 
 Pinball with the “Amethyst” table, seen in perspective like the 1980s home computer pinball games.
 
-1. Open RuscaPinball from the RuscaLinux Tools folder or from the games; Space starts a game.
+1. Open RuscaPinball from the RuscaLinux Apps folder or from the games; Space starts a game.
 2. Hold Space (or ↓) and release to launch: the longer you hold, the harder the ball goes.
 3. Flippers with Z and M (or Left and Right Shift, ← and →); N nudges the table, but the third nudge in a row means tilt.
 4. Light the bonus ring up to the SPECIAL, then send the ball into the trap at the top left: extra ball.
@@ -1520,7 +1520,7 @@ Support: info@ruscalinux.org
 
 ## 🔒 Privacy and security
 
-All data processed by RuscaLinux OS Tools remains local. No data or files are sent to remote servers or over the internet. No tool contains telemetry or commands that could harm the system.
+All data processed by RuscaLinux OS Apps remains local. No data or files are sent to remote servers or over the internet. No tool contains telemetry or commands that could harm the system.
 
 ## 🤖 AI note
 
@@ -1528,4 +1528,4 @@ Development note: “Design, specifications and testing by the author; code writ
 
 ---
 
-Questo file è il riferimento unico per specifiche, interfaccia, tema, pacchetti, supporto linguistico, privacy, sicurezza e guida utente dei RuscaLinux OS Tools.
+Questo file è il riferimento unico per specifiche, interfaccia, tema, pacchetti, supporto linguistico, privacy, sicurezza e guida utente delle RuscaLinux OS Apps.
