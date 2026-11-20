@@ -247,7 +247,7 @@ else
     say "ONNX Runtime $ORT_VERSIONE ha GetOutputNames(): Piper senza modifiche"
 fi
 FLAGS_FIRMA=$(printf '%s %s' "$CFLAGS_DEB" "$LDFLAGS_DEB" | sed 's/-ffile-prefix-map=[^ ]*//g')
-OPZIONI="piper=$COMMIT espeak=$ESPEAK_COMMIT ort=$ORT_VERSIONE cmake=$(sha256sum CMakeLists.txt | cut -c1-16) stream=$(sha256sum ruscapiper-stream.c | cut -c1-16) patch=$([ -z "$PATCH_ORT" ] || sha256sum "$PATCH_ORT" | cut -c1-16) flags=$FLAGS_FIRMA"
+OPZIONI="piper=$COMMIT espeak=$ESPEAK_COMMIT ort=$ORT_VERSIONE cmake=$(sha256sum CMakeLists.txt | cut -c1-16) stream=$(sha256sum ruscapiper-stream.c | cut -c1-16) patch=$([ -z "$PATCH_ORT" ] || sha256sum "$PATCH_ORT" | cut -c1-16) fonemi=$(sha256sum patches/fonemi.patch | cut -c1-16) flags=$FLAGS_FIRMA"
 FIRMA=$(printf '%s' "$OPZIONI" | sha256sum | cut -c1-16)
 STAGE_CACHE="$CACHE/stage-${PIPER_VERSION}-${FIRMA}"
 
@@ -266,6 +266,12 @@ else
     mkdir -p "$BUILD/piper" "$BUILD/espeak"
     tar -xzf "$CACHED" -C "$BUILD/piper" --strip-components=1
     tar -xzf "$ESPEAK_CACHED" -C "$BUILD/espeak" --strip-components=1
+    # Correzioni a libpiper 1.8.0 (sempre): chiavi di piu' codepoint nella
+    # mappa dei fonemi (accento straniero con le voci recenti) e fonemi che
+    # non ripartivano da capo a ogni frase.
+    say "Applico patches/fonemi.patch"
+    patch -d "$BUILD/piper" -p1 --forward --no-backup-if-mismatch -s < "$SRC_DIR/patches/fonemi.patch" \
+        || die "patches/fonemi.patch non si applica a Piper $TAG: va aggiornata (o non serve piu')"
     if [ -n "$PATCH_ORT" ]; then
         say "ONNX Runtime $ORT_VERSIONE senza GetOutputNames(): applico patches/onnxruntime-1.21.patch"
         patch -d "$BUILD/piper" -p1 --forward --no-backup-if-mismatch -s < "$PATCH_ORT" \
@@ -394,6 +400,31 @@ assert p == len(d), "lunghezza sbagliata"
 assert {1, 2} <= ids, "frasi non concluse"
 assert campioni > 0 and fonemi > 0, "niente audio o niente fonemi"
 print(f"==> Voce di prova: {campioni} campioni, {fonemi} fonemi")
+open(sys.argv[1] + ".fonemi", "w").write(str(fonemi))
+PY
+    # Prova delle chiavi di piu' caratteri (patches/fonemi.patch): con la
+    # chiave "aɪ" aggiunta alla mappa, i fonemi devono restare quelli di prima.
+    python3 - "$STAGE_CACHE/prova/test_voice.onnx.json" "$TMP/gruppi.onnx.json" <<'PY'
+import json, sys
+c = json.load(open(sys.argv[1], encoding="utf-8"))
+c["phoneme_id_map"]["aɪ"] = c["phoneme_id_map"]["ɪ"]
+json.dump(c, open(sys.argv[2], "w", encoding="utf-8"), ensure_ascii=False)
+PY
+    printf '1\t0\tHello, this is a test.\n' | LD_LIBRARY_PATH="$BIN" timeout 120 \
+        "$BIN/ruscapiper-stream" --voice "$STAGE_CACHE/prova/test_voice.onnx" \
+        --config "$TMP/gruppi.onnx.json" --espeak-data "$BIN/espeak-ng-data" \
+        > "$TMP/gruppi.bin" 2> /dev/null || die "ruscapiper-stream non usa la voce con la chiave aɪ"
+    python3 - "$TMP/gruppi.bin" "$(cat "$TMP/prova.bin.fonemi")" <<'PY' \
+        || die "con la chiave aɪ i fonemi cambiano: patches/fonemi.patch non funziona"
+import struct, sys
+d = open(sys.argv[1], "rb").read()
+p, fonemi = 8, 0
+while p < len(d):
+    _m, _cid, _fl, _r, ns, nph, nal = struct.unpack_from("<4s6I", d, p)
+    p += 28 + ns * 2 + nph * 4 + nal * 4
+    fonemi += nph
+assert fonemi == int(sys.argv[2]), f"{fonemi} fonemi invece di {sys.argv[2]}"
+print("==> Chiavi di piu' caratteri nella mappa dei fonemi: ignorate")
 PY
 else
     avviso "voce di prova non trovata nel sorgente di Piper: prova saltata"
@@ -423,15 +454,18 @@ if command -v apparmor_parser >/dev/null 2>&1; then
 fi
 
 # ── Documentazione ───────────────────────────────────────────────────────────
+MODIFICHE="RuscaLinux li compila dal sorgente, con due correzioni a
+libpiper/src/piper.cpp (fonemi.patch, in questa cartella): le chiavi di piu'
+caratteri della mappa dei fonemi (gruppi vocalici come \"aɪ\") non si
+attribuiscono al loro primo carattere, che con le voci recenti dava un accento
+straniero; i fonemi di ogni frase ripartono da capo."
+cp "$SRC_DIR/patches/fonemi.patch" "$DOC/fonemi.patch"
 if [ -n "$PATCH_ORT" ]; then
-    MODIFICHE="RuscaLinux li compila dal sorgente. Una sola modifica a Piper, per
-l'ONNX Runtime $ORT_VERSIONE di Debian: in libpiper/src/piper.cpp la chiamata a
-Session::GetOutputNames() (che esiste dalla 1.22) e' sostituita da
-GetOutputCount() e GetOutputNameAllocated(), con lo stesso risultato. La
-modifica e' in onnxruntime-1.21.patch, in questa cartella."
+    MODIFICHE="$MODIFICHE Per l'ONNX Runtime $ORT_VERSIONE di Debian,
+inoltre, la chiamata a Session::GetOutputNames() (che esiste dalla 1.22) e'
+sostituita da GetOutputCount() e GetOutputNameAllocated(), con lo stesso
+risultato (onnxruntime-1.21.patch)."
     cp "$PATCH_ORT" "$DOC/onnxruntime-1.21.patch"
-else
-    MODIFICHE="RuscaLinux li compila dal sorgente senza modifiche al codice."
 fi
 cat > "$DOC/README.md" <<README
 # ruscapiper-engine $VER
@@ -475,11 +509,13 @@ Source: https://github.com/OHF-Voice/piper1-gpl
  https://github.com/espeak-ng/espeak-ng
 Comment: ruscapiper-engine is Piper (libpiper) and espeak-ng, external
  components, built from source for RuscaLinux. Only the build files
- (make-deb.sh, CMakeLists.txt), ruscapiper-stream, the AppArmor profile and,
- when present, onnxruntime-1.21.patch are part of RuscaLinux. That patch
- (in this directory) changes one call in libpiper/src/piper.cpp so that
- Piper builds with ONNX Runtime 1.21; it is applied only when the system
- ONNX Runtime lacks Session::GetOutputNames().
+ (make-deb.sh, CMakeLists.txt), ruscapiper-stream, the AppArmor profile and
+ the patches in this directory are part of RuscaLinux. fonemi.patch fixes
+ two bugs in libpiper/src/piper.cpp: multi-codepoint keys of the phoneme id
+ map were assigned to their first codepoint, and phoneme codepoints were not
+ reset between sentences. onnxruntime-1.21.patch, applied only when the
+ system ONNX Runtime lacks Session::GetOutputNames(), changes one call so
+ that Piper builds with ONNX Runtime 1.21.
 
 Files: usr/lib/ruscapiper-engine/libpiper.so
 Copyright: 2023-2026 Michael Hansen and the Piper authors
@@ -496,7 +532,7 @@ Comment: espeak-ng also contains files under the Apache-2.0 and BSD-2-Clause
  are in this directory (COPYING.*.espeak-ng).
 
 Files: usr/lib/ruscapiper-engine/ruscapiper-stream etc/apparmor.d/*
- usr/share/doc/ruscapiper-engine/onnxruntime-1.21.patch
+ usr/share/doc/ruscapiper-engine/*.patch
 Copyright: 2026 Nunzio Curcuruto
 License: GPL-3+
 Comment: Design, specifications and testing by the author; code written

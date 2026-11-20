@@ -1,0 +1,30 @@
+--- a/libpiper/src/piper.cpp
++++ b/libpiper/src/piper.cpp
+@@ -155,6 +155,18 @@
+         if (!from_codepoint) {
+           continue;
+         }
++        // RuscaLinux: le chiavi di piu' codepoint (gruppi vocalici come "aɪ"
++        // nelle voci recenti) non vanno sul loro primo codepoint: ogni "a"
++        // riceverebbe anche l'id di "aɪ" e la voce parlerebbe con accento
++        // straniero. Si saltano, come fa Piper in Python quando il gruppo
++        // non compare nei fonemi.
++        {
++          auto from_view = una::views::utf8(from_phoneme);
++          auto from_it = from_view.begin();
++          if (from_it != from_view.end() && ++from_it != from_view.end()) {
++            continue;
++          }
++        }
+         for (auto &to_id_value : from_phoneme_item.value()) {
+           PhonemeId to_id = to_id_value.get<PhonemeId>();
+           synth->phoneme_id_map[*from_codepoint].push_back(to_id);
+@@ -596,6 +608,8 @@
+     synth->phoneme_id_queue.emplace(
+         std::move(std::make_pair(sentence_codepoints, sentence_ids)));
+     sentence_ids.clear();
++    // RuscaLinux: anche i fonemi ripartono da capo a ogni frase.
++    sentence_codepoints.clear();
+   }
+ 
+   return PIPER_OK;

@@ -8,7 +8,8 @@ Motore di sintesi vocale di RuscaLLisse: **Piper** (piper1-gpl), software estern
 | `ultima-versione.sh` | Dice qual è l’ultima release stabile (o quella fissata a mano) |
 | `CMakeLists.txt` | La build di RuscaLinux: `libpiper.so` dai file di Piper, senza modifiche, e `ruscapiper-stream` |
 | `ruscapiper-stream.c` | Il programma che avvia RuscaLLisse (GPL-3.0, scritto da RuscaLinux) |
-| `patches/onnxruntime-1.21.patch` | L’unica modifica a Piper: con l’ONNX Runtime 1.21 di Debian 13 sostituisce `Session::GetOutputNames()` (che c’è dalla 1.22) con `GetOutputCount()` e `GetOutputNameAllocated()`. Si applica solo se serve |
+| `patches/fonemi.patch` | Corregge due difetti di libpiper 1.8.0, sempre: le chiavi di più caratteri della mappa dei fonemi (`aɪ`, `oʊ`…) finivano sul loro primo carattere, e con le voci recenti ogni «a» o «o» italiana riceveva anche il dittongo inglese (accento straniero); i fonemi di una frase si accumulavano a quelli delle precedenti |
+| `patches/onnxruntime-1.21.patch` | Con l’ONNX Runtime 1.21 di Debian 13 sostituisce `Session::GetOutputNames()` (che c’è dalla 1.22) con `GetOutputCount()` e `GetOutputNameAllocated()`. Si applica solo se serve |
 | `checksums/` | Impronta SHA-256 dei due archivi sorgente di ogni versione già costruita (la cartella nasce vuota e si riempie alla prima build) |
 | `apparmor/usr.lib.ruscapiper-engine.ruscapiper-stream` | Profilo AppArmor, installato in modalità complain |
 
@@ -69,7 +70,8 @@ espeak-ng **non** è quello di Debian: Piper usa `espeak_TextToPhonemesWithTermi
 4. **ONNX Runtime.** Solo quello di Debian: la build non scarica niente. Se le sue intestazioni non hanno `GetOutputNames`, la build applica `patches/onnxruntime-1.21.patch`; se la patch non si applica a una release nuova di Piper, si ferma.
 5. **Niente rete.** La compilazione gira senza rete (`unshare -rn`). Binari e libreria non devono essere collegati a OpenSSL, libcrypto o curl, né richiedere `socket`, `connect`, `bind`, `listen`, `accept`, `getaddrinfo`, `gethostbyname`, `sendto` o `recvfrom`.
 6. **API.** `libpiper.so` deve esportare le funzioni usate da `ruscapiper-stream` (`SIMBOLI_PIPER`).
-7. **Prova.** `ruscapiper-stream` legge una frase con la voce di prova del sorgente (`tests/test_voice.onnx`, senza pesi veri) e deve rispondere con intestazioni e campioni corretti. Controlla che il programma funzioni; non dice nulla sulla qualità della voce.
+7. **Chiavi di più caratteri.** Alla voce di prova si aggiunge la chiave `aɪ`: i fonemi della frase di prova non devono cambiare.
+8. **Prova.** `ruscapiper-stream` legge una frase con la voce di prova del sorgente (`tests/test_voice.onnx`, senza pesi veri) e deve rispondere con intestazioni e campioni corretti. Controlla che il programma funzioni; non dice nulla sulla qualità della voce.
 
 ## Rete e privacy
 
