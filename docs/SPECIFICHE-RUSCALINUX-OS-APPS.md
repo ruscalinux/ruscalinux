@@ -267,6 +267,8 @@ La vista **Video** (Alt+3) crea brevi video, di qualche secondo, da una descrizi
 
 RuscaLLisse fa parlare l’utente, a voce, con un’**entità**: un personaggio con un volto animato, una voce e una personalità scritta in un file che l’utente può modificare. La prima entità è **Ellittica**, una donna digitale intellettuale, dolce e sensibile, che spiega ogni cosa in modo chiaro, semplice e lineare.
 
+**Come un dialogo vero.** Tutto avviene a voce: sullo schermo c’è solo il volto, nessuna parola della conversazione viene scritta, né mentre si parla né dopo. La conversazione non si salva: resta in memoria finché la finestra è aperta e si dimentica alla chiusura, come una chiacchierata. Il testo compare solo dove è configurazione: il file della personalità (sezione 1.7.5) e il lessico delle pronunce (sezione 1.7.6).
+
 Tutto gira sul computer dell’utente, con tre motori:
 
 | Passo | Motore | Programma o libreria |
@@ -288,7 +290,7 @@ Il tempo che conta è quello fra la fine della frase dell’utente e la prima si
 3. **Il prompt dell’entità si elabora una volta sola.** Il prompt di sistema (personalità e regole del parlato) è sempre lo stesso all’inizio del contesto: `llama-server` lo tiene in cache (`cache_prompt`), così ogni domanda paga solo le parole nuove. All’apertura RuscaLLisse manda una richiesta di riscaldamento con il solo prompt di sistema e `n_predict` 0.
 4. **Risposte brevi.** Le regole del parlato chiedono frasi brevi; il numero massimo di parole per risposta (Preferenze, 80 se non cambiato) diventa `n_predict` (circa 2 token per parola).
 
-Con `RUSCALLISSE_DEBUG=1` il programma scrive sul terminale, per ogni turno, i tempi di ogni passo: fine del parlato → testo finale di Vosk → primo token → prima frase a Piper → primo campione audio riprodotto. Sono i numeri da guardare prima di cambiare qualunque cosa.
+Con `RUSCALLISSE_DEBUG=1` il programma scrive sul terminale, per ogni turno, i tempi di ogni passo: fine del parlato → testo finale di Vosk → primo token → prima frase a Piper → primo campione audio riprodotto. Sono i numeri da guardare prima di cambiare qualunque cosa. Con `RUSCALLISSE_DEBUG=2` scrive anche ciò che Vosk ha capito e ciò che il modello risponde: è uno strumento per chi sviluppa, dal terminale, e non compare mai nella finestra.
 
 #### 1.7.2 Moduli
 
@@ -312,11 +314,20 @@ Con `RUSCALLISSE_DEBUG=1` il programma scrive sul terminale, per ogni turno, i t
 - **Microfono.** `audio_io.py` avvia `/usr/bin/pw-record --rate 16000 --channels 1 --format s16 -` (pacchetto Debian `pipewire-bin`) e legge l’audio dallo standard output a blocchi di 20 ms. L’audio **non si scrive mai su disco**: passa in memoria da `pw-record` a Vosk.
 - **Riconoscimento.** `rusca_vosk.py` usa l’API in C di Vosk: `vosk_model_new()`, `vosk_recognizer_new()` a 16 kHz, `vosk_recognizer_accept_waveform()` a ogni blocco, `vosk_recognizer_partial_result()` per il testo parziale, `vosk_recognizer_result()` e `vosk_recognizer_final_result()` per quello finale, `vosk_set_log_level(-1)` per il silenzio sul terminale. I nomi delle funzioni usate sono in `SIMBOLI_VOSK` e la build del motore controlla che la libreria li esporti.
 - **Fine della frase.** La dichiara Vosk (`accept_waveform` restituisce 1); in più, una frase finisce dopo il silenzio impostato nelle Preferenze («Pausa prima di rispondere»: 0,5 s se non cambiata; da 0,3 a 1,5 s). Un risultato vuoto o di una sola parola corta («eh», «mh») non fa partire un turno.
-- **Testo parziale.** Mentre l’utente parla, il testo parziale compare sotto il volto (se «Mostra il testo» è attivo): così si vede subito se l’entità sta capendo.
+- **Niente testo.** Il testo parziale serve solo a capire quando l’utente comincia e smette di parlare; non compare mai.
+- **Fiducia delle parole.** Il riconoscitore chiede a Vosk la fiducia di ogni parola (`vosk_recognizer_set_words()`, campo `conf`) e, quando la frase intera è incerta, fino a tre interpretazioni (`vosk_recognizer_set_max_alternatives()`, 3). Servono al filtro dell’ascolto (sezione 1.7.4).
 - **Modelli.** Non fanno parte dei pacchetti. Ogni modello è una **cartella** (come esce dallo zip ufficiale) in `~/.local/share/ruscavosk/models/` o, per tutti, in `/usr/share/ruscavosk/models/`. Una cartella è un modello se contiene `am/final.mdl` e `conf/`. Fra più modelli della stessa lingua si propone il più grande. Le cartelle si guardano con `Gio.FileMonitor`. Modelli di riferimento per l’italiano: `vosk-model-it-0.22` (1,2 GB, più preciso) e `vosk-model-small-it-0.22` (48 MB, per computer con poca memoria), entrambi Apache 2.0. Ogni modello ha la propria licenza: alcuni modelli Vosk di altre lingue sono AGPL o CC-BY-NC-SA.
 - **Lingua.** Il modello decide la lingua dell’ascolto. La lingua si ricava dal nome della cartella (`vosk-model-it-…`, `vosk-model-small-it-…`); «Lingua della conversazione» nelle Preferenze filtra modelli e voci (al primo avvio: la lingua dell’interfaccia, se c’è un modello; altrimenti la prima disponibile).
 
 #### 1.7.4 Pensare: il modello linguistico
+
+**Il filtro dell’ascolto.** Vosk sbaglia più di Whisper, ma il modello linguistico non ha bisogno di una trascrizione perfetta: deve capire che cosa chiede chi parla, come fa una persona che sente male una parola e la ricava dal contesto. Il filtro ha tre strati:
+
+1. **Il modello sa che sta ascoltando.** Una regola del parlato (sezione 1.7.5, regola 6) gli dice che riceve la trascrizione automatica di una persona che parla, con possibili parole sbagliate, mancanti o simili nel suono, e che deve rispondere all’intenzione, senza mai far notare gli errori.
+2. **Le parole incerte sono segnate.** Le parole con fiducia sotto 0,6 (`SOGLIA_FIDUCIA`) arrivano al modello fra parentesi quadre: `mi spieghi come funziona il [fotone]`. Se la fiducia media della frase è sotto 0,7, il messaggio porta anche le altre interpretazioni di Vosk, su righe che cominciano con «oppure:». Il modello sceglie quella sensata nel contesto della conversazione.
+3. **Se non capisce, chiede.** Quando nemmeno il contesto basta, l’entità chiede come farebbe una persona («Scusa, non ho capito bene: mi chiedevi di…?»). Non esistono messaggi d’errore sul riconoscimento.
+
+La trascrizione con i segni del filtro è solo per il modello: non si mostra e non si salva.
 
 - Il modello è un GGUF della cartella di RuscaLLama (`~/.local/share/ruscallama/models/`, `/usr/share/ruscallama/models/`): chi usa già RuscaLLama non copia niente. RuscaLLisse ha un proprio `llama-server`, con le stesse regole della sezione 11 (127.0.0.1, porta libera, chiave casuale, `--no-webui`).
 - La conversazione resta in memoria e si manda al modello a ogni turno, con il prompt di sistema in testa. Quando il contesto si riempie si tolgono i turni più vecchi, mai il prompt di sistema.
@@ -391,12 +402,14 @@ velocità: 0,95
 3. Scrivi i numeri, le sigle e i simboli come si dicono a voce.
 4. Sulle parole che si scrivono uguali ma si dicono diverse metti l’accento grafico dove cade: ancòra o àncora, princìpi o prìncipi, sùbito o subìto.
 5. Rispondi nella lingua della conversazione: {language}.
+6. Ciò che ricevi è la trascrizione automatica di una persona che ti parla a voce: può contenere parole sbagliate, mancanti o simili nel suono. Le parole fra parentesi quadre sono incerte; le righe che cominciano con «oppure:» sono altre interpretazioni della stessa frase. Capisci l’intenzione dal senso e dalla conversazione e rispondi a quella. Non far mai notare gli errori di trascrizione. Se davvero non capisci, chiedi con naturalezza che cosa intendeva.
+7. Non scrivere mai codice, comandi o formule da copiare: se ti chiedono qualcosa di tecnico, spiegalo a voce, a parole, un passo alla volta.
 
 #### 1.7.6 Dal testo alla voce
 
 `speech_text.py` trasforma la risposta che arriva in streaming in frasi da dire:
 
-1. **Markdown.** Se il modello scrive comunque formattazione, il testo passa da `speech_blocks()` del motore comune (sezione 1.2): niente marcatori, il testo dei link e non l’indirizzo, formule in parole. Gli elenchi non si saltano: ogni voce diventa una frase («Primo, …», «Secondo, …» per gli elenchi numerati). I blocchi di codice non si leggono: al loro posto l’entità dice una frase fissa per lingua («Ti ho scritto del codice: lo trovi nel testo.»).
+1. **Markdown.** Se il modello scrive comunque formattazione, il testo passa da `speech_blocks()` del motore comune (sezione 1.2): niente marcatori, il testo dei link e non l’indirizzo, formule in parole. Gli elenchi non si saltano: ogni voce diventa una frase («Primo, …», «Secondo, …» per gli elenchi numerati). I blocchi di codice non si leggono e si saltano: la regola 7 del parlato chiede di non scriverne, e il testo non si mostra.
 2. **Etichette d’emozione.** Un’etichetta all’inizio della risposta o di una frase (`[sorride]`, `[pensierosa]`, `[commossa]`, `[divertita]`, `[perplessa]`, `[seria]`) si toglie dal testo e va al volto. Un’etichetta sconosciuta si toglie e si ignora.
 3. **Divisione in frasi.** Si taglia a fine frase (`.`, `?`, `!`, `…`, due punti seguiti da spazio). Se una frase supera 120 caratteri si taglia anche alla prima virgola dopo 40 caratteri. La **prima** frase si manda appena ha 25 caratteri e incontra una virgola: è quella che decide quanto si aspetta.
 4. **Lessico delle pronunce.** File `~/.local/share/ruscallisse/pronunce.tsv`, una riga per parola: `parola<TAB>fonemi`, con i fonemi nell’alfabeto di espeak-ng. Prima di mandare la frase a Piper, ogni parola del lessico (confronto senza maiuscole, parola intera) si sostituisce con `[[fonemi]]`, la sintassi di Piper per i fonemi scritti a mano. Il pacchetto installa un lessico di partenza in `/usr/share/ruscallisse/pronunce.tsv` con le parole italiane che espeak-ng accentua male o che portano l’accento grafico della regola 4 (`ancòra`, `àncora`, `princìpi`, `prìncipi`…); quello dell’utente vale di più. Ogni riga del lessico di partenza ha un test.
@@ -455,18 +468,17 @@ Adw.ApplicationWindow
     │   └── end: menu principale
     └── content: Adw.ToastOverlay
         └── Gtk.Box verticale
-            ├── volto (Gtk.DrawingArea, si allarga con la finestra, almeno 240 × 240)
-            └── Adw.Clamp: testo della conversazione (Gtk.ListBox), se «Mostra il testo»
+            └── volto (Gtk.DrawingArea, occupa tutta la finestra, almeno 240 × 240)
 ```
 
 - **Pagina di benvenuto.** Finché manca un pezzo, al posto del volto c’è un `Adw.StatusPage` con i tre pezzi che servono, ognuno su una riga (`Adw.ActionRow`) con lo stato («Pronto» o «Manca») e i pulsanti: **Modello per ascoltare** (Apri la cartella, Quali file scaricare?), **Modello per pensare** (Apri la cartella; se RuscaLLama ne ha già uno, è pronto), **Voce** (Importa una voce…, Quali file scaricare?). **Quali file scaricare?** (`GUIDE` in `ruscallisse.py`) elenca per ogni pezzo nome e pagina dei file, e si apre nel browser: RuscaLLisse non scarica niente.
 - **Il microfono.** Il pulsante (icona `audio-input-microphone-symbolic`, barrata quando è in pausa) e il tasto Spazio mettono in pausa e riprendono l’ascolto. In pausa `pw-record` è fermo, non solo ignorato.
-- **L’eco.** Con gli altoparlanti, il microfono sentirebbe l’entità. Per questo, per impostazione predefinita, **mentre l’entità parla RuscaLLisse non passa l’audio a Vosk**; la si interrompe con Spazio o con Esc. Nelle Preferenze, «Uso le cuffie» (spento se non cambiato) lascia il microfono aperto anche mentre parla: se l’utente parla per più di 0,4 s l’entità tace e ascolta. Se in PipeWire c’è una sorgente con cancellazione dell’eco (`echo-cancel`), le Preferenze la propongono come microfono e «Uso le cuffie» si può attivare anche con gli altoparlanti.
+- **L’eco.** In un dialogo vero si interrompe parlando, senza tasti. Con gli altoparlanti, però, il microfono sentirebbe l’entità. La soluzione è la cancellazione dell’eco di PipeWire (`libpipewire-module-echo-cancel`): la ISO la attiva con un file in `/etc/pipewire/pipewire.conf.d/`, che crea una sorgente e un’uscita con l’eco tolto, e RuscaLLisse le usa quando ci sono. Senza cancellazione dell’eco, per impostazione predefinita, **mentre l’entità parla RuscaLLisse non passa l’audio a Vosk**; la si interrompe con Spazio o con Esc. Nelle Preferenze, «Uso le cuffie» (spento se non cambiato) lascia il microfono aperto anche mentre parla: se l’utente parla per più di 0,4 s l’entità tace e ascolta. Se in PipeWire c’è una sorgente con cancellazione dell’eco (`echo-cancel`), le Preferenze la propongono come microfono e «Uso le cuffie» si può attivare anche con gli altoparlanti.
 - **L’interruzione.** Esc fa tacere subito l’entità: si svuota la coda delle frasi, si chiude il flusso verso `pw-play`, si ferma la generazione di `llama-server`. La risposta interrotta resta nella storia, troncata dove si è fermata.
-- **Menu principale:** Nuova conversazione (Ctrl+N), Salva la conversazione… (Ctrl+S, Markdown: un titolo con l’entità e la data, poi i turni), separatore, Modifica la personalità…, Nuova entità…, Come la pronuncia?…, Importa una voce…, Apri la cartella dei modelli per ascoltare, separatore, Preferenze, Scorciatoie da tastiera, Informazioni su RuscaLLisse.
-- **Scorciatoie:** Spazio (microfono), Esc (zitta), Ctrl+N, Ctrl+S, Ctrl+T (mostra o nasconde il testo), Ctrl++ / Ctrl+− / Ctrl+0 per il testo, più quelle della sezione 3.9.
-- **Preferenze** (`~/.config/ruscallisse/settings.json`): Conversazione (lingua della conversazione, mostra il testo, etichette d’emozione, parole massime per risposta, pausa prima di rispondere), Ascolto (modello Vosk, microfono, uso le cuffie), Voce (voce, velocità, licenza della voce), Modello (modello GGUF, scheda grafica), Aspetto (tema, sezione 4.5), Avanzate (latenza della riproduzione).
-- **Chiusura.** Con una conversazione non salvata di almeno due turni si chiede (`Adw.AlertDialog`, «Chiudi senza salvare» distruttivo, «Annulla» predefinito).
+- **Menu principale:** Ricomincia (Ctrl+N: l’entità dimentica la conversazione e saluta di nuovo), separatore, Modifica la personalità…, Nuova entità…, Come la pronuncia?…, Importa una voce…, Apri la cartella dei modelli per ascoltare, separatore, Preferenze, Scorciatoie da tastiera, Informazioni su RuscaLLisse.
+- **Scorciatoie:** Spazio (microfono), Esc (zitta), Ctrl+N (ricomincia), più quelle della sezione 3.9.
+- **Preferenze** (`~/.config/ruscallisse/settings.json`): Conversazione (lingua della conversazione, etichette d’emozione, parole massime per risposta, pausa prima di rispondere), Ascolto (modello Vosk, microfono, uso le cuffie; la cancellazione dell’eco si usa da sola quando c’è), Voce (voce, velocità, licenza della voce), Modello (modello GGUF, scheda grafica), Aspetto (tema, sezione 4.5), Avanzate (latenza della riproduzione).
+- **Chiusura.** La finestra si chiude senza domande: la conversazione non si salva mai, per scelta.
 
 #### 1.7.10 Dati
 
@@ -478,10 +490,10 @@ Adw.ApplicationWindow
 | Modelli Vosk | `~/.local/share/ruscavosk/models/`, `/usr/share/ruscavosk/models/` |
 | Voci Piper | `~/.local/share/ruscapiper/voices/`, `/usr/share/ruscapiper/voices/` |
 | Modelli linguistici | Quelli di RuscaLLama (sezione 1.1) |
-| Conversazione | Solo in memoria; su disco solo con «Salva la conversazione…» |
+| Conversazione | Solo in memoria, mai su disco; si dimentica con «Ricomincia» e alla chiusura |
 | Audio | Mai su disco |
 
-**Test.** `tests/test_ruscallisse.py` controlla, senza motori veri: la lettura e la scrittura dei file delle entità e il prompt di sistema; la divisione in frasi (compresa la prima frase corta), le etichette d’emozione, gli elenchi letti come frasi, il lessico delle pronunce con la sintassi `[[…]]`; i visemi da una stringa di fonemi; i passaggi di stato di `conversation.py` (ascolto → pensa → parla → ascolto, interruzione con Esc, microfono in pausa, eco senza cuffie) con un riconoscitore finto al posto di `libvosk`, un `ruscapiper-stream` finto che scrive PCM vero con le intestazioni, e un `llama-server` finto in streaming; l’assenza di moduli di rete fuori da `rusca_engine.py`. Le prove del volto disegnano ogni stato su una superficie Cairo in memoria e controllano che l’etichetta accessibile cambi. Senza PyGObject si saltano le prove con GTK.
+**Test.** `tests/test_ruscallisse.py` controlla, senza motori veri: la lettura e la scrittura dei file delle entità e il prompt di sistema; la divisione in frasi (compresa la prima frase corta), le etichette d’emozione, gli elenchi letti come frasi, il lessico delle pronunce con la sintassi `[[…]]`; i visemi da una stringa di fonemi; il filtro dell’ascolto (parole incerte fra parentesi quadre, interpretazioni alternative sotto la soglia); i passaggi di stato di `conversation.py` (ascolto → pensa → parla → ascolto, interruzione con Esc e a voce, microfono in pausa, eco senza cuffie e con la cancellazione dell’eco); che nessun testo della conversazione finisca su disco o nella finestra con un riconoscitore finto al posto di `libvosk`, un `ruscapiper-stream` finto che scrive PCM vero con le intestazioni, e un `llama-server` finto in streaming; l’assenza di moduli di rete fuori da `rusca_engine.py`. Le prove del volto disegnano ogni stato su una superficie Cairo in memoria e controllano che l’etichetta accessibile cambi. Senza PyGObject si saltano le prove con GTK.
 
 ```bash
 python3 -m unittest tests/test_ruscallisse.py
@@ -508,7 +520,8 @@ python3 -m unittest tests/test_ruscallisse.py
 2. **Vosk e Kaldi.** Quale commit del fork di Kaldi vuole l’ultima release di vosk-api, e se si compila con OpenBLAS, LAPACK e OpenFST di Debian o servono le loro copie.
 3. **Accenti grafici.** Che espeak-ng italiano metta l’accento giusto su `ancòra`, `princìpi`, `sùbito` scritti con l’accento grafico; dove non lo fa, la riga va nel lessico di partenza.
 4. **Voci italiane.** La licenza di `it_IT-riccardo-x_low` (dal suo MODEL_CARD) e l’origine del dataset sintetico di `it_IT-serena`, prima di consigliarle nel manuale.
-5. **Latenza.** I tempi veri sui due computer di prova (checklist, punto 19): se il primo campione arriva oltre circa un secondo e mezzo, si guarda prima la soglia di silenzio, poi la dimensione del modello linguistico.
+5. **Cancellazione dell’eco.** Che `libpipewire-module-echo-cancel` (con WebRTC) sia nel PipeWire di trixie, che il file di configurazione della ISO crei sorgente e uscita senza disturbare le altre applicazioni, e che con gli altoparlanti l’interruzione a voce funzioni davvero.
+6. **Latenza.** I tempi veri sui due computer di prova (checklist, punto 19): se il primo campione arriva oltre circa un secondo e mezzo, si guarda prima la soglia di silenzio, poi la dimensione del modello linguistico.
 
 Gli identificatori di ogni tool devono coincidere tra loro (vedi sezione 5.2).
 
@@ -1367,7 +1380,7 @@ Regole aggiuntive per la conversazione a voce (RuscaLLisse):
 | Rete solo verso il proprio motore | `llama-server` su 127.0.0.1 con le regole degli strumenti di intelligenza artificiale; Vosk e Piper non hanno codice di rete (lo controlla la build dei motori) |
 | Il microfono | Aperto solo durante l’ascolto; in pausa `pw-record` è fermo. Lo stato è sempre visibile: pulsante nella barra del titolo, sottotitolo, volto |
 | L’audio | Mai scritto su disco: passa in memoria da `pw-record` a Vosk e da `ruscapiper-stream` a `pw-play` |
-| La conversazione | Solo in memoria; su disco solo con «Salva la conversazione…», dove sceglie l’utente |
+| La conversazione | Mai scritta: né sullo schermo né su disco. Resta in memoria finché la finestra è aperta |
 | Programmi esterni | `/usr/bin/pw-record`, `/usr/bin/pw-play`, `/usr/bin/espeak-ng`, `/usr/lib/ruscapiper-engine/ruscapiper-stream`, `/usr/lib/ruscallama-engine/llama-server`, con percorso assoluto e lista di argomenti; il testo delle frasi passa a `ruscapiper-stream` e a `espeak-ng` dallo standard input, mai sulla riga di comando |
 | Confinamento | Profilo AppArmor per `ruscapiper-stream`, in modalità complain: nega la rete, `.ssh`, `.gnupg`, `.config`, profili di Firefox e Thunderbird; legge solo le cartelle delle voci |
 | Modelli e voci | Solo file locali, importati dall’utente; la licenza della voce scelta è mostrata nelle Preferenze |
@@ -1599,9 +1612,10 @@ Una conversazione a voce con Ellittica, una donna digitale che ti ascolta, ti ri
 2. Dal menu principale, “Modifica la personalità…”: scrivi il quid di Ellittica, il tratto centrale del suo carattere.
 3. Parla: Ellittica ascolta, pensa e risponde a voce. Spazio mette in pausa il microfono, Esc la fa tacere.
 4. Se sbaglia l’accento di una parola: menu principale → “Come la pronuncia?…” → “Correggi la pronuncia…”. Da quel momento la dirà giusta.
-5. La conversazione si salva in Markdown dal menu principale (Ctrl+S).
 
-Con gli altoparlanti, mentre Ellittica parla il microfono non ascolta, per non farle sentire la sua voce; con le cuffie puoi attivare “Uso le cuffie” nelle Preferenze e interromperla parlando.
+È un dialogo come nella vita: sullo schermo c’è solo il suo volto, niente viene scritto e la conversazione non si salva. Se non capisce bene una parola la ricava dal contesto, e se proprio non capisce te lo chiede.
+
+Puoi interromperla parlando, come in una conversazione vera. Se il sistema non ha la cancellazione dell’eco, con gli altoparlanti la si interrompe con Spazio o Esc; con le cuffie attiva “Uso le cuffie” nelle Preferenze.
 
 RuscaLLisse usa **ruscavosk-engine** (Vosk, licenza Apache 2.0), **ruscallama-engine** (llama.cpp, licenza MIT) e **ruscapiper-engine** (Piper, licenza GPL-3.0). Non usa la rete: il modello linguistico ascolta solo su 127.0.0.1 e l’audio non viene mai salvato. Ogni modello e ogni voce hanno la propria licenza, mostrata nelle Preferenze: molte voci Piper sono solo per uso non commerciale. Le risposte vanno verificate: Ellittica è un personaggio, non un’esperta.
 
@@ -1820,9 +1834,10 @@ A voice conversation with Ellittica, a digital woman who listens, answers and ex
 2. From the main menu, "Edit Personality…": write Ellittica's quid, the core trait of her character.
 3. Talk: Ellittica listens, thinks and answers aloud. Space pauses the microphone, Esc makes her stop.
 4. If she stresses a word wrongly: main menu → "How Does She Say It?…" → "Fix Pronunciation…". From then on she says it right.
-5. Save the conversation as Markdown from the main menu (Ctrl+S).
 
-With speakers, the microphone does not listen while Ellittica speaks, so she does not hear herself; with headphones you can turn on "I Use Headphones" in Preferences and interrupt her by speaking.
+It is a conversation like in real life: only her face is on screen, nothing is written and the conversation is not saved. If she mishears a word she works it out from the context, and if she really does not understand she asks you.
+
+You can interrupt her by speaking, as in a real conversation. If the system has no echo cancellation, with speakers you interrupt her with Space or Esc; with headphones turn on "I Use Headphones" in Preferences.
 
 RuscaLLisse uses **ruscavosk-engine** (Vosk, Apache 2.0 license), **ruscallama-engine** (llama.cpp, MIT license) and **ruscapiper-engine** (Piper, GPL-3.0 license). It does not use the network: the language model listens only on 127.0.0.1 and audio is never saved. Every model and voice has its own license, shown in Preferences: many Piper voices are for non-commercial use only. Answers must be checked: Ellittica is a character, not an expert.
 
