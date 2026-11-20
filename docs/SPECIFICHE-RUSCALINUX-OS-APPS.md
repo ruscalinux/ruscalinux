@@ -516,6 +516,7 @@ python3 -m unittest tests/test_ruscallisse.py
 
 - Il pacchetto contiene, in `/usr/lib/ruscapiper-engine/`: `libpiper.so` (la libreria C di Piper), i dati di espeak-ng che Piper usa, e **`ruscapiper-stream`**, un piccolo programma in C scritto da RuscaLinux (GPL-3.0, file a sé in `apps/ruscapiper-engine/ruscapiper-stream.c`, sezione 6, regola 6) che apre una voce con l’API di libpiper, legge una riga per frase dallo standard input e scrive intestazioni, PCM e allineamenti dei fonemi sullo standard output (sezione 1.7.7). È il programma che avvia RuscaLLisse.
 - I nomi delle funzioni dell’API di libpiper che `ruscapiper-stream` usa (per esempio `piper_create()`) si fissano sul tag della release costruita: la build controlla che la libreria li esporti (`SIMBOLI_PIPER`).
+- **L’ultimo pezzo arriva con `PIPER_DONE`.** In libpiper 1.8.0 `piper_synthesize_next()` restituisce l’ultimo pezzo di audio insieme a `PIPER_DONE`, non prima (l’esempio del README di Piper lo perderebbe): `ruscapiper-stream` lo scrive comunque, con il flag 1. Una frase corta è un solo pezzo: perderlo vuol dire perdere tutta la voce. Se la voce non dà gli allineamenti, i visemi si distribuiscono in parti uguali sulla frase.
 - **Nessuna porta.** `ruscapiper-stream` legge e scrive solo i propri flussi standard: niente server HTTP di Piper.
 - Le voci non fanno parte dei pacchetti (sezione 1.7.7).
 

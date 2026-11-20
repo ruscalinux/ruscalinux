@@ -223,26 +223,33 @@ int main(int argc, char **argv) {
       fprintf(stderr, "ruscapiper-stream: frase %lu non sintetizzabile\n", id);
       ok = write_header((uint32_t)id, FLAG_LAST | FLAG_ERROR, 0, 0, 0, 0);
     } else {
+      /* libpiper 1.8.0 consegna l'ultimo pezzo insieme a PIPER_DONE (non
+       * dopo, come lascerebbe intendere piper.h): il pezzo va scritto anche
+       * quando rc == PIPER_DONE. */
       int rc, last_sent = 0;
-      while ((rc = piper_synthesize_next(synth, &chunk)) != PIPER_DONE) {
-        if (rc != PIPER_OK) {
+      for (;;) {
+        rc = piper_synthesize_next(synth, &chunk);
+        if (rc != PIPER_OK && rc != PIPER_DONE) {
           fprintf(stderr, "ruscapiper-stream: errore nella frase %lu\n", id);
           ok = write_header((uint32_t)id, FLAG_LAST | FLAG_ERROR, 0, 0, 0, 0);
           last_sent = 1;
           break;
         }
-        uint32_t flags = chunk.is_last ? FLAG_LAST : 0;
+        int last = rc == PIPER_DONE || chunk.is_last;
+        size_t n_samp = chunk.samples ? chunk.num_samples : 0;
         size_t n_ph = chunk.phonemes ? chunk.num_phonemes : 0;
         size_t n_al = chunk.alignments ? chunk.num_alignments : 0;
-        ok = write_header((uint32_t)id, flags, (uint32_t)chunk.sample_rate,
-                          (uint32_t)chunk.num_samples, (uint32_t)n_ph,
-                          (uint32_t)n_al) &&
-             write_samples(chunk.samples, chunk.num_samples, &pcm, &pcm_cap) &&
-             write_u32_array((const uint32_t *)chunk.phonemes, n_ph) &&
-             write_i32_array(chunk.alignments, n_al) && fflush(stdout) == 0;
-        if (!ok)
-          break;
-        if (chunk.is_last) {
+        if (n_samp || n_ph || last) {
+          ok = write_header((uint32_t)id, last ? FLAG_LAST : 0,
+                            (uint32_t)chunk.sample_rate, (uint32_t)n_samp,
+                            (uint32_t)n_ph, (uint32_t)n_al) &&
+               write_samples(chunk.samples, n_samp, &pcm, &pcm_cap) &&
+               write_u32_array((const uint32_t *)chunk.phonemes, n_ph) &&
+               write_i32_array(chunk.alignments, n_al) && fflush(stdout) == 0;
+          if (!ok)
+            break;
+        }
+        if (last) {
           last_sent = 1;
           break;
         }
