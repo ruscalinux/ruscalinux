@@ -1139,7 +1139,7 @@ Dipendenze di costruzione in più: `gfortran`, `autoconf`, `automake`, `libtool`
 4. La build controlla che `libpiper.so` esporti le funzioni usate da `ruscapiper-stream` (`SIMBOLI_PIPER`), poi fa dire una frase a `ruscapiper-stream` con la voce di prova del sorgente (`tests/test_voice.onnx`) e controlla intestazioni, campioni, fonemi e allineamenti.
 5. `Depends` comprende `libonnxruntime1.21` (calcolato da `dpkg-shlibdeps`).
 
-Dipendenze di costruzione in più: `libonnxruntime-dev` e `libsonic-dev` (senza, la configurazione di espeak-ng scaricherebbe sonic, anche se poi non lo usa).
+Dipendenze di costruzione in più: `libonnxruntime-dev` e `libsonic-dev` (senza, la configurazione di espeak-ng scaricherebbe sonic, anche se poi non lo usa). Come quelle degli altri motori, sono anche nell’elenco dei pacchetti della ISO (`steps/20-packages.sh`), perché RuscaLinux si possa costruire da RuscaLinux.
 
 Esempio di output:
 

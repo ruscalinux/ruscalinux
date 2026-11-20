@@ -142,6 +142,11 @@ wget
 libvulkan-dev
 glslc
 spirv-headers
+# Compilare ruscapiper-engine (Piper con espeak-ng): ONNX Runtime di Debian,
+# e libsonic-dev perche' la configurazione di espeak-ng non scarichi sonic.
+# Vedi apps/ruscapiper-engine/README.md
+libonnxruntime-dev
+libsonic-dev
 
 # ===========================================================================
 # LIBS SUPPORT
