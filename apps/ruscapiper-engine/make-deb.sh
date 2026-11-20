@@ -89,7 +89,7 @@ avviso() { echo "ATTENZIONE: $*" >&2; }
 
 # ── Controllo delle dipendenze, prima di scaricare o compilare ──────────────
 MANCA=""
-for c in dpkg-deb dpkg-shlibdeps cmake g++ gcc make pkg-config strip nm readelf python3; do
+for c in dpkg-deb dpkg-shlibdeps cmake g++ gcc make patch pkg-config strip nm readelf python3; do
     command -v "$c" >/dev/null || MANCA="$MANCA $c"
 done
 command -v wget >/dev/null || command -v curl >/dev/null || MANCA="$MANCA wget"
@@ -102,7 +102,7 @@ for h in /usr/include/onnxruntime/onnxruntime_cxx_api.h \
          /usr/include/onnxruntime_cxx_api.h; do
     [ -f "$h" ] && { ORT_H="$h"; break; }
 done
-[ -n "$ORT_H" ] || ORT_H=$(dpkg -L libonnxruntime-dev 2>/dev/null | grep '/onnxruntime_cxx_api\.h$' | head -n1)
+[ -n "$ORT_H" ] || ORT_H=$(dpkg -L libonnxruntime-dev 2>/dev/null | grep '/onnxruntime_cxx_api\.h$' | head -n1 || true)
 [ -n "$ORT_H" ] || MANCA="$MANCA libonnxruntime-dev"
 [ -z "$ORT_H" ] || say "ONNX Runtime: $ORT_H"
 [ -f /usr/include/sonic.h ] || MANCA="$MANCA libsonic-dev"
@@ -232,8 +232,15 @@ CFLAGS_DEB="$(dpkg-buildflags --get CFLAGS) $(dpkg-buildflags --get CPPFLAGS)"
 CXXFLAGS_DEB="$(dpkg-buildflags --get CXXFLAGS) $(dpkg-buildflags --get CPPFLAGS)"
 LDFLAGS_DEB="$(dpkg-buildflags --get LDFLAGS)"
 ORT_VERSIONE=$(dpkg-query -W -f='${Version}' libonnxruntime-dev 2>/dev/null || echo "?")
+# Piper e' scritto per ONNX Runtime 1.22: con un ONNX Runtime che non ha
+# Session::GetOutputNames() (Debian 13 ha la 1.21) si applica
+# patches/onnxruntime-1.21.patch, che usa le funzioni della 1.21.
+PATCH_ORT=""
+if ! grep -rqs 'GetOutputNames' "$(dirname "$ORT_H")"; then
+    PATCH_ORT="$SRC_DIR/patches/onnxruntime-1.21.patch"
+fi
 FLAGS_FIRMA=$(printf '%s %s' "$CFLAGS_DEB" "$LDFLAGS_DEB" | sed 's/-ffile-prefix-map=[^ ]*//g')
-OPZIONI="piper=$COMMIT espeak=$ESPEAK_COMMIT ort=$ORT_VERSIONE cmake=$(sha256sum CMakeLists.txt | cut -c1-16) stream=$(sha256sum ruscapiper-stream.c | cut -c1-16) flags=$FLAGS_FIRMA"
+OPZIONI="piper=$COMMIT espeak=$ESPEAK_COMMIT ort=$ORT_VERSIONE cmake=$(sha256sum CMakeLists.txt | cut -c1-16) stream=$(sha256sum ruscapiper-stream.c | cut -c1-16) patch=$([ -z "$PATCH_ORT" ] || sha256sum "$PATCH_ORT" | cut -c1-16) flags=$FLAGS_FIRMA"
 FIRMA=$(printf '%s' "$OPZIONI" | sha256sum | cut -c1-16)
 STAGE_CACHE="$CACHE/stage-${PIPER_VERSION}-${FIRMA}"
 
@@ -252,6 +259,11 @@ else
     mkdir -p "$BUILD/piper" "$BUILD/espeak"
     tar -xzf "$CACHED" -C "$BUILD/piper" --strip-components=1
     tar -xzf "$ESPEAK_CACHED" -C "$BUILD/espeak" --strip-components=1
+    if [ -n "$PATCH_ORT" ]; then
+        say "ONNX Runtime $ORT_VERSIONE senza GetOutputNames(): applico patches/onnxruntime-1.21.patch"
+        patch -d "$BUILD/piper" -p1 --forward --no-backup-if-mismatch -s < "$PATCH_ORT" \
+            || die "patches/onnxruntime-1.21.patch non si applica a Piper $TAG: va aggiornata"
+    fi
 
     # 1. espeak-ng statico, con le stesse opzioni dell'ExternalProject di
     #    Piper (niente audio, niente mbrola, niente sonic; dizionari estesi
@@ -404,6 +416,16 @@ if command -v apparmor_parser >/dev/null 2>&1; then
 fi
 
 # ── Documentazione ───────────────────────────────────────────────────────────
+if [ -n "$PATCH_ORT" ]; then
+    MODIFICHE="RuscaLinux li compila dal sorgente. Una sola modifica a Piper, per
+l'ONNX Runtime $ORT_VERSIONE di Debian: in libpiper/src/piper.cpp la chiamata a
+Session::GetOutputNames() (che esiste dalla 1.22) e' sostituita da
+GetOutputCount() e GetOutputNameAllocated(), con lo stesso risultato. La
+modifica e' in onnxruntime-1.21.patch, in questa cartella."
+    cp "$PATCH_ORT" "$DOC/onnxruntime-1.21.patch"
+else
+    MODIFICHE="RuscaLinux li compila dal sorgente senza modifiche al codice."
+fi
 cat > "$DOC/README.md" <<README
 # ruscapiper-engine $VER
 
@@ -411,7 +433,7 @@ Motore di sintesi vocale del RuscaLinux OS App RuscaLLisse.
 
 **Componenti esterni:** Piper (piper1-gpl) $TAG — $UPSTREAM — licenza
 GPL-3.0; espeak-ng (revisione fissata da Piper) — $ESPEAK_UPSTREAM —
-licenza GPL-3.0. RuscaLinux li compila dal sorgente senza modifiche al codice.
+licenza GPL-3.0. $MODIFICHE
 
 | Voce | Valore |
 |---|---|
@@ -445,9 +467,12 @@ Upstream-Name: piper1-gpl, espeak-ng
 Source: https://github.com/OHF-Voice/piper1-gpl
  https://github.com/espeak-ng/espeak-ng
 Comment: ruscapiper-engine is Piper (libpiper) and espeak-ng, external
- components, built from unmodified source for RuscaLinux. Only the build
- files (make-deb.sh, CMakeLists.txt), ruscapiper-stream and the AppArmor
- profile are part of RuscaLinux.
+ components, built from source for RuscaLinux. Only the build files
+ (make-deb.sh, CMakeLists.txt), ruscapiper-stream, the AppArmor profile and,
+ when present, onnxruntime-1.21.patch are part of RuscaLinux. That patch
+ (in this directory) changes one call in libpiper/src/piper.cpp so that
+ Piper builds with ONNX Runtime 1.21; it is applied only when the system
+ ONNX Runtime lacks Session::GetOutputNames().
 
 Files: usr/lib/ruscapiper-engine/libpiper.so
 Copyright: 2023-2026 Michael Hansen and the Piper authors
@@ -464,6 +489,7 @@ Comment: espeak-ng also contains files under the Apache-2.0 and BSD-2-Clause
  are in this directory (COPYING.*.espeak-ng).
 
 Files: usr/lib/ruscapiper-engine/ruscapiper-stream etc/apparmor.d/*
+ usr/share/doc/ruscapiper-engine/onnxruntime-1.21.patch
 Copyright: 2026 Nunzio Curcuruto
 License: GPL-3+
 Comment: Design, specifications and testing by the author; code written

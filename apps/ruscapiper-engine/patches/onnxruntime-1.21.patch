@@ -1,0 +1,22 @@
+--- a/libpiper/src/piper.cpp
++++ b/libpiper/src/piper.cpp
+@@ -672,7 +672,18 @@
+   std::array<const char *, 4> input_names = {"input", "input_lengths", "scales",
+                                              "sid"};
+ 
+-  std::vector<std::string> output_names_strs = synth->session->GetOutputNames();
++  // RuscaLinux: Session::GetOutputNames() esiste da ONNX Runtime 1.22;
++  // Debian 13 ha la 1.21. Stessi nomi, con le funzioni della 1.21.
++  std::vector<std::string> output_names_strs;
++  {
++    Ort::AllocatorWithDefaultOptions allocator;
++    const size_t output_count = synth->session->GetOutputCount();
++    output_names_strs.reserve(output_count);
++    for (size_t i = 0; i < output_count; i++) {
++      output_names_strs.emplace_back(
++          synth->session->GetOutputNameAllocated(i, allocator).get());
++    }
++  }
+   std::vector<const char *> output_names;
+   output_names.reserve(output_names_strs.size());
+   for (const auto &name : output_names_strs) {
