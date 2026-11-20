@@ -235,9 +235,16 @@ ORT_VERSIONE=$(dpkg-query -W -f='${Version}' libonnxruntime-dev 2>/dev/null || e
 # Piper e' scritto per ONNX Runtime 1.22: con un ONNX Runtime che non ha
 # Session::GetOutputNames() (Debian 13 ha la 1.21) si applica
 # patches/onnxruntime-1.21.patch, che usa le funzioni della 1.21.
+# Si prova a compilare una chiamata a Session::GetOutputNames(): cercare il
+# nome nelle intestazioni non basta, compare anche altrove. Se la prova non
+# compila per altri motivi la patch si applica lo stesso: e' innocua anche
+# con la 1.22, dove GetOutputCount() e GetOutputNameAllocated() ci sono.
 PATCH_ORT=""
-if ! grep -rqs 'GetOutputNames' "$(dirname "$ORT_H")"; then
+if ! printf '#include <onnxruntime_cxx_api.h>\nvoid f(Ort::Session &s) { (void)s.GetOutputNames(); }\n' \
+        | g++ -std=c++17 -fsyntax-only -I "$(dirname "$ORT_H")" -x c++ - >/dev/null 2>&1; then
     PATCH_ORT="$SRC_DIR/patches/onnxruntime-1.21.patch"
+else
+    say "ONNX Runtime $ORT_VERSIONE ha GetOutputNames(): Piper senza modifiche"
 fi
 FLAGS_FIRMA=$(printf '%s %s' "$CFLAGS_DEB" "$LDFLAGS_DEB" | sed 's/-ffile-prefix-map=[^ ]*//g')
 OPZIONI="piper=$COMMIT espeak=$ESPEAK_COMMIT ort=$ORT_VERSIONE cmake=$(sha256sum CMakeLists.txt | cut -c1-16) stream=$(sha256sum ruscapiper-stream.c | cut -c1-16) patch=$([ -z "$PATCH_ORT" ] || sha256sum "$PATCH_ORT" | cut -c1-16) flags=$FLAGS_FIRMA"
