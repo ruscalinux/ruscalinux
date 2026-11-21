@@ -427,17 +427,19 @@ velocità: 0,95
 
 #### 1.7.8 Il volto
 
-Il volto è disegnato da `face.py` con Cairo in un `Gtk.DrawingArea`, aggiornato con `add_tick_callback()` (al ritmo dello schermo, senza timer propri). Niente immagini, niente modelli: solo forme, quasi tutte ellissi.
+Il volto è disegnato da `face.py` con Cairo in un `Gtk.DrawingArea`, aggiornato con `add_tick_callback()` (al ritmo dello schermo, senza timer propri). Niente immagini, niente modelli: un’illustrazione vettoriale fatta di curve e sfumature.
 
 **Ellittica.** Una donna digitale, personaggio originale (nessun volto reale come modello):
 
-- volto ovale color Rosa 100 (`#f6e4ec`), capelli **corti** color Prugna 600 (`#7a2357`) con la frangia di lato e un riflesso Prugna 500 (`#8a2b5f`);
-- **occhiali** con lenti ovali e montatura sottile Prugna 900 (`#2d0a1d`), con un riflesso fisso in alto;
-- una **matita dietro l’orecchio** (legno `#e8b04a`, gomma Rosa 250, punta Prugna 800): è il suo segno di riconoscimento, ripreso nell’icona;
-- occhi grandi con l’iride Prugna 500 e due riflessi, sopracciglia morbide un po’ sollevate verso l’interno, guance Rosa 300;
+- volto ovale, pelle rosata chiara; capelli **corti** color Prugna 600 (`#7a2357`): un caschetto che arriva al mento con le punte verso l’interno, la frangia di lato che scende da sinistra a destra in ciocche morbide, la ciocca sinistra davanti al viso e la destra portata **dietro l’orecchio**; un riflesso di luce sulla testa e, sul bordo destro, il riflesso rosa dell’orbita;
+- **occhiali** con lenti ovali e montatura sottile Prugna 900 (`#2d0a1d`), più chiara in basso, con un riflesso obliquo sulle lenti e una leggera ombra sulla pelle;
+- una **matita dietro l’orecchio** (legno `#e8b04a`, gomma Rosa 250, punta Prugna 800): è il suo segno di riconoscimento, ripreso nell’icona. L’icona di RuscaLLisse segue la regola delle altre (l’anello dell’emblema con il simbolo del tool al posto dell’aeroplanino): nel disco c’è il ritratto di Ellittica, con caschetto, occhiali, matita e orbita, generato da `branding/generators/ruscalinux-tool-icons.py`;
+- occhi grandi a mandorla: iride Prugna 500 più chiara in basso, con le fibre, l’anello scuro sul bordo, la pupilla e due riflessi; palpebra superiore più spessa verso l’esterno, con tre ciglia e la piega sopra; sopracciglia piene, sottili in coda; guance Rosa 300; un piccolo orecchino a forma d’orbita;
 - intorno alla testa un’**orbita**: un’ellisse sottile Rosa 300 con un punto che la percorre (davanti alla testa Prugna 600 con il bordo crema, dietro Rosa 300).
 
-**Disegno.** Spazio di disegno di 400 × 400 punti, scalato sulla finestra. Forme definite con sfumature leggere dello stesso colore (luce sulla frangia, ombra sotto il mento, iride con riflessi, labbra con il labbro superiore ad arco di Cupido): il volto resta pulito, senza contorni pesanti. Occhi a mandorla con due ciglia morbide all’angolo esterno; un maglione prugna con una camicetta a V e un piccolo ciondolo a forma d’orbita. L’orbita passa davvero dietro la testa (metà disegnata prima dei capelli) e davanti (metà disegnata dopo il volto).
+**Disegno.** Spazio di disegno di 400 × 400 punti, scalato sulla finestra. La luce viene da sinistra in alto: chiaroscuro del viso fatto di sfumature (ombra a destra e sotto la mascella, luce su fronte, zigomi e mento), ombre morbide della frangia e delle ciocche sulla pelle (Cairo non sfoca: la stessa sagoma ripetuta, spostata e sempre più trasparente), labbra con l’arco di Cupido e un riflesso, naso appena accennato. Maglione prugna a coste con una camicetta e un ciondolo a forma d’orbita su una catenina. L’orbita passa davvero dietro la testa (metà disegnata prima del volto) e davanti (metà disegnata dopo i capelli). Nessun contorno pesante.
+
+**Velocità.** Il volto non deve togliere il processore ai motori. Le parti che non cambiano (capelli dietro e davanti, viso con le ombre, orecchio, matita, naso, maglione) si disegnano **una volta** per dimensione della finestra in tre immagini in memoria (`_layer()`, al massimo dieci, le più vecchie si buttano) e a ogni fotogramma si incollano; si ridisegnano solo occhi, sopracciglia, occhiali, bocca, orbita e riflesso. L’inclinazione della testa (quando ascolta o pensa) è salvata nelle immagini a passi di 0,004 radianti, invisibili; a riposo la testa **ondeggia di lato** invece di ruotare, perché incollare un’immagine ruotata costa cinque volte tanto. Misure di riferimento: circa 3 ms a fotogramma a 400 pixel e 6 ms a 700 (il volto disegnato tutto ogni volta costava 15 e 28 ms); il primo fotogramma, e quelli in cui la testa si sta inclinando, costano di più.
 
 **La materializzazione.** La prima volta che il volto compare, mentre i modelli si caricano, Ellittica si materializza dal nulla in circa 2,8 secondi (`APPEAR_TIME`): scie di luce rosa arrivano a spirale da ogni parte e si raccolgono nella sua sagoma (contorno dei capelli e del volto, occhiali, bocca, spalle); poi il volto compare dal basso dietro una linea di luce, e alla fine l’orbita si disegna da sola intorno alla testa. Con «Animazioni ridotte» compare subito, senza effetto.
 
@@ -445,7 +447,7 @@ Il volto è disegnato da `face.py` con Cairo in un `Gtk.DrawingArea`, aggiornato
 
 | Stato | Volto |
 |---|---|
-| A riposo | Respiro lento, battito di ciglia ogni 2–5 s, sguardo che vaga appena, sorriso leggero, orbita lenta |
+| A riposo | Respiro lento, testa che ondeggia appena, battito di ciglia ogni 2–5 s, sguardo con piccoli scatti come quello di una persona vera, sorriso leggero, orbita lenta |
 | In ascolto | Testa inclinata di circa 5°, sopracciglia sollevate, occhi un po’ socchiusi in un sorriso; l’orbita si ispessisce con il livello del microfono, così si vede che sente |
 | Pensa | Sguardo in alto, oltre la montatura; il punto corre veloce sull’orbita |
 | Parla | Bocca dai visemi e dall’ampiezza dell’audio; sopracciglia che seguono l’intonazione; a fine frase una breve pausa con lo sguardo verso l’utente |
@@ -457,9 +459,9 @@ Il volto è disegnato da `face.py` con Cairo in un `Gtk.DrawingArea`, aggiornato
 
 **Espressioni.** Le etichette d’emozione (sezione 1.7.6) cambiano sopracciglia, occhi e angoli della bocca per la frase che segue: `sorride` (occhi socchiusi, angoli in alto), `pensierosa` (sguardo di lato, un sopracciglio alzato), `commossa` (sopracciglia sollevate all’interno, sguardo morbido), `divertita` (sorriso largo), `perplessa` (sopracciglia asimmetriche), `seria` (sopracciglia diritte, bocca neutra).
 
-**Eccezione alla sezione 3.11, regola 5.** Il volto è il contenuto del programma, non una decorazione: le sue animazioni sono ammesse. Con **Animazioni ridotte** attivo (`Gtk.Settings:gtk-enable-animations` spento) il volto non respira, non vaga con lo sguardo e l’orbita è ferma: cambiano solo l’espressione da uno stato all’altro, il battito di ciglia e la bocca mentre parla.
+**Eccezione alla sezione 3.11, regola 5.** Il volto è il contenuto del programma, non una decorazione: le sue animazioni sono ammesse. Con **Animazioni ridotte** attivo (`Gtk.Settings:gtk-enable-animations` spento) il volto non respira, non ondeggia, non sposta lo sguardo e l’orbita è ferma: cambiano solo l’espressione da uno stato all’altro, il battito di ciglia e la bocca mentre parla.
 
-**Colori e contrasti.** Il volto usa la palette della sezione 4.1, più il legno della matita (`#e8b04a`), solo decorativo, e **non cambia con il tema**: contorni, occhiali e sopracciglia stanno sul volto (Rosa 100) e non sul fondo, quindi restano leggibili anche in modalità scura, dove il volto sta su `--view-bg-color`. Nessun testo è disegnato sul volto.
+**Colori e contrasti.** Il volto usa la palette della sezione 4.1, più il legno della matita (`#e8b04a`), solo decorativo, e **non cambia con il tema**: contorni, occhiali e sopracciglia stanno sul volto (pelle chiara) e non sul fondo, quindi restano leggibili anche in modalità scura, dove il volto sta su `--view-bg-color`. Nessun testo è disegnato sul volto.
 
 **Accessibilità.** Il `Gtk.DrawingArea` ha un’etichetta accessibile che dice l’entità e lo stato («Ellittica, in ascolto»), aggiornata a ogni cambio di stato. Lo stato si legge anche nel sottotitolo della barra del titolo, quindi non è affidato solo al disegno.
 

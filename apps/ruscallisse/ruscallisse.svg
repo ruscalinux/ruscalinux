@@ -1,28 +1,60 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
-  <!-- RuscaLLisse — Ellittica: capelli corti, occhiali ovali, matita, orbita. GPL-3.0 -->
-  <ellipse cx="64" cy="122" rx="40" ry="12" fill="#8a2b5f"/>
-  <ellipse cx="64" cy="104" rx="11" ry="14" fill="#f8d7e6"/>
-  <ellipse cx="64" cy="54" rx="38" ry="35" fill="#7a2357"/>
-  <ellipse cx="31" cy="70" rx="8" ry="16" fill="#7a2357"/>
-  <ellipse cx="97" cy="70" rx="8" ry="16" fill="#7a2357"/>
-  <ellipse cx="64" cy="64" rx="31" ry="38" fill="#f6e4ec"/>
-  <g transform="translate(97 60) rotate(35)">
-    <rect x="-3" y="-24" width="6" height="40" fill="#e8b04a"/>
-    <rect x="-3" y="-28" width="6" height="5" fill="#f5b8d3"/>
-    <path d="M-3 16 L3 16 L0 24 Z" fill="#3a1028"/>
+  <title>RuscaLLisse</title>
+  <desc>Icona di RuscaLLisse: l’emblema di RuscaLinux con il simbolo del tool al posto dell’aeroplanino. Generata da gen_icons.py.</desc>
+  <defs>
+    <linearGradient id="ring" x1="0.15" y1="0" x2="0.75" y2="1">
+      <stop offset="0" stop-color="#8a2b5f"/>
+      <stop offset="0.5" stop-color="#7a2357"/>
+      <stop offset="1" stop-color="#5c1a40"/>
+    </linearGradient>
+    <radialGradient id="disc" cx="0.4" cy="0.35" r="0.75">
+      <stop offset="0" stop-color="#fff7f0"/>
+      <stop offset="1" stop-color="#f8d7e6"/>
+    </radialGradient>
+  </defs>
+  <!-- disco interno: dà al simbolo un fondo chiaro su qualsiasi sfondo -->
+  <circle cx="72.29" cy="51.06" r="42.05" fill="url(#disc)"/>
+  <!-- ombra sottile dell'anello (niente sfocature: resta nitida a ogni dimensione) -->
+  <path d="M213.2,385.4c-81.2-13.6-137.1-89.8-125-171.8c10.7-72.2,71.2-127.3,144-131.2c84.2-4.5,156.4,60.8,161.1,145c3.2,57.1-23.7,110.1-66.7,141.4c-15.3,11.1-34.8,19.3-51.2,12.5c-15.6-6.5-19.1-26.6-11.4-39.8c15.1-25.9,50.7-27.1,73.5-47.8c34.3-31.1,48.2-82.7,33-126.7c-18.7-54-78.5-87.1-133.1-73.8c-55.7,13.6-94,68-85.1,124.9c7,44.7,42.2,81.1,87,88.2c16.1,2.5,23.3,23.1,13.4,36.2C241.6,411.3,222.8,387,213.2,385.4z" transform="translate(-26.390 -21.883) scale(0.37662)" fill="#2d0a1d" opacity="0.22"/>
+  <!-- anello dell'emblema RuscaLinux -->
+  <path d="M213.2,385.4c-81.2-13.6-137.1-89.8-125-171.8c10.7-72.2,71.2-127.3,144-131.2c84.2-4.5,156.4,60.8,161.1,145c3.2,57.1-23.7,110.1-66.7,141.4c-15.3,11.1-34.8,19.3-51.2,12.5c-15.6-6.5-19.1-26.6-11.4-39.8c15.1-25.9,50.7-27.1,73.5-47.8c34.3-31.1,48.2-82.7,33-126.7c-18.7-54-78.5-87.1-133.1-73.8c-55.7,13.6-94,68-85.1,124.9c7,44.7,42.2,81.1,87,88.2c16.1,2.5,23.3,23.1,13.4,36.2C241.6,411.3,222.8,387,213.2,385.4z" transform="translate(-26.390 -23.883) scale(0.37662)" fill="url(#ring)"/>
+  <!-- simbolo del tool -->
+  <g transform="translate(46.012 24.792) scale(0.5255)">
+  <!-- Ellittica: caschetto, frangia di lato, occhiali ovali, matita, orbita -->
+  <defs>
+    <linearGradient id="ell-hair" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0" stop-color="#8a2b5f"/><stop offset="1" stop-color="#5c1a40"/>
+    </linearGradient>
+    <radialGradient id="ell-skin" cx="0.42" cy="0.38" r="0.7">
+      <stop offset="0" stop-color="#fbf4f7"/><stop offset="1" stop-color="#f3d3e1"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="50" cy="27" rx="47" ry="11" transform="rotate(-14 50 27)" fill="none" stroke="#f2a7c8" stroke-width="3" stroke-dasharray="74 300" stroke-dashoffset="-148" opacity="0.8"/>
+  <path d="M20 100C22 89 34 84 50 84C66 84 78 89 80 100Z" fill="#7a2357"/>
+  <path d="M41 84 50 95 59 84Z" fill="#fff7f0"/>
+  <path d="M12 58C9 28 26 8 50 8C74 8 91 28 88 58C87 72 81 80 70 82H30C19 80 13 72 12 58Z" fill="url(#ell-hair)"/>
+  <ellipse cx="50" cy="52" rx="27" ry="31" fill="url(#ell-skin)"/>
+  <g transform="translate(80 37) rotate(-54)">
+    <rect x="-3" y="-15" width="6" height="26" fill="#e8b04a"/>
+    <rect x="-3" y="-19" width="6" height="4.5" fill="#f2a7c8"/>
+    <path d="M-3 11H3L0 17Z" fill="#2d0a1d"/>
   </g>
-  <path d="M31 66 C30 40 44 25 66 25 C88 25 98 42 97 64 C93 50 86 42 74 40 C64 46 50 49 40 48 C35 52 32 58 31 66 Z" fill="#7a2357"/>
-  <ellipse cx="64" cy="58" rx="58" ry="16" transform="rotate(-15 64 58)" fill="none" stroke="#f2a7c8" stroke-width="2.5"/>
-  <circle cx="117" cy="44" r="4" fill="#7a2357" stroke="#fff7f0" stroke-width="1.5"/>
-  <ellipse cx="52" cy="66" rx="6" ry="5" fill="#fff7f0"/>
-  <ellipse cx="76" cy="66" rx="6" ry="5" fill="#fff7f0"/>
-  <circle cx="52" cy="66" r="3" fill="#2d0a1d"/>
-  <circle cx="76" cy="66" r="3" fill="#2d0a1d"/>
-  <ellipse cx="52" cy="66" rx="10" ry="8" fill="none" stroke="#2d0a1d" stroke-width="2"/>
-  <ellipse cx="76" cy="66" rx="10" ry="8" fill="none" stroke="#2d0a1d" stroke-width="2"/>
-  <path d="M61 65 Q64 62 67 65" fill="none" stroke="#2d0a1d" stroke-width="2"/>
-  <ellipse cx="46" cy="78" rx="5" ry="3" fill="#f2a7c8"/>
-  <ellipse cx="82" cy="78" rx="5" ry="3" fill="#f2a7c8"/>
-  <path d="M57 86 Q64 91 71 86" fill="none" stroke="#7a2357" stroke-width="2.4" stroke-linecap="round"/>
+  <path d="M21 52C19 28 33 15 52 15C70 15 82 27 80 44C76 37 70 34 63 34C57 38 50 38 43 36C35 38 27 43 21 52Z" fill="url(#ell-hair)"/>
+  <path d="M30 31C38 22 52 19 66 22" fill="none" stroke="#f2a7c8" stroke-width="2.4" stroke-linecap="round" opacity="0.7"/>
+  <ellipse cx="33" cy="66" rx="6" ry="3.6" fill="#f2a7c8" opacity="0.75"/>
+  <ellipse cx="67" cy="66" rx="6" ry="3.6" fill="#f2a7c8" opacity="0.75"/>
+  <circle cx="39" cy="55" r="3.6" fill="#2d0a1d"/>
+  <circle cx="61" cy="55" r="3.6" fill="#2d0a1d"/>
+  <circle cx="40.3" cy="53.6" r="1.3" fill="#fff7f0"/>
+  <circle cx="62.3" cy="53.6" r="1.3" fill="#fff7f0"/>
+  <g fill="#fff7f0" fill-opacity="0.25" stroke="#2d0a1d" stroke-width="2.4">
+    <ellipse cx="39" cy="55" rx="10.5" ry="8.5"/>
+    <ellipse cx="61" cy="55" rx="10.5" ry="8.5"/>
+  </g>
+  <path d="M48 54Q50 51.5 52 54" fill="none" stroke="#2d0a1d" stroke-width="2.2" stroke-linecap="round"/>
+  <path d="M42 70Q50 77 58 70" fill="none" stroke="#7a2357" stroke-width="3.2" stroke-linecap="round"/>
+  <ellipse cx="50" cy="27" rx="47" ry="11" transform="rotate(-14 50 27)" fill="none" stroke="#f2a7c8" stroke-width="3" stroke-dasharray="148 300"/>
+  <circle cx="95" cy="16" r="4.2" fill="#7a2357" stroke="#fff7f0" stroke-width="1.6"/>
+  </g>
 </svg>

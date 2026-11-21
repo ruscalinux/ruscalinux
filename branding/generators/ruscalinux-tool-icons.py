@@ -75,10 +75,48 @@ GLYPHS = {
   <g stroke="{P_MID}" stroke-width="6" stroke-linecap="round"><path d="M12 18h34M12 32h22"/></g>
   <path d="M92 34H42a9 9 0 0 0-9 9v30a9 9 0 0 0 9 9h26l16 14V82h8a9 9 0 0 0 9-9V43a9 9 0 0 0-9-9z" fill="{P_MID}"/>
   <g stroke="{CREAM}" stroke-width="6" stroke-linecap="round"><path d="M46 50h36M46 64h22"/></g>''',
+
+"ruscallisse": f'''
+  <!-- Ellittica: caschetto, frangia di lato, occhiali ovali, matita, orbita -->
+  <defs>
+    <linearGradient id="ell-hair" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0" stop-color="{P500}"/><stop offset="1" stop-color="{P_MID}"/>
+    </linearGradient>
+    <radialGradient id="ell-skin" cx="0.42" cy="0.38" r="0.7">
+      <stop offset="0" stop-color="{R50}"/><stop offset="1" stop-color="#f3d3e1"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="50" cy="27" rx="47" ry="11" transform="rotate(-14 50 27)" fill="none" stroke="{R300}" stroke-width="3" stroke-dasharray="74 300" stroke-dashoffset="-148" opacity="0.8"/>
+  <path d="M20 100C22 89 34 84 50 84C66 84 78 89 80 100Z" fill="{P600}"/>
+  <path d="M41 84 50 95 59 84Z" fill="{CREAM}"/>
+  <path d="M12 58C9 28 26 8 50 8C74 8 91 28 88 58C87 72 81 80 70 82H30C19 80 13 72 12 58Z" fill="url(#ell-hair)"/>
+  <ellipse cx="50" cy="52" rx="27" ry="31" fill="url(#ell-skin)"/>
+  <g transform="translate(80 37) rotate(-54)">
+    <rect x="-3" y="-15" width="6" height="26" fill="#e8b04a"/>
+    <rect x="-3" y="-19" width="6" height="4.5" fill="{R300}"/>
+    <path d="M-3 11H3L0 17Z" fill="{P900}"/>
+  </g>
+  <path d="M21 52C19 28 33 15 52 15C70 15 82 27 80 44C76 37 70 34 63 34C57 38 50 38 43 36C35 38 27 43 21 52Z" fill="url(#ell-hair)"/>
+  <path d="M30 31C38 22 52 19 66 22" fill="none" stroke="{R300}" stroke-width="2.4" stroke-linecap="round" opacity="0.7"/>
+  <ellipse cx="33" cy="66" rx="6" ry="3.6" fill="{R300}" opacity="0.75"/>
+  <ellipse cx="67" cy="66" rx="6" ry="3.6" fill="{R300}" opacity="0.75"/>
+  <circle cx="39" cy="55" r="3.6" fill="{P900}"/>
+  <circle cx="61" cy="55" r="3.6" fill="{P900}"/>
+  <circle cx="40.3" cy="53.6" r="1.3" fill="{CREAM}"/>
+  <circle cx="62.3" cy="53.6" r="1.3" fill="{CREAM}"/>
+  <g fill="{CREAM}" fill-opacity="0.25" stroke="{P900}" stroke-width="2.4">
+    <ellipse cx="39" cy="55" rx="10.5" ry="8.5"/>
+    <ellipse cx="61" cy="55" rx="10.5" ry="8.5"/>
+  </g>
+  <path d="M48 54Q50 51.5 52 54" fill="none" stroke="{P900}" stroke-width="2.2" stroke-linecap="round"/>
+  <path d="M42 70Q50 77 58 70" fill="none" stroke="{P600}" stroke-width="3.2" stroke-linecap="round"/>
+  <ellipse cx="50" cy="27" rx="47" ry="11" transform="rotate(-14 50 27)" fill="none" stroke="{R300}" stroke-width="3" stroke-dasharray="148 300"/>
+  <circle cx="95" cy="16" r="4.2" fill="{P600}" stroke="{CREAM}" stroke-width="1.6"/>''',
 }
 
 TITLES = {"ruscacleaner": "RuscaCleaner", "ruscahub": "RuscaHub", "ruscamark": "RuscaMark",
-          "ruscawriter": "RuscaWriter", "ruscallama": "RuscaLLama", "ruscatranslator": "RuscaTranslator"}
+          "ruscawriter": "RuscaWriter", "ruscallama": "RuscaLLama", "ruscatranslator": "RuscaTranslator",
+          "ruscallisse": "RuscaLLisse"}
 
 
 def full_icon(tool):
