@@ -155,6 +155,28 @@ class AmethystTableTest(unittest.TestCase):
         self.assertGreater(caught, 0)
         self.assertLess(caught / seconds, 1 / 8, "trappola troppo facile")
 
+    def test_dish_bounces_the_ball_up(self):
+        table = T.Table()
+        (x0, y), (x1, _) = T.DISH
+        ball = Ball((x0 + x1) / 2, y - 30, 0, 300)
+        hit = False
+        for _ in range(int(0.5 / DT)):
+            for tag, _speed in table.world.step(ball, DT, 5):
+                hit = hit or tag == ("dish", 0)
+            if hit:
+                break
+        self.assertTrue(hit)
+        self.assertLess(ball.vy, -200, "la cupola deve rimbalzare la pallina verso l'alto")
+
+    def test_new_elements_are_on_the_field(self):
+        """Lampade nuove dentro il campo e lontane da bumper e trappola."""
+        pts = T.arc_lamps() + T.inlane_lamps() + [T.ROLLOVER, T.POWER_LAMP, T.CENTER_TARGET]
+        for x, y in pts:
+            self.assertTrue(T.LEFT < x < T.RIGHT and 0 < y < T.HEIGHT, (x, y))
+        for x, y in T.arc_lamps():
+            for px in T.LANE_POSTS:
+                self.assertFalse(abs(x - px) < 10 and T.TOP_LANE_Y[0] - 8 < y, (x, y))
+
     def test_bonus_lamps(self):
         self.assertEqual(T.bonus_lamps_on(0), (0, 0))
         self.assertEqual(T.bonus_lamps_on(7), (7, 0))
@@ -276,6 +298,33 @@ class GameTest(unittest.TestCase):
         self.assertEqual(g.score - start, 12 * self.R.BONUS_UNIT * 2)
         self.assertTrue({11, 6, 1, 0} <= seen)
         self.assertEqual(g.ball_num, 2)
+
+    def test_center_target_lights_double_bumpers(self):
+        g = self.g
+        g.on_hit(("bumper", 0))
+        single = g.score
+        g.on_hit(("center", 0))
+        self.assertTrue(g.powered())
+        before = g.score
+        g.on_hit(("bumper", 0))
+        self.assertEqual(g.score - before, 2 * single)
+        g.clock_t += T.POWER_SECONDS + 0.1
+        self.assertFalse(g.powered())
+
+    def test_rollover_and_inlanes(self):
+        g = self.g
+        g.ball.x, g.ball.y = T.ROLLOVER
+        g.ball.vx = g.ball.vy = 0
+        g.tick(1 / 120)
+        self.assertEqual(g.bonus, 1)
+        g.power_until = g.clock_t + 5
+        g.on_rollover()
+        self.assertEqual(g.bonus, 3, "col fulmine il pulsante vale due passi")
+        g.on_inlane(0)
+        self.assertEqual(g.mult, 1)
+        g.on_inlane(1)
+        self.assertEqual(g.mult, 2)
+        self.assertEqual(g.inlanes, [False, False])
 
     def test_tilt_loses_the_bonus(self):
         g = self.g

@@ -49,5 +49,7 @@
  "msg_trap": "Trappola del bonus! {points}",
  "msg_special_lit": "SPECIAL acceso: vai alla trappola!",
  "msg_special": "SPECIAL!",
- "marquee": "TAVOLO, GRAFICA E SUONI ORIGINALI"
+ "marquee": "TAVOLO, GRAFICA E SUONI ORIGINALI",
+ "msg_power": "Fulmine! Bumper doppi per 15 secondi",
+ "msg_inlanes": "Corsie interne! Moltiplicatore {n}×"
 }

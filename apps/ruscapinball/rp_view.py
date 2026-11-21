@@ -195,6 +195,30 @@ def draw_canvas(fonts, lit):
     pygame.draw.rect(s, CREMA if lit else PRUGNA_600, box, 3, border_radius=6)
     # salvataggio della pallina
     _lamp(s, fonts["lamp"], T.SAVE_LAMP, lit, r=7)
+    # luci sull'arco: il valore dei bumper
+    for p in T.arc_lamps():
+        _lamp(s, fonts["lamp"], p, lit, r=6)
+    # corsie interne: lampada con la freccia verso il flipper
+    for i, p in enumerate(T.inlane_lamps()):
+        _lamp(s, fonts["lamp"], p, lit, r=8)
+        d = 1 if i == 0 else -1
+        _poly(s, PRUGNA_900 if lit else PRUGNA_600,
+              [(p[0] - 3 * d, p[1] - 4), (p[0] + 4 * d, p[1] + 1), (p[0] - 3 * d, p[1] + 5)])
+    # pulsante del bonus: una stella a filo del tavolo
+    cx, cy = T.ROLLOVER
+    _circle(s, PRUGNA_600, T.ROLLOVER, 12)
+    star = []
+    for k in range(10):
+        rr = 10 if k % 2 == 0 else 4
+        a = -math.pi / 2 + k * math.pi / 5
+        star.append((cx + rr * math.cos(a), cy + rr * math.sin(a)))
+    _poly(s, CREMA if lit else AMETISTA_500, star)
+    # il fulmine
+    bx, by = T.POWER_LAMP
+    bolt = [(bx + 4, by - 15), (bx - 7, by + 2), (bx - 1, by + 2), (bx - 5, by + 15),
+            (bx + 8, by - 3), (bx + 2, by - 3), (bx + 7, by - 15)]
+    _poly(s, ROSA_250 if lit else PRUGNA_750, bolt)
+    _poly(s, CREMA if lit else PRUGNA_600, bolt, 2)
     # frecce delle corsie interne
     for x, y, d in ((70, 585, 1), (380, 585, -1)):
         _poly(s, PRUGNA_600, [(x, y), (x + 14 * d, y + 12), (x, y + 24)])
@@ -228,8 +252,8 @@ def draw_labels(surf, fonts, lit):
         surf.blit(img, img.get_rect(center=(round(p[0]), round(p[1]))))
 
     on, off = PRUGNA_900, ROSA_300
-    label(fonts["table_small"], "RUSCALINUX · 2026", AMETISTA_300, project(225, T.TITLE_Y + 26))
-    label(fonts["lamp_small"], "BONUS", AMETISTA_300, project(225, 449))
+    label(fonts["table_small"], "RUSCALINUX · 2026", AMETISTA_300, project(225, T.TITLE_Y + 24))
+    label(fonts["lamp_small"], "BONUS", AMETISTA_300, project(225, T.RING_C[1] - 36))
     for n, p in enumerate(T.BONUS_LAMPS, 1):
         label(fonts["lamp"], str(n), on if lit else off, project(*p))
     for k, p in enumerate(T.TENS_LAMPS, 1):
@@ -345,6 +369,14 @@ def element_rects():
     rects["special"] = project_rect(cx - w / 2 - 2, cy - h / 2 - 2, cx + w / 2 + 2, cy + h / 2 + 2)
     x, y = T.SAVE_LAMP
     rects["save"] = project_rect(x - 10, y - 10, x + 10, y + 10)
+    for i, (x, y) in enumerate(T.arc_lamps()):
+        rects[("arc", i)] = project_rect(x - 7, y - 7, x + 7, y + 7)
+    for i, (x, y) in enumerate(T.inlane_lamps()):
+        rects[("inlane", i)] = project_rect(x - 9, y - 9, x + 9, y + 9)
+    x, y = T.ROLLOVER
+    rects["rollover"] = project_rect(x - 11, y - 11, x + 11, y + 11)
+    x, y = T.POWER_LAMP
+    rects["power"] = project_rect(x - 10, y - 17, x + 11, y + 17)
     x, y = T.TRAP_ARROW
     rects["arrow"] = project_rect(x - 14, y - 14, x + 14, y + 14)
     for i, (y0, y1) in enumerate(T.DROP_TARGETS):
@@ -376,6 +408,38 @@ def draw_bumper(surf, x, y, hot, label):
     inner = cap_top.inflate(-round(cap_top.w * 0.22), -round(cap_top.h * 0.36))
     pygame.draw.ellipse(surf, PRUGNA_600 if not hot else ROSA_300, inner)
     surf.blit(label, label.get_rect(center=inner.center))
+
+
+def draw_center_target(surf, hot, powered):
+    """Bersaglio centrale: un ovale in piedi fra i due bumper alti."""
+    x, y = T.CENTER_TARGET
+    r = T.CENTER_R
+    base, top = ellipse_rect(x, y, r), ellipse_rect(x, y, r, 16)
+    side = PRUGNA_500 if not hot else ROSA_250
+    pygame.draw.ellipse(surf, AMETISTA_700, ellipse_rect(x, y, r + 3))
+    pygame.draw.rect(surf, side, top.union(base).inflate(0, -base.h))
+    pygame.draw.ellipse(surf, side, base)
+    pygame.draw.ellipse(surf, CREMA if hot else (ROSA_250 if powered else AMETISTA_300), top)
+    pygame.draw.ellipse(surf, CREMA, top, 1)
+
+
+def draw_dish(surf, hot):
+    """Cupola sotto il bumper centrale: un piatto bombato che rimbalza la pallina."""
+    (x0, y), (x1, _) = T.DISH
+    pts0 = [project(x0, y - 6), project(x1, y - 6), project(x1, y + 6), project(x0, y + 6)]
+    pts1 = [project(px, py, 6) for px, py in ((x0, y - 6), (x1, y - 6), (x1, y + 6), (x0, y + 6))]
+    for i in range(4):
+        j = (i + 1) % 4
+        pygame.draw.polygon(surf, AMETISTA_700, [pts0[i], pts0[j], pts1[j], pts1[i]])
+    pygame.draw.polygon(surf, PRUGNA_500 if not hot else ROSA_250, pts1)
+    left, right = project(x0 + 4, y, 6), project(x1 - 4, y, 6)
+    h = 12 * scale_at(y)[1] + 6
+    dome = pygame.Rect(round(left[0]), round(left[1] - h), round(right[0] - left[0]), round(2 * h))
+    clip = surf.get_clip()
+    surf.set_clip(pygame.Rect(dome.x, dome.y, dome.w, dome.h // 2 + 1))
+    pygame.draw.ellipse(surf, CREMA if hot else ROSA_300, dome)
+    pygame.draw.ellipse(surf, CREMA, dome, 1)
+    surf.set_clip(clip)
 
 
 def draw_flipper(surf, fl):

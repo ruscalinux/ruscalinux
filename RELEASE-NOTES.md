@@ -109,7 +109,8 @@
   them from the app.
 - **A pinball game.** RuscaPinball brings the “Amethyst” table, seen in
   perspective like the 1980s home computer pinball games: mushroom
-  bumpers, the bonus trap, a ring of bonus lamps that counts down at the
+  bumpers, a centre target that lights double bumpers, a dome kicker, the
+  bonus trap, a ring of bonus lamps that counts down at the
   end of each ball, the SPECIAL for an extra ball and the R-U-S-C-A
   letters. Original table, graphics and sounds; keyboard or gamepad. It is
   in the RuscaLinux Apps folder and in the Games category.

@@ -24,7 +24,7 @@ ARC_C = ((LEFT + LANE_X1) / 2, 200.0)   # arco superiore (mezza ellisse)
 ARC_R = ((LANE_X1 - LEFT) / 2, 180.0)
 
 # ── elementi attivi ─────────────────────────────────────────────────────────
-BUMPERS = [(160, 238), (300, 238), (230, 318)]
+BUMPERS = [(160, 212), (300, 212), (230, 288)]
 BUMPER_R = 24
 LANE_POSTS = [120, 170, 220, 270, 320]   # paletti delle quattro corsie in alto
 TOP_LANES = [145, 195, 245, 295]         # centri delle corsie
@@ -37,6 +37,28 @@ RUSCA_X = 423
 RUSCA_Y = [280 + i * 30 for i in range(5)]
 RUSCA_LEN = 22
 
+# Bersaglio centrale: l'ovale fra i due bumper alti. Accende il fulmine:
+# per POWER_SECONDS i bumper valgono il doppio.
+# Fisicamente è un cerchio: una sbarra piatta farebbe da mensola e la
+# pallina ci resterebbe ferma sopra.
+CENTER_TARGET = (230, 200)
+CENTER_R = 11
+POWER_SECONDS = 15.0
+POWER_LAMP = (292, 326)          # il fulmine, accanto alla cupola
+
+# Cupola: sotto il bumper centrale, rimbalza la pallina verso l'alto.
+DISH = ((196, 340), (264, 340))
+DISH_KICK = 380
+
+# Pulsante del bonus: un bottone a filo del tavolo sopra l'anello; la
+# pallina che ci passa sopra fa avanzare il bonus (di due col fulmine).
+ROLLOVER = (225, 420)
+ROLLOVER_R = 13
+
+# Luci sull'arco: quante sono accese dice il valore dei bumper (100-500).
+ARC_LAMP_ANGLES = (188, 197, 206, 215, 224)
+ARC_LAMP_INSET = 24
+
 # Trappola del bonus: una buca in alto a sinistra. La pallina che ci passa
 # sopra abbastanza piano resta presa, poi viene ributtata verso i bumper.
 TRAP = (44, 250)
@@ -48,17 +70,17 @@ TRAP_ARROW = (80, 284)           # freccia che indica la trappola
 
 # Anello del bonus: nove lampade (1-9) attorno alle decine (10, 20, 30) e
 # alla lampada SPECIAL, come nei tavoli elettromeccanici.
-RING_C = (225, 485)
-RING_R = (84, 58)
+RING_C = (225, 495)
+RING_R = (84, 52)
 LAMP_R = 12
 BONUS_LAMPS = [(RING_C[0] + RING_R[0] * math.cos(math.radians(a)),
                 RING_C[1] + RING_R[1] * math.sin(math.radians(a)))
                for a in range(-70, 290, 40)]            # 1 in alto a destra, poi in senso orario
-TENS_LAMPS = [(187, 470), (225, 470), (263, 470)]       # 10, 20, 30
-SPECIAL_LAMP = (225, 503, 70, 18)                       # centro, larghezza, altezza
+TENS_LAMPS = [(187, 480), (225, 480), (263, 480)]       # 10, 20, 30
+SPECIAL_LAMP = (225, 512, 70, 16)                       # centro, larghezza, altezza
 BONUS_MAX = 39
 SAVE_LAMP = (225, 600)
-TITLE_Y = 380
+TITLE_Y = 366
 
 SLING_L = [(60, 455), (60, 535), (122, 578)]
 SLING_R = [(2 * 225 - x, y) for x, y in SLING_L]
@@ -85,6 +107,23 @@ def guide_end(x0, pivot, r0=11.0, thick=2.0):
     if ny > 0:
         nx, ny = -nx, -ny
     return (pivot[0] + nx * (r0 - thick), pivot[1] + ny * (r0 - thick))
+
+
+def arc_lamps():
+    """Posizioni delle cinque luci del valore dei bumper, dentro l'arco."""
+    cx, cy = ARC_C
+    rx, ry = ARC_R[0] - ARC_LAMP_INSET, ARC_R[1] - ARC_LAMP_INSET
+    return [(cx + rx * math.cos(math.radians(a)), cy + ry * math.sin(math.radians(a)))
+            for a in ARC_LAMP_ANGLES]
+
+
+def inlane_lamps():
+    """Lampade delle corsie interne: fra la parete e lo slingshot, dove la
+    pallina scende verso il flipper."""
+    return [(LEFT + 20, 500), (RIGHT - 20, 500)]
+
+
+INLANE_R = 13
 
 
 def bonus_lamps_on(bonus):
@@ -144,6 +183,10 @@ class Table:
         # banco di bersagli abbattibili
         self.drops = [wall((DROP_X, y0), (DROP_X, y1), thick=3, e=0.35,
                            tag=("drop", i)) for i, (y0, y1) in enumerate(DROP_TARGETS)]
+        # bersaglio centrale e cupola
+        self.center = Circle(*CENTER_TARGET, CENTER_R, e=0.45, kick=0, tag=("center", 0))
+        w.circles.append(self.center)
+        self.dish = wall(*DISH, thick=6, e=0.4, kick=DISH_KICK, tag=("dish", 0))
         # bersagli R-U-S-C-A
         self.rusca = [wall((RUSCA_X, y), (RUSCA_X, y + RUSCA_LEN), thick=3, e=0.4,
                            tag=("rusca", i)) for i, y in enumerate(RUSCA_Y)]
@@ -169,6 +212,18 @@ class Table:
     @staticmethod
     def on_plunger(ball):
         return ball.x > LANE_X0 and ball.y > LANE_FLOOR - 40
+
+    @staticmethod
+    def on_rollover(ball):
+        return math.hypot(ball.x - ROLLOVER[0], ball.y - ROLLOVER[1]) < ROLLOVER_R
+
+    @staticmethod
+    def on_inlane(ball):
+        """Indice della corsia interna sotto la pallina (0 sinistra, 1 destra) o None."""
+        for i, (x, y) in enumerate(inlane_lamps()):
+            if math.hypot(ball.x - x, ball.y - y) < INLANE_R:
+                return i
+        return None
 
     @staticmethod
     def in_trap(ball):

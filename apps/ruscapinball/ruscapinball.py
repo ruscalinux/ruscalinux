@@ -301,6 +301,10 @@ class Game:
         self.extra_this_ball = False
         self.stuck = 0.0
         self.trapped = 0.0       # secondi che mancano al calcio della trappola
+        self.power_until = 0.0   # fulmine: bumper doppi fino a quest'ora
+        self.inlanes = [False, False]
+        self.inlane_cool = 0.0
+        self.rollover_cool = 0.0
         self.trap_cool = 0.0
         self.counting = None     # conteggio del bonus a fine pallina
 
@@ -560,6 +564,17 @@ class Game:
             self.on_trap()
             return
 
+        # pulsante del bonus e corsie interne (a filo del tavolo)
+        self.rollover_cool = max(0.0, self.rollover_cool - dt)
+        if not self.rollover_cool and T.Table.on_rollover(ball):
+            self.rollover_cool = 0.5
+            self.on_rollover()
+        self.inlane_cool = max(0.0, self.inlane_cool - dt)
+        side = T.Table.on_inlane(ball)
+        if side is not None and not self.inlane_cool:
+            self.inlane_cool = 0.5
+            self.on_inlane(side)
+
         # corsie in alto
         for i, x in enumerate(T.TOP_LANES):
             self.lane_cool[i] = max(0.0, self.lane_cool[i] - dt)
@@ -628,9 +643,24 @@ class Game:
     def on_hit(self, tag):
         kind, idx = tag if isinstance(tag, tuple) else (tag, 0)
         if kind == "bumper":
-            self.add(self.bumper_value)
+            self.add(self.bumper_value * (2 if self.powered() else 1))
             self.flash[("bumper", idx)] = 0.12
             self.snd.play("bumper")
+        elif kind == "center":
+            self.flash[("center", 0)] = 0.15
+            self.add(750)
+            self.advance_bonus(1)
+            if not self.powered() and self.state == "play" and not self.tilt:
+                self.say(self.t("msg_power"), 2.0)
+                self.snd.play("complete")
+            else:
+                self.snd.play("drop")
+            if not self.tilt:
+                self.power_until = self.clock_t + T.POWER_SECONDS
+        elif kind == "dish":
+            self.flash[("dish", 0)] = 0.12
+            self.add(50)
+            self.snd.play("kick")
         elif kind == "sling":
             self.add(10)
             self.flash[("sling", idx)] = 0.10
@@ -669,6 +699,32 @@ class Game:
             else:
                 self.add(100)
                 self.snd.play("sling")
+
+    def powered(self):
+        return self.clock_t < self.power_until
+
+    def on_rollover(self):
+        """Pulsante del bonus: un passo di bonus, due con il fulmine."""
+        self.flash[("rollover", 0)] = 0.3
+        self.add(300)
+        self.advance_bonus(2 if self.powered() else 1)
+        self.snd.play("lane")
+
+    def on_inlane(self, side):
+        """Corsie interne: accese tutte e due, il moltiplicatore sale."""
+        if self.inlanes[side]:
+            self.add(100)
+            return
+        self.inlanes[side] = True
+        self.add(500)
+        self.snd.play("lane")
+        if all(self.inlanes):
+            self.inlanes = [False, False]
+            self.add(2500)
+            if self.mult < 5:
+                self.mult += 1
+            self.say(self.t("msg_inlanes", n=self.mult))
+            self.snd.play("complete")
 
     def on_lane(self, i):
         if not self.lanes[i]:
@@ -754,8 +810,10 @@ class Game:
             on += [("lane", k % len(T.TOP_LANES))]
             on += [("bonus", 1 + (k + j) % 9) for j in (0, 3, 6)]
             on += [("tens", 1 + (k // 3) % 3), ("rusca", k % 5)]
+            on += [("arc", j) for j in range(5) if j <= k % 6]
+            on += [("inlane", k % 2)]
             if blink:
-                on += ["special", "arrow"]
+                on += ["special", "arrow", "power", "rollover"]
             return on
         on += [("lane", i) for i, v in enumerate(self.lanes) if v]
         units, tens = T.bonus_lamps_on(self.bonus)
@@ -765,6 +823,15 @@ class Game:
             on.append(("tens", tens))
         if self.special and blink:
             on += ["special", "arrow"]
+        on += [("arc", j) for j in range(min(5, self.bumper_value // 100))]
+        on += [("inlane", i) for i, v in enumerate(self.inlanes) if v]
+        if self.powered():
+            # il fulmine lampeggia più in fretta negli ultimi 3 secondi
+            left = self.power_until - t
+            if left > 3 or int(t * 8) % 2 == 0:
+                on += ["power", "rollover"]
+        elif self.lit(("rollover", 0)):
+            on.append("rollover")
         on += [("rusca", i) for i, v in enumerate(self.letters) if v or self.lit(("rusca", i))]
         on += [("drop", i) for i, s in enumerate(self.table.drops) if not s.active]
         on += [("sling", i) for i in (0, 1) if self.lit(("sling", i))]
@@ -774,10 +841,11 @@ class Game:
         return on
 
     def bumper_label(self):
-        img = self.bumper_labels.get(self.bumper_value)
+        value = self.bumper_value * (2 if self.powered() else 1)
+        img = self.bumper_labels.get(value)
         if img is None:
-            img = self.fonts["bumper"].render(str(self.bumper_value), False, CREMA)
-            self.bumper_labels[self.bumper_value] = img
+            img = self.fonts["bumper"].render(str(value), False, CREMA)
+            self.bumper_labels[value] = img
         return img
 
     def draw(self):
@@ -791,6 +859,7 @@ class Game:
         # bumper e pallina in ordine di distanza: ciò che è davanti copre
         ball_visible = self.state in ("play", "attract") and self.counting is None
         items = [(y, "bumper", i) for i, (x, y) in enumerate(T.BUMPERS)]
+        items += [(T.CENTER_TARGET[1], "center", 0), (T.DISH[0][1], "dish", 0)]
         if ball_visible:
             items.append((self.ball.y, "ball", 0))
         label = self.bumper_label()
@@ -798,6 +867,10 @@ class Game:
             if kind == "bumper":
                 x, y = T.BUMPERS[i]
                 V.draw_bumper(f, x, y, self.lit(("bumper", i)), label)
+            elif kind == "center":
+                V.draw_center_target(f, self.lit(("center", 0)), self.powered())
+            elif kind == "dish":
+                V.draw_dish(f, self.lit(("dish", 0)))
             else:
                 V.draw_ball(f, self.ball, sunk=bool(self.trapped))
         for fl in (self.table.left, self.table.right):

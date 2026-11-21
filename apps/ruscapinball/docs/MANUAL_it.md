@@ -27,10 +27,14 @@ Opzioni: `--fullscreen` (schermo intero), `--version`.
 ## Regole
 
 - Tre palline a partita. Nei primi 6 secondi dopo il lancio la pallina persa viene restituita (spia lampeggiante sopra i flipper).
-- **Bumper**: 100 punti, che salgono fino a 500 completando le corsie.
+- **Bumper**: 100 punti, che salgono fino a 500 completando le corsie; le luci sull’arco in alto a sinistra dicono quanto valgono.
+- **Bersaglio centrale** (l’ovale fra i due bumper alti): 750 punti e un passo di bonus; accende il **fulmine**, che per 15 secondi raddoppia i bumper (negli ultimi 3 lampeggia in fretta).
+- **Cupola** (sotto il bumper centrale): rimbalza la pallina verso i bumper, 50 punti.
+- **Pulsante del bonus** (la stella sopra l’anello): 300 punti e un passo di bonus, due con il fulmine acceso.
+- **Corsie interne** (fra la parete e gli slingshot): 500 punti ciascuna; accese tutte e due, 2.500 punti e moltiplicatore del bonus.
 - **Corsie in alto** (quattro): 500 punti ciascuna; i flipper spostano le spie accese. Con tutte e quattro accese: 5.000 punti e bumper più ricchi.
 - **Trappola del bonus** (in alto a sinistra, la freccia la indica): la pallina che ci passa abbastanza piano resta presa, poi viene ributtata verso i bumper. 2.000 punti più 1.000 per ogni grado del moltiplicatore, e tre passi di bonus.
-- **Bersagli abbattibili** (a sinistra): 500 punti ciascuno; abbattuti tutti, 2.500 punti e moltiplicatore del bonus (fino a 5×, indicato a destra).
+- **Bersagli abbattibili** (a sinistra): 500 punti ciascuno; abbattuti tutti, 2.500 punti e moltiplicatore del bonus (fino a 5×, indicato a destra; sale anche con le corsie interne).
 - **Lettere R-U-S-C-A** (a destra): 1.000 punti ciascuna; restano accese da una pallina all’altra. Completate: 15.000 punti e una pallina extra.
 - **Anello del bonus** (al centro): corsie, bersagli e lettere accendono le lampade 1–9 e 10, 20, 30, fino a 39. A fine pallina le lampade si spengono una alla volta, 1.000 punti ciascuna, per il moltiplicatore.
 - **SPECIAL**: con il bonus a 39 si accende la lampada SPECIAL; allora la trappola del bonus dà 25.000 punti e una pallina extra.

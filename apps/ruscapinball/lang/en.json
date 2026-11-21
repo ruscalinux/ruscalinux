@@ -49,5 +49,7 @@
  "msg_trap": "Bonus trap! {points}",
  "msg_special_lit": "SPECIAL lit: go for the trap!",
  "msg_special": "SPECIAL!",
- "marquee": "ORIGINAL TABLE, GRAPHICS AND SOUNDS"
+ "marquee": "ORIGINAL TABLE, GRAPHICS AND SOUNDS",
+ "msg_power": "Lightning! Double bumpers for 15 seconds",
+ "msg_inlanes": "Inlanes! Multiplier {n}×"
 }
