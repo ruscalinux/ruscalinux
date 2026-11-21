@@ -112,11 +112,45 @@ GLYPHS = {
   <path d="M42 70Q50 77 58 70" fill="none" stroke="{P600}" stroke-width="3.2" stroke-linecap="round"/>
   <ellipse cx="50" cy="27" rx="47" ry="11" transform="rotate(-14 50 27)" fill="none" stroke="{R300}" stroke-width="3" stroke-dasharray="148 300"/>
   <circle cx="95" cy="16" r="4.2" fill="{P600}" stroke="{CREAM}" stroke-width="1.6"/>''',
+
+"ruscapinball": f'''
+  <!-- il tavolo «Amethyst»: tre funghi, due flipper e la pallina in corsa -->
+  <defs>
+    <radialGradient id="pin-ball" cx="0.36" cy="0.32" r="0.75">
+      <stop offset="0" stop-color="#ffffff"/><stop offset="0.6" stop-color="{R200}"/><stop offset="1" stop-color="#cfa9bd"/>
+    </radialGradient>
+    <linearGradient id="pin-cap" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="{R200}"/><stop offset="1" stop-color="{R300}"/>
+    </linearGradient>
+  </defs>
+  <path d="M7 100V34C7 10 27 0 50 0S93 10 93 34V100" fill="none" stroke="{P600}" stroke-width="4.5" stroke-linecap="round"/>
+  <path d="M93 34V100" stroke="{P_MID}" stroke-width="4.5"/>
+  <path d="M16 56V70L30 79Z" fill="{R300}" stroke="{P600}" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M84 56V70L70 79Z" fill="{R300}" stroke="{P600}" stroke-width="3" stroke-linejoin="round"/>
+  <g>
+    <ellipse cx="31" cy="27" rx="13" ry="8.5" fill="{P_MID}"/>
+    <ellipse cx="31" cy="22" rx="13" ry="8.5" fill="url(#pin-cap)" stroke="{P600}" stroke-width="3"/>
+    <ellipse cx="69" cy="27" rx="13" ry="8.5" fill="{P_MID}"/>
+    <ellipse cx="69" cy="22" rx="13" ry="8.5" fill="url(#pin-cap)" stroke="{P600}" stroke-width="3"/>
+    <ellipse cx="50" cy="46" rx="13" ry="8.5" fill="{P_MID}"/>
+    <ellipse cx="50" cy="41" rx="13" ry="8.5" fill="url(#pin-cap)" stroke="{P600}" stroke-width="3"/>
+  </g>
+  <g stroke="{P_MID}" stroke-width="11" stroke-linecap="round">
+    <path d="M22 83 42 94M78 83 58 94"/>
+  </g>
+  <circle cx="22" cy="83" r="2.6" fill="{CREAM}"/>
+  <circle cx="78" cy="83" r="2.6" fill="{CREAM}"/>
+  <g fill="none" stroke="{R300}" stroke-width="3" stroke-linecap="round">
+    <path d="M51 51C54 55 56 57 58 59" opacity="0.45"/>
+    <path d="M49 58C51 61 53 63 55 64" opacity="0.8"/>
+  </g>
+  <circle cx="62" cy="67" r="9" fill="url(#pin-ball)" stroke="{P600}" stroke-width="2"/>
+  <circle cx="59.2" cy="63.8" r="2.5" fill="#ffffff"/>''',
 }
 
 TITLES = {"ruscacleaner": "RuscaCleaner", "ruscahub": "RuscaHub", "ruscamark": "RuscaMark",
           "ruscawriter": "RuscaWriter", "ruscallama": "RuscaLLama", "ruscatranslator": "RuscaTranslator",
-          "ruscallisse": "RuscaLLisse"}
+          "ruscallisse": "RuscaLLisse", "ruscapinball": "RuscaPinball"}
 
 
 def full_icon(tool):
