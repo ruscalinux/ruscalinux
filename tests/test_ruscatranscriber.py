@@ -402,6 +402,30 @@ class Transcription(unittest.TestCase):
         self.assertEqual(e.exception.key, "err_no_engine")
 
 
+@unittest.skipIf(rw is None, "PyGObject (GLib) non disponibile")
+class Repeats(unittest.TestCase):
+    """Le ripetizioni che Whisper inventa quando si incanta."""
+
+    def test_collapse(self):
+        S = rw.Segment
+        out = rw.collapse_repeats([
+            S(0, 1000, "Il corso di un'automita, il corso di un'automita, il corso di un'automita."),
+            S(1000, 2000, "Grazie."), S(2000, 3000, "Grazie."), S(3000, 4000, "Grazie."),
+            S(4000, 5000, "Grazie."), S(5000, 6000, "po po po po po po po mylzi."),
+            S(6000, 7000, "Sì, sì, va bene.")])
+        self.assertEqual([s.text for s in out], ["Il corso di un'automita.", "Grazie.", "Grazie.",
+                                                  "po mylzi.", "Sì, sì, va bene."])
+        self.assertEqual((out[2].start, out[2].end), (2000, 5000))
+
+    def test_vad_model(self):
+        with tempfile.TemporaryDirectory() as t:
+            self.assertEqual(rw.find_vad_model([t]), "")
+            for name in ("ggml-base.bin", "ggml-silero-v6.2.0.bin"):
+                open(os.path.join(t, name), "w").close()
+            self.assertTrue(rw.find_vad_model([t]).endswith("ggml-silero-v6.2.0.bin"))
+            self.assertEqual([os.path.basename(p) for p in rw.find_models([t])], ["ggml-base.bin"])
+
+
 class SpokenLanguage(unittest.TestCase):
     """La lingua del parlato è «Automatica» finché non la sceglie l'utente:
     quella dell'interfaccia, data al primo avvio, faceva inventare a

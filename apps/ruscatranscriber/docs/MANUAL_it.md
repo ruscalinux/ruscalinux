@@ -47,6 +47,8 @@ Nel Markdown il parlato resta testo: asterischi, cancelletti, indirizzi e altri 
 
 **Lingua del parlato.** Lasciala su **Automatica**, oppure scegli quella che si parla davvero nel video. Una lingua sbagliata (per esempio «Italiano» per un video russo) non traduce: Whisper inventa un testo nella lingua indicata, spesso con frasi ripetute all'infinito. Per tradurre, trascrivi nella lingua originale e usa RuscaTranslator o RuscaDubbing.
 
+**Ripetizioni e silenzi.** Quando Whisper «si incanta» e ripete la stessa frase, RuscaTranscriber toglie le ripetizioni. Se scarichi il modello Silero VAD di whisper.cpp (`ggml-silero-v6.2.0.bin`, da huggingface.co/ggml-org/whisper-vad) e lo metti fra i modelli, la trascrizione salta silenzi e musica, dove Whisper tende a inventare frasi; RuscaTranscriber lo usa da solo, e non lo propone fra i modelli di trascrizione.
+
 **La trascrizione automatica va riletta.** Un modello può sbagliare nomi, numeri e parole rare, e nei tratti di silenzio o di musica può scrivere frasi che nessuno ha detto. Per correggere il testo apri il file salvato con RuscaMark; per i sottotitoli, con un editor di testo o di sottotitoli.
 
 ## 5. Formati di ingresso

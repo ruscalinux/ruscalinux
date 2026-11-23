@@ -47,6 +47,8 @@ In the Markdown file speech stays text: asterisks, hash signs, addresses and oth
 
 **Spoken language.** Leave it on **Automatic**, or choose the language actually spoken in the video. A wrong language (for example “Italian” for a Russian video) does not translate: Whisper invents a text in the language given, often with sentences repeated endlessly. To translate, transcribe in the original language and use RuscaTranslator or RuscaDubbing.
 
+**Repetitions and silence.** When Whisper gets stuck repeating the same sentence, RuscaTranscriber removes the repetitions. If you download whisper.cpp's Silero VAD model (`ggml-silero-v6.2.0.bin`, from huggingface.co/ggml-org/whisper-vad) and put it among the models, transcription skips silence and music, where Whisper tends to invent sentences; RuscaTranscriber uses it by itself and does not list it among the transcription models.
+
 **Automatic transcription must be reviewed.** A model can get names, numbers and rare words wrong, and during silence or music it can write sentences nobody said. To correct the text, open the saved file with RuscaMark; for subtitles, use a text or subtitle editor.
 
 ## 5. Input formats

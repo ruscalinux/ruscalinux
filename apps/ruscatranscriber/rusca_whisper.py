@@ -113,6 +113,54 @@ def is_model_name(name):
             and "silero" not in low and "vad" not in low and "encoder" not in low)
 
 
+def is_vad_model(name):
+    """Il modello del rilevamento del parlato (Silero VAD per whisper.cpp,
+    «ggml-silero-v6.2.0.bin»): non è un modello di trascrizione."""
+    return "silero" in name.lower() and name.lower().endswith(".bin")
+
+
+def find_vad_model(dirs=None):
+    """Il modello Silero VAD, se l'utente l'ha messo fra i modelli: con lui
+    whisper-cli trascrive solo i tratti con voce e non inventa frasi nei
+    silenzi e nella musica."""
+    for d in (MODEL_DIRS if dirs is None else dirs):
+        if not d or not os.path.isdir(d):
+            continue
+        for root, _dirs, files in os.walk(d):
+            for nome in sorted(files, reverse=True):          # la versione più nuova
+                if is_vad_model(nome):
+                    return os.path.join(root, nome)
+    return ""
+
+
+_REPEAT = re.compile(r"(\b\w[^.!?]{4,80}?)(?:[\s,;]+\1\b){2,}", re.IGNORECASE)
+_REPEAT_WORD = re.compile(r"\b(\w{1,4})(?:[\s,]+\1\b){3,}", re.IGNORECASE)
+
+
+def collapse_repeats(segments):
+    """Toglie le ripetizioni che Whisper inventa quando si incanta: una
+    frase ripetuta tre o più volte di fila dentro un segmento («il corso di
+    un'automita, il corso di un'automita, …») resta una volta; tre o più
+    segmenti uguali di fila restano uno solo."""
+    out = []
+    for seg in segments:
+        text = seg.text
+        for _ in range(3):
+            new = _REPEAT.sub(r"\1", _REPEAT_WORD.sub(r"\1", text))
+            if new == text:
+                break
+            text = new
+        seg = Segment(seg.start, seg.end, text)
+        key = " ".join(text.lower().split()).strip(" .,!?…")
+        if (len(out) >= 2 and key and
+                all(" ".join(o.text.lower().split()).strip(" .,!?…") == key for o in out[-2:])):
+            # Il terzo uguale di fila: si allunga il precedente.
+            out[-1] = Segment(out[-1].start, seg.end, out[-1].text)
+            continue
+        out.append(seg)
+    return out
+
+
 def find_models(dirs=None):
     """Tutti i modelli nelle cartelle dei modelli, dal piu' grande (di
     solito il piu' preciso). Restituisce percorsi."""
@@ -123,7 +171,7 @@ def find_models(dirs=None):
         for root, _dirs, files in os.walk(d):
             for nome in files:
                 p = os.path.join(root, nome)
-                if is_model_name(nome) and p not in trovati:
+                if is_model_name(nome) and not is_vad_model(nome) and p not in trovati:
                     trovati.append(p)
 
     def size(p):
@@ -557,7 +605,15 @@ class Transcriber:
             # 2. Riconoscimento.
             self._emit(self.on_stage, "model", 0)
             cmd = [find_binary(), "-m", model, "-f", wav, "-l", language,
-                   "-t", str(max(1, threads)), "-oj", "-of", prefix, "-pp"]
+                   "-t", str(max(1, threads)), "-oj", "-of", prefix, "-pp",
+                   # Niente simboli non verbali («[musica]», «♪»), che
+                   # innescano le ripetizioni.
+                   "-sns"]
+            vad = find_vad_model()
+            if vad:
+                cmd += ["--vad", "-vm", vad]
+                self._emit(self.on_log, f"ruscatranscriber: rilevamento del parlato con "
+                                        f"{os.path.basename(vad)}")
             env = os.environ.copy()
             if not gpu:
                 # Senza scheda grafica i driver Vulkan vengono nascosti:
@@ -602,6 +658,7 @@ class Transcriber:
                 raise WhisperError("err_engine", f"{exit_description(code)}\n{tail}".strip())
             try:
                 detected, segments = load_json(prefix + ".json")
+                segments = collapse_repeats(segments)
             except (OSError, ValueError) as e:
                 raise WhisperError("err_engine", tail or str(e)) from e
             if code != 0:
