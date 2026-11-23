@@ -28,7 +28,7 @@ HOMEPAGE="https://www.ruscalinux.org/"
 # predefiniti di menu e metainfo).
 LANGS="en $(cd lang && ls -1 -- *.json | sed 's/\.json$//' | grep -vx en | sort | tr '\n' ' ')"
 SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-$(date +%s)}"
-FILES="ruscadubbing.py rusca_dubbing.py rusca_whisper.py rusca_tts.py rusca_engine.py rusca_markdown.py markdown_it_mark.py"
+FILES="ruscadubbing.py rusca_dubbing.py rusca_voicematch.py rusca_whisper.py rusca_tts.py rusca_engine.py rusca_markdown.py markdown_it_mark.py"
 
 die() { echo "ERRORE: $*" >&2; exit 1; }
 for l in en it; do [ -f "lang/$l.json" ] || die "manca lang/$l.json"; done

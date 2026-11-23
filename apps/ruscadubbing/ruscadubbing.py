@@ -34,6 +34,7 @@ BASE_DIR = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, BASE_DIR)
 
 import rusca_dubbing as dub  # noqa: E402
+import rusca_voicematch as match  # noqa: E402
 
 tts, whisper, engine = dub.tts, dub.whisper, dub.engine
 
@@ -317,6 +318,7 @@ class DubbingWindow(Adw.ApplicationWindow):
         self.whisper_models, self.llm_models, self.voices = [], [], []
         self.pref_rows = {}
         self.dubbing = dub.Dubbing(self._on_stage, self._on_log, self._on_done)
+        self.finder = None               # finestra «Trova una voce simile» aperta
         self._build_actions()
         self._build_ui()
         dub.clean_work_dir()
@@ -435,6 +437,18 @@ class DubbingWindow(Adw.ApplicationWindow):
         self.srt_row.add_suffix(srt_choose)
         langs.add(self.srt_row)
         box.append(langs)
+
+        # La voce del doppiaggio: quella di riferimento, e la ricerca di una
+        # voce che somigli all'originale.
+        voice_group = Adw.PreferencesGroup(title=_("group_dub_voice"))
+        self.voice_row = Adw.ActionRow(title=_("speaker_file"), activatable=True)
+        self.voice_row.connect("activated", lambda _r: self.show_preferences())
+        self.find_btn = Gtk.Button(label=_("find_voice"), valign=Gtk.Align.CENTER,
+                                   tooltip_text=_("find_voice_tip"))
+        self.find_btn.connect("clicked", lambda _b: self.find_voice())
+        self.voice_row.add_suffix(self.find_btn)
+        voice_group.add(self.voice_row)
+        box.append(voice_group)
 
         out = Adw.PreferencesGroup(title=_("group_output"))
         self.out_rows = {}
@@ -584,11 +598,24 @@ class DubbingWindow(Adw.ApplicationWindow):
             b.set_revealed(False)
         self._refresh_actions()
 
+    def _refresh_voice_row(self):
+        path = self.cfg["speaker_file"]
+        if path and os.path.isfile(path):
+            name = os.path.splitext(os.path.basename(path))[0]
+        else:
+            name = _("speaker_none")
+        self.voice_row.set_subtitle(GLib.markup_escape_text(name))
+
     def _refresh_actions(self):
-        running = self.dubbing.running
+        self._refresh_voice_row()
+        busy = self.finder is not None
+        self.find_btn.set_sensitive(self.media is not None and not self.dubbing.running
+                                    and not busy and self._voice() is not None
+                                    and bool(self.info and self.info["audio"]))
+        running = self.dubbing.running or busy
         ready = self.media is not None and self._missing() is None and bool(self._outputs())
         self.lookup_action("dub").set_enabled(ready and not running)
-        self.lookup_action("stop").set_enabled(running)
+        self.lookup_action("stop").set_enabled(self.dubbing.running)
         self.lookup_action("open").set_enabled(not running)
         self.lookup_action("new").set_enabled(not running)
         self.lookup_action("open-result").set_enabled(bool(self.files) and not running)
@@ -914,6 +941,40 @@ class DubbingWindow(Adw.ApplicationWindow):
         self.stack.set_visible_child_name("setup" if self.media else "empty")
         self._refresh_actions()
 
+    # ── voce simile ───────────────────────────────────────────────────────
+    def find_voice(self):
+        if self.media is None or self.dubbing.running or self.finder is not None:
+            return
+        voice = self._voice()
+        if voice is None:
+            self.show_preferences()
+            return
+        cues = []
+        if self.source_srt:
+            try:
+                with open(self.source_srt, encoding="utf-8-sig", errors="replace") as f:
+                    cues = dub.cues_from_srt(f.read())
+            except OSError:
+                cues = []
+        elif self.dubbing.cues and self.dubbing.o and self.dubbing.o.media == self.media:
+            cues = list(self.dubbing.cues)        # le battute dell'ultimo doppiaggio
+        self.finder = VoiceFinder(self, voice, cues)
+        self.finder.connect("closed", self._finder_closed)
+        self._refresh_actions()
+        self.finder.present(self)
+        self.finder.begin()
+
+    def _finder_closed(self, finder):
+        finder.shutdown()
+        self.finder = None
+        self._refresh_actions()
+
+    def use_voice(self, path):
+        """La voce trovata diventa quella di riferimento."""
+        self._set("speaker_file", path)
+        self._refresh_actions()
+        self._toast(_("voice_saved", name=os.path.splitext(os.path.basename(path))[0]))
+
     # ── preferenze ────────────────────────────────────────────────────────
     def show_preferences(self):
         self._refresh_models()
@@ -1149,6 +1210,8 @@ class DubbingWindow(Adw.ApplicationWindow):
         dialog.present(self)
 
     def _on_close(self, *_a):
+        if self.finder is not None:
+            self.finder.shutdown()
         if self.dubbing.running and not self._force_close:
             dialog = Adw.AlertDialog(heading=_("discard_title"), body=_("discard_body"))
             dialog.add_response("cancel", _("cancel"))
@@ -1169,6 +1232,213 @@ class DubbingWindow(Adw.ApplicationWindow):
         self.cfg.update(width=w, height=h, maximized=self.is_maximized())
         save_settings(self.cfg)
         return False
+
+
+class VoiceFinder(Adw.Dialog):
+    """«Trova una voce simile»: ascolta la voce originale, inventa voci
+    nella lingua del doppiaggio e le propone dalla più simile. Si ascoltano,
+    si confrontano con l'originale, e una si tiene come voce di riferimento."""
+
+    def __init__(self, win, voice, cues):
+        super().__init__(title=_("finder_title"), content_width=520, content_height=600)
+        self.win = win
+        self.voice = voice
+        self.cues = cues
+        self.media_file = None           # Gtk.MediaFile in riproduzione
+        self.playing_btn = None
+        self.rows = []
+        self.search = match.VoiceSearch(os.path.join(dub.WORK_DIR, "voci"), self._on_stage,
+                                        win._on_log, self._on_done)
+
+        self.stack = Gtk.Stack(transition_type=Gtk.StackTransitionType.CROSSFADE)
+        # Lavoro in corso
+        work = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18, valign=Gtk.Align.CENTER,
+                       margin_start=24, margin_end=24, margin_top=24, margin_bottom=24)
+        spinner = (Adw.Spinner() if hasattr(Adw, "Spinner") else Gtk.Spinner(spinning=True))
+        spinner.set_size_request(48, 48)
+        spinner.set_halign(Gtk.Align.CENTER)
+        work.append(spinner)
+        self.work_label = Gtk.Label(wrap=True, justify=Gtk.Justification.CENTER)
+        self.work_label.add_css_class("title-4")
+        work.append(self.work_label)
+        self.work_bar = Gtk.ProgressBar()
+        work.append(self.work_bar)
+        hint = Gtk.Label(label=_("finder_hint"), wrap=True, justify=Gtk.Justification.CENTER)
+        hint.add_css_class("dim-label")
+        work.append(hint)
+        stop = Gtk.Button(label=_("stop"), halign=Gtk.Align.CENTER)
+        stop.add_css_class("pill")
+        stop.connect("clicked", lambda _b: self.search.cancel())
+        work.append(stop)
+        self.stack.add_named(work, "work")
+
+        # Risultati
+        page = Adw.PreferencesPage()
+        self.orig_group = Adw.PreferencesGroup(title=_("finder_original"))
+        self.orig_row = Adw.ActionRow(title=_("finder_original_row"))
+        self.orig_row.add_prefix(self._play_button(lambda: self.search.reference
+                                                   and self.search.reference[0]))
+        self.orig_group.add(self.orig_row)
+        page.add(self.orig_group)
+        self.list_group = Adw.PreferencesGroup(title=_("finder_voices"),
+                                               description=_("finder_voices_desc"))
+        page.add(self.list_group)
+        more_group = Adw.PreferencesGroup()
+        more = Gtk.Button(label=_("finder_more"), halign=Gtk.Align.CENTER)
+        more.add_css_class("pill")
+        more.connect("clicked", lambda _b: self._more())
+        more_group.add(more)
+        page.add(more_group)
+        self.stack.add_named(page, "list")
+
+        view = Adw.ToolbarView(content=self.stack)
+        view.add_top_bar(Adw.HeaderBar())
+        self.toasts = Adw.ToastOverlay(child=view)
+        self.set_child(self.toasts)
+
+    # ── ricerca ───────────────────────────────────────────────────────────
+    def begin(self):
+        w = self.win
+        cfg = w.cfg
+        self.work_label.set_label(_("finder_listen"))
+        self.work_bar.set_fraction(0)
+        self.stack.set_visible_child_name("work")
+        try:
+            self.search.start(w.media, w.info["duration_ms"], self.cues, self.voice, cfg["tgt"],
+                              cfg["gpu"], cfg["gpu_device"], cfg["threads"])
+        except match.MatchError as e:
+            self._fail(e)
+
+    def _more(self):
+        self._stop_playing()
+        self.work_label.set_label(_("finder_voice", i=1, n=match.CANDIDATES))
+        self.work_bar.set_fraction(0)
+        self.stack.set_visible_child_name("work")
+        try:
+            self.search.more()
+        except match.MatchError as e:
+            self._fail(e)
+
+    def _on_stage(self, stage, i=0, n=0):
+        if stage == "listen":
+            self.work_label.set_label(_("finder_listen"))
+            self.work_bar.pulse()
+        elif stage == "voice":
+            self.work_label.set_label(_("finder_voice", i=i, n=n))
+            self.work_bar.set_fraction((i - 1) / max(1, n))
+
+    def _on_done(self, error, reference, candidates):
+        if error == "cancelled":
+            self.close()
+            return
+        if error is not None:
+            self._fail(error)
+            return
+        self._show(reference, candidates)
+
+    def _fail(self, error):
+        body = _(error.key)
+        if error.detail:
+            body += "\n\n" + error.detail
+        dialog = Adw.AlertDialog(heading=_("finder_failed"), body=body)
+        dialog.add_response("close", _("close"))
+        dialog.connect("response", lambda *_a: self.close())
+        dialog.present(self)
+
+    def _show(self, reference, candidates):
+        _wav, ref = reference
+        self.orig_row.set_subtitle(self._portrait(ref))
+        for row in self.rows:
+            self.list_group.remove(row)
+        self.rows = []
+        for n, cand in enumerate(candidates[:match.SHOWN], 1):
+            row = Adw.ActionRow(title=_("finder_voice_row", n=n,
+                                         percent=match.similarity(cand.distance)),
+                                subtitle=self._difference(ref, cand.profile))
+            row.add_prefix(self._play_button(lambda p=cand.path: p))
+            use = Gtk.Button(label=_("finder_use"), valign=Gtk.Align.CENTER)
+            use.add_css_class("suggested-action" if n == 1 else "flat")
+            use.connect("clicked", lambda _b, c=cand: self._use(c))
+            row.add_suffix(use)
+            self.list_group.add(row)
+            self.rows.append(row)
+        self.stack.set_visible_child_name("list")
+
+    def _portrait(self, p):
+        hz = match.semitones_to_hz(p.pitch)
+        register = (_("reg_very_low") if hz < 100 else _("reg_low") if hz < 140 else
+                    _("reg_mid") if hz < 185 else _("reg_high") if hz < 240 else _("reg_very_high"))
+        expressive = _("expr_flat") if p.spread < 2.0 else (
+            _("expr_lively") if p.spread > 4.5 else _("expr_normal"))
+        return _("finder_portrait", register=register, hz=int(round(hz)), expressive=expressive)
+
+    def _difference(self, ref, other):
+        parts = [_(f"diff_{k}") for k in match.describe(ref, other) if k]
+        return ", ".join(parts) if parts else _("diff_none")
+
+    # ── ascolto ───────────────────────────────────────────────────────────
+    def _play_button(self, path_getter):
+        btn = Gtk.Button(icon_name="media-playback-start-symbolic", valign=Gtk.Align.CENTER,
+                         tooltip_text=_("finder_play"))
+        btn.add_css_class("circular")
+        btn.update_property([Gtk.AccessibleProperty.LABEL], [_("finder_play")])
+        btn.connect("clicked", lambda b: self._toggle(b, path_getter()))
+        return btn
+
+    def _toggle(self, btn, path):
+        was = self.playing_btn
+        self._stop_playing()
+        if was is btn or not path or not os.path.isfile(path):
+            return
+        self.media_file = Gtk.MediaFile.new_for_filename(path)
+        self.media_file.connect("notify::ended", lambda m, _p: m.get_ended() and self._stop_playing())
+        self.media_file.play()
+        self.playing_btn = btn
+        btn.set_icon_name("media-playback-stop-symbolic")
+        btn.set_tooltip_text(_("finder_stop_play"))
+
+    def _stop_playing(self):
+        if self.media_file is not None:
+            self.media_file.pause()
+            self.media_file = None
+        if self.playing_btn is not None:
+            self.playing_btn.set_icon_name("media-playback-start-symbolic")
+            self.playing_btn.set_tooltip_text(_("finder_play"))
+            self.playing_btn = None
+        return False
+
+    # ── scelta ────────────────────────────────────────────────────────────
+    def _use(self, cand):
+        self._stop_playing()
+        stem = os.path.splitext(os.path.basename(self.win.media))[0]
+        entry = Gtk.Entry(text=_("finder_default_name", video=stem[:40].strip()),
+                          activates_default=True)
+        dialog = Adw.AlertDialog(heading=_("finder_name_title"), body=_("finder_name_body"),
+                                 extra_child=entry)
+        dialog.add_response("cancel", _("cancel"))
+        dialog.add_response("save", _("finder_use"))
+        dialog.set_response_appearance("save", Adw.ResponseAppearance.SUGGESTED)
+        dialog.set_default_response("save")
+        dialog.set_close_response("cancel")
+
+        def answered(_d, response):
+            if response != "save":
+                return
+            try:
+                path = tts.save_voice(cand.path, entry.get_text().strip() or "Voce")
+            except OSError as e:
+                self.toasts.add_toast(Adw.Toast(title=GLib.markup_escape_text(str(e))))
+                return
+            self.win.use_voice(path)
+            self.close()
+        dialog.connect("response", answered)
+        dialog.present(self)
+
+    def shutdown(self):
+        """Ferma la ricerca e cancella l'audio originale e le voci di prova
+        (quella tenuta è già stata copiata fra le voci)."""
+        self._stop_playing()
+        self.search.discard()
 
 
 class DubbingApp(Adw.Application):

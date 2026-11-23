@@ -200,7 +200,8 @@ class Source(unittest.TestCase):
     def test_no_network(self):
         """Solo rusca_engine.py parla (con llama-server, su 127.0.0.1)."""
         net = {"socket", "urllib", "requests", "http", "ftplib", "smtplib", "ssl"}
-        for name in ("rusca_dubbing.py", "ruscadubbing.py", "rusca_whisper.py", "rusca_tts.py"):
+        for name in ("rusca_dubbing.py", "ruscadubbing.py", "rusca_whisper.py", "rusca_tts.py",
+                     "rusca_voicematch.py"):
             path = os.path.join(APP, name)
             if not os.path.isfile(path):
                 continue
@@ -235,10 +236,11 @@ class Source(unittest.TestCase):
         self.assertEqual(set(it), set(en))
         used = set()
         for name in ("rusca_dubbing.py", "ruscadubbing.py", "rusca_whisper.py", "rusca_tts.py",
-                     "rusca_engine.py"):
+                     "rusca_engine.py", "rusca_voicematch.py"):
             src = open(os.path.join(APP, name), encoding="utf-8").read()
             if name.startswith("rusca_"):           # nei moduli comuni, solo gli errori
-                pattern = r'(?:DubbingError|WhisperError|TTSError|EngineError)\("([a-z][a-z0-9_]+)"'
+                pattern = (r'(?:DubbingError|WhisperError|TTSError|EngineError|MatchError)'
+                           r'\("([a-z][a-z0-9_]+)"')
             else:
                 pattern = r'\b_\("([a-z][a-z0-9_]+)"'
             used |= set(re.findall(pattern, src))
@@ -249,6 +251,8 @@ class Source(unittest.TestCase):
         used |= {f"file_{k}" for k in ("video", "audio", "srt_tgt", "srt_src", "srt_both")}
         used |= {f"{k}_sub" for k in ("out_srt", "out_audio", "out_video")}
         used |= {f"theme_{t}" for t in ("system", "light", "dark")}
+        used |= {f"diff_{k}" for k in ("higher", "lower", "brighter", "darker", "livelier",
+                                       "flatter")}
         self.assertEqual(sorted(used - set(en)), [])
 
 
@@ -424,6 +428,145 @@ class Siblings(unittest.TestCase):
             got = ui.sibling_settings(t)
         self.assertEqual(got, {"voice_model": "/m/1.7B.gguf", "seed": 7, "speaker_file": "/v/a.wav",
                                "max_speed": 1.0, "llm_model": "/m/gemma.gguf"})
+
+
+# llama-tts finto per la ricerca di voci: un tono armonico la cui altezza
+# dipende dal seme, così la voce «giusta» è nota.
+FAKE_TTS_PITCH = r"""#!/usr/bin/env python3
+import math, struct, sys, wave
+args = sys.argv[1:]
+if args == ["--list-devices"]:
+    print("Available devices:"); sys.exit(0)
+opt = lambda name: args[args.index(name) + 1]
+seed, out = int(opt("-s")), opt("-o")
+assert "--tts-speaker-file" not in args          # mai la voce originale
+f0 = 90 + seed % 160
+rate = 24000
+w = wave.open(out, "wb"); w.setnchannels(1); w.setsampwidth(2); w.setframerate(rate)
+frames = bytearray()
+for i in range(rate * 5):
+    t = i / rate
+    v = 0.4 * math.sin(2 * math.pi * f0 * t) + 0.25 * math.sin(4 * math.pi * f0 * t) \
+        + 0.15 * math.sin(6 * math.pi * f0 * t)
+    frames += struct.pack("<h", int(12000 * v * (0.6 + 0.4 * math.sin(2 * math.pi * 3 * t))))
+w.writeframes(bytes(frames)); w.close()
+"""
+
+
+@unittest.skipIf(rd is None or FFMPEG is None, "PyGObject o FFmpeg non disponibili")
+class VoiceMatch(unittest.TestCase):
+    """Misure della voce e ricerca di voci simili."""
+
+    @classmethod
+    def setUpClass(cls):
+        import rusca_voicematch
+        cls.vm = rusca_voicematch
+        cls.tmp = tempfile.TemporaryDirectory()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def tone(self, name, f0, seconds=8, extra=()):
+        path = os.path.join(self.tmp.name, name)
+        expr = (f"(0.4*sin(2*PI*{f0}*t)+0.25*sin(4*PI*{f0}*t)+0.15*sin(6*PI*{f0}*t))"
+                f"*(0.6+0.4*sin(2*PI*3*t))")
+        subprocess.run([FFMPEG, "-nostdin", "-loglevel", "error", "-f", "lavfi", "-i",
+                        f"aevalsrc='{expr}':s=24000:d={seconds}"] + list(extra) + ["-y", path],
+                       check=True)
+        return path
+
+    def test_pitch(self):
+        for f0 in (100, 160, 240):
+            p = self.vm.measure(FFMPEG, self.tone(f"t{f0}.wav", f0))
+            self.assertAlmostEqual(self.vm.semitones_to_hz(p.pitch), f0, delta=f0 * 0.02)
+            self.assertLess(p.spread, 0.5)
+            self.assertGreater(p.voiced, 6)
+
+    def test_no_voice(self):
+        silent = os.path.join(self.tmp.name, "muto.wav")
+        subprocess.run([FFMPEG, "-nostdin", "-loglevel", "error", "-f", "lavfi", "-i",
+                        "anullsrc=r=16000:cl=mono", "-t", "5", "-y", silent], check=True)
+        with self.assertRaises(self.vm.MatchError) as cm:
+            self.vm.measure(FFMPEG, silent)
+        self.assertEqual(cm.exception.key, "err_no_voice")
+
+    def test_distance(self):
+        P = self.vm.Profile
+        ref = P(20.0, 3.0, 500.0, 30)
+        self.assertEqual(self.vm.distance(ref, ref), 0)
+        self.assertEqual(self.vm.similarity(0), 100)
+        near, far = P(21.0, 3.0, 520.0, 10), P(30.0, 3.0, 500.0, 10)
+        self.assertLess(self.vm.distance(ref, near), self.vm.distance(ref, far))
+        self.assertEqual(self.vm.describe(ref, far), ("higher", "", ""))
+        self.assertEqual(self.vm.describe(ref, P(15.0, 6.0, 1000.0, 9)),
+                         ("lower", "brighter", "livelier"))
+        self.assertEqual(self.vm.describe(ref, near), ("", "", ""))
+
+    def test_windows(self):
+        Cue = rd.Cue
+        cues = [Cue(0, 500, "a"), Cue(1000, 41000, "b"), Cue(50000, 80000, "c"), Cue(90000, 95000, "d")]
+        self.assertEqual(self.vm.speech_windows(100000, cues), [(1000, 41000), (50000, 80000)])
+        self.assertEqual(self.vm.speech_windows(30000), [(0, 30000)])
+        w = self.vm.speech_windows(600000)
+        self.assertEqual(len(w), 3)
+        self.assertEqual(sum(b - a for a, b in w), 60000)
+
+    def test_search(self):
+        """Video con una voce a 130 Hz; llama-tts finto con l'altezza dal
+        seme: le voci tornano ordinate e la prima è la più vicina."""
+        video = self.tone("video.mkv", 130, 12, ["-f", "lavfi", "-i",
+                                                 "testsrc=size=64x48:rate=5:duration=12",
+                                                 "-c:v", "libx264", "-preset", "ultrafast",
+                                                 "-c:a", "aac", "-shortest"])
+        bins = os.path.join(self.tmp.name, "bin")
+        os.makedirs(bins, exist_ok=True)
+        fake = os.path.join(bins, "llama-tts")
+        with open(fake, "w") as f:
+            f.write(FAKE_TTS_PITCH)
+        os.chmod(fake, 0o755)
+        model = os.path.join(self.tmp.name, "voce.gguf")
+        proj = os.path.join(self.tmp.name, "mmproj-voce.gguf")
+        for p in (model, proj):
+            open(p, "w").close()
+        saved = (rd.tts.ENGINE_DIRS, rd.tts.FFMPEG_PATHS, rd.tts.WORK_DIR)
+        rd.tts.ENGINE_DIRS, rd.tts.FFMPEG_PATHS = (bins,), (FFMPEG,)
+        rd.tts.WORK_DIR = os.path.join(self.tmp.name, "tts")
+        work = os.path.join(self.tmp.name, "voci")
+        loop = GLib.MainLoop()
+        seen = {"stages": [], "done": None}
+
+        def done(error, reference, candidates):
+            seen["done"] = (error, reference, candidates)
+            loop.quit()
+        try:
+            search = self.vm.VoiceSearch(work, lambda s, i=0, n=0: seen["stages"].append((s, i, n)),
+                                         None, done)
+            search.start(video, 12000, [], rd.tts.Voice(model, proj), "it", gpu=False, count=4)
+            GLib.timeout_add_seconds(120, loop.quit)
+            loop.run()
+            error, reference, cands = seen["done"]
+            self.assertIsNone(error, error)
+            self.assertAlmostEqual(self.vm.semitones_to_hz(reference[1].pitch), 130, delta=3)
+            self.assertEqual(len(cands), 4)
+            self.assertEqual(cands, sorted(cands, key=lambda c: c.distance))
+            for c in cands:
+                self.assertAlmostEqual(self.vm.semitones_to_hz(c.profile.pitch),
+                                       90 + c.seed % 160, delta=4)
+            self.assertIn(("voice", 4, 4), seen["stages"])
+            # Altre voci: si aggiungono, con semi nuovi.
+            seen["done"] = None
+            search.more(count=2)
+            loop = GLib.MainLoop()
+            GLib.timeout_add_seconds(120, loop.quit)
+            loop.run()
+            self.assertEqual(len(seen["done"][2]), 6)
+            self.assertEqual(len({c.seed for c in seen["done"][2]}), 6)
+            search.discard()
+            left = [f for _r, _d, fs in os.walk(work) for f in fs]
+            self.assertEqual(left, [])
+        finally:
+            rd.tts.ENGINE_DIRS, rd.tts.FFMPEG_PATHS, rd.tts.WORK_DIR = saved
 
 
 if __name__ == "__main__":

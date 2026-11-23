@@ -35,6 +35,18 @@ Alla prima apertura RuscaDubbing usa i modelli che hai scelto nelle altre app. N
 
 **La voce.** Senza voce di riferimento il modello inventa una voce per ogni battuta. Per un doppiaggio serve **una voce sola**: crea una voce con **Crea una voce** di RuscaNarrator e sceglila nelle Preferenze → **Voce di riferimento**. Alla prima apertura RuscaDubbing sceglie la prima voce che trova.
 
+### Una voce simile all'originale
+
+La voce di riferimento dovrebbe parlare **la lingua del doppiaggio**: il modello ne copia anche l'accento. Con la voce originale di un video russo, l'italiano esce con l'accento russo (libérta, pérche).
+
+Per avere una voce italiana che somigli all'originale, nella pagina del video premi **Trova una voce simile…**. RuscaDubbing:
+
+1. ascolta fino a un minuto della voce originale e ne **misura** l'altezza, quanto varia e quanto è chiara o cupa (il modello della voce non la sente e non la copia);
+2. **inventa** otto voci nella lingua del doppiaggio;
+3. te le propone **dalla più simile**, con la percentuale di somiglianza e che cosa cambia («più acuta», «più cupa»…).
+
+Ascoltale, confrontale con l'originale (il pulsante accanto a **Ascolta l'originale**) e premi **Usa** su quella che preferisci: si salva fra le voci di RuscaNarrator e diventa la voce di riferimento. **Altre voci** ne crea altre otto. Le voci trovate somigliano per registro, non per timbro: non sono una copia della persona.
+
 ## 3. Doppiare un video
 
 1. **Apri** il video (Ctrl+O), trascinalo sulla finestra, oppure dal gestore dei file: **Apri con → RuscaDubbing**.

@@ -35,6 +35,18 @@ On first start RuscaDubbing uses the models you chose in the other apps. In **Pr
 
 **The voice.** Without a reference voice the model invents a voice for every line. A dubbing needs **one voice**: make one with **Create a Voice** in RuscaNarrator and choose it in Preferences → **Reference Voice**. On first start RuscaDubbing picks the first voice it finds.
 
+### A voice similar to the original
+
+The reference voice should speak **the dubbing language**: the model also copies its accent. With the original voice of a Russian video, the Italian comes out with a Russian accent.
+
+To get a voice in the dubbing language that resembles the original, press **Find a Similar Voice…** on the video page. RuscaDubbing:
+
+1. listens to up to one minute of the original voice and **measures** its pitch, how much it varies and how bright or dark it is (the voice model never hears or copies it);
+2. **invents** eight voices in the dubbing language;
+3. suggests them **most similar first**, with a similarity percentage and what differs (“higher”, “darker”…).
+
+Listen to them, compare them with the original (the button next to **Listen to the Original**) and press **Use** on the one you prefer: it is saved among the RuscaNarrator voices and becomes the reference voice. **More Voices** makes eight more. The voices found resemble the original in register, not in timbre: they are not a copy of the person.
+
 ## 3. Dubbing a video
 
 1. **Open** the video (Ctrl+O), drop it on the window, or from the file manager: **Open With → RuscaDubbing**.
