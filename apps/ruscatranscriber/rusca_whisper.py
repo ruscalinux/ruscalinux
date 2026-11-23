@@ -305,6 +305,17 @@ def parse_language(line):
     return m.group(1) if m else None
 
 
+def exit_description(code):
+    """Il codice di uscita di un programma, a parole: "codice 1", o il
+    segnale che l'ha fermato ("segnale 11, SIGSEGV")."""
+    if code is not None and code < 0:
+        try:
+            return f"segnale {-code}, {signal.Signals(-code).name}"
+        except ValueError:
+            return f"segnale {-code}"
+    return f"codice {code}"
+
+
 def load_json(path):
     """Legge il JSON scritto da whisper-cli (-oj): (lingua, [Segment]).
     whisper-cli protegge solo virgolette e barre rovesciate, quindi nel
@@ -579,13 +590,27 @@ class Transcriber:
                 lang = parse_language(line)
                 if lang:
                     found.append(lang)
-            code, tail = self._run(cmd, env, on_stdout, on_stderr)
-            if code != 0:
-                raise WhisperError("err_engine", tail)
+            finished = []
+
+            def on_stderr_end(line):
+                on_stderr(line)
+                # whisper-cli stampa i tempi solo dopo aver scritto i file.
+                if "whisper_print_timings" in line and "total time" in line:
+                    finished.append(True)
+            code, tail = self._run(cmd, env, on_stdout, on_stderr_end)
+            if code != 0 and not (finished and os.path.isfile(prefix + ".json")):
+                raise WhisperError("err_engine", f"{exit_description(code)}\n{tail}".strip())
             try:
                 detected, segments = load_json(prefix + ".json")
             except (OSError, ValueError) as e:
                 raise WhisperError("err_engine", tail or str(e)) from e
+            if code != 0:
+                # Il lavoro è finito e il testo è salvato: l'errore è venuto
+                # dopo, alla chiusura. Succede con alcuni driver Vulkan
+                # (NVIDIA) quando il programma libera la scheda grafica.
+                self._emit(self.on_log, "ruscatranscriber: whisper-cli ha finito la trascrizione "
+                                        f"e poi si è chiuso con un errore ({exit_description(code)}): "
+                                        "il testo è completo e si tiene")
             if language != "auto":
                 detected = language
             elif found:

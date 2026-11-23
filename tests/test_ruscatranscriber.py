@@ -101,7 +101,13 @@ if "lento" in model:
     time.sleep(60)
 sys.stdout.write(%(stdout)r)
 sys.stdout.flush()
+if "crash-prima" in model:                  # si ferma prima di scrivere il testo
+    os.kill(os.getpid(), 11)
 open(prefix + ".json", "w", encoding="utf-8").write(%(json)r)
+sys.stderr.write("whisper_print_timings:    total time = 14599.74 ms\\n")
+sys.stderr.flush()
+if "crash-dopo" in model:                   # il driver cade alla chiusura (NVIDIA)
+    os.kill(os.getpid(), 11)
 ''' % {"stderr": STDERR, "stdout": STDOUT, "json": JSON}
 
 
@@ -267,7 +273,7 @@ class Transcription(unittest.TestCase):
         self.args = os.environ["FAKE_ARGS"] = os.path.join(t, "args.json")
         self.files = {}
         for name in ("video.mkv", "senza-audio.mkv", "ggml-base.bin", "ggml-rotto.bin",
-                     "ggml-lento.bin"):
+                     "ggml-lento.bin", "ggml-crash-dopo.bin", "ggml-crash-prima.bin"):
             self.files[name] = os.path.join(t, name)
             with open(self.files[name], "wb") as f:
                 f.write(b"x")
@@ -358,6 +364,20 @@ class Transcription(unittest.TestCase):
         error = self.run_one("video.mkv", "ggml-rotto.bin")["done"][0]
         self.assertEqual(error.key, "err_engine")
         self.assertIn("failed to load model", error.detail)
+
+    def test_crash_after_finishing(self):
+        """whisper-cli finisce, scrive il testo e cade alla chiusura (driver
+        Vulkan NVIDIA): il testo si tiene, e il registro lo dice."""
+        seen = self.run_one("video.mkv", "ggml-crash-dopo.bin")
+        error, _language, segments = seen["done"]
+        self.assertIsNone(error)
+        self.assertTrue(segments)
+        self.assertTrue(any("SIGSEGV" in line and "si tiene" in line for line in seen["log"]))
+
+    def test_crash_before_finishing(self):
+        error = self.run_one("video.mkv", "ggml-crash-prima.bin")["done"][0]
+        self.assertEqual(error.key, "err_engine")
+        self.assertIn("segnale 11, SIGSEGV", error.detail)
 
     def test_cancel(self):
         seen = self.run_one("video.mkv", "ggml-lento.bin", cancel_after=1500)
