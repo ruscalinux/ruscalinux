@@ -15,6 +15,7 @@ export const MODES = ['walk', 'listen', 'think', 'speak', 'sit', 'wake'];
 export const EMOTIONS = ['sorride', 'pensierosa', 'commossa', 'divertita', 'perplessa', 'seria'];
 
 const SHOULDER_L = [37, 80], SHOULDER_R = [92, 80];
+export const MAGIC_TIME = 1.5;        // s: apparire dal nulla, o sparire nel nulla
 
 // Posa delle braccia (gomito e zampa, a sinistra e a destra) e del tomo.
 export const POSES = {
@@ -74,6 +75,22 @@ export class Animator {
         this.puffLeft = 0;          // sbuffo
         this.blinkIn = 3 * FPS;
         this.blink = 0;
+        this.magic = null;          // {kind: 'appear' | 'vanish', p: da 0 a 1}
+    }
+
+    /** Comincia l'apparizione o la sparizione. Restituisce la durata in s. */
+    startMagic(kind) {
+        this.magic = {kind, p: 0};
+        return this.reduceMotion ? MAGIC_TIME / 3 : MAGIC_TIME;
+    }
+
+    /** È sparito del tutto (fine della sparizione). */
+    get gone() {
+        return this.magic?.kind === 'vanish' && this.magic.p >= 1;
+    }
+
+    get inMagic() {
+        return this.magic !== null && !(this.magic.kind === 'vanish' && this.magic.p >= 1);
     }
 
     setMode(mode) {
@@ -114,6 +131,12 @@ export class Animator {
     /** Avanza di dt secondi e restituisce il modello per figure.draw(). */
     step(dt) {
         const f = Math.min(dt, 0.25) * FPS;           // fotogrammi trascorsi
+        if (this.magic && !(this.magic.kind === 'vanish' && this.magic.p >= 1)) {
+            const len = this.reduceMotion ? MAGIC_TIME / 3 : MAGIC_TIME;
+            this.magic.p = Math.min(1, this.magic.p + Math.min(dt, 0.25) / len);
+            if (this.magic.kind === 'appear' && this.magic.p >= 1)
+                this.magic = null;
+        }
         this.t += f;
         const t = this.t, mode = this.mode, rm = this.reduceMotion;
         const seated = this.seated;
@@ -220,6 +243,7 @@ export class Animator {
 
         // bocca: ringhia parlando, ghigno di traverso con certe emozioni
         const o = this.mouth * 6.4;
+        m.mouthOpen = o;
         const speaking = mode === 'speak';
         const tender = emo === 'commossa';
         if (speaking) {
@@ -237,6 +261,7 @@ export class Animator {
         // sbuffo
         m.op.puff = this.puffLeft > 0 ? Math.min(1, this.puffLeft / 20) : 0;
         m.tr.puff = `translate(${(60 - this.puffLeft) * 0.25} ${-(60 - this.puffLeft) * 0.15})`;
+        m.magic = this.magic ? {kind: this.magic.kind, p: this.magic.p, t, plain: rm} : null;
         return m;
     }
 }

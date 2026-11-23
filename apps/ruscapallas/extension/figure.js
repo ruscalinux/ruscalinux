@@ -209,12 +209,82 @@ function group(cr, t, alpha, fn) {
     cr.restore();
 }
 
+// ── pelo disegnato a mano, ma calcolato una volta sola ───────────────────
+// Un generatore pseudo-casuale con il seme fisso: lo stesso pelo a ogni
+// fotogramma (niente tremolio) e a ogni avvio.
+function seeded(seed) {
+    let x = seed >>> 0 || 1;
+    return () => (x = Math.imul(x ^ x >>> 15, 0x2c1b3c6d) + 0x9e3779b9 >>> 0) / 4294967296;
+}
+
+const deg = a => a * Math.PI / 180;
+const r1 = v => Math.round(v * 10) / 10;
+
+/** Un contorno d'ellisse che, fra gli angoli `from` e `to` (gradi, in senso
+ *  orario, 0 = destra), diventa una frangia di ciuffi: `len(a)` è la
+ *  lunghezza del ciuffo all'angolo a. Fuori da quell'arco è liscio. */
+function furEllipse(cx, cy, rx, ry, from, to, n, len, seed) {
+    const rnd = seeded(seed);
+    const pt = (a, k = 1) => [r1(cx + Math.cos(deg(a)) * rx * k), r1(cy + Math.sin(deg(a)) * ry * k)];
+    const span = to - from, step = span / n;
+    let d = `M${pt(from).join(' ')}`;
+    for (let i = 0; i < n; i++) {
+        const a0 = from + i * step, a1 = a0 + step;
+        const am = a0 + step * (0.45 + rnd() * 0.25);
+        const l = len(am) * (0.75 + rnd() * 0.5);
+        const lean = (rnd() - 0.35) * step * 0.5;         // i ciuffi si piegano un po'
+        const at = (a, rr) => [r1(cx + Math.cos(deg(a)) * (rx + rr)), r1(cy + Math.sin(deg(a)) * (ry + rr))];
+        const w = step * 0.16;                            // punta arrotondata, morbida
+        const tipA = at(am + lean - w, l * 0.92), tipB = at(am + lean + w, l * 0.92), top = at(am + lean, l * 1.12);
+        const c0 = pt(a0 + step * 0.25, 1 + l / rx * 0.55);
+        const c1 = pt(a1 - step * 0.2, 1 + l / rx * 0.4);
+        d += ` Q${c0.join(' ')} ${tipA.join(' ')} Q${top.join(' ')} ${tipB.join(' ')} Q${c1.join(' ')} ${pt(a1).join(' ')}`;
+    }
+    // il resto dell'ellisse, liscio: quattro archi di quadratica
+    const rest = 360 - span, k = 1 / Math.cos(deg(rest / 8));
+    for (let i = 0; i < 4; i++) {
+        const a0 = to + i * rest / 4, a1 = a0 + rest / 4;
+        d += ` Q${pt((a0 + a1) / 2, k).join(' ')} ${pt(a1).join(' ')}`;
+    }
+    return `${d} Z`;
+}
+
+/** Tratti di pelo dentro un'ellisse: corti, inclinati verso l'esterno. */
+function furHatch(cx, cy, rx, ry, n, seed, {from = 0, to = 360, minR = 0.25, maxR = 0.95, len = 3} = {}) {
+    const rnd = seeded(seed), out = [];
+    for (let i = 0; i < n; i++) {
+        const a = deg(from + rnd() * (to - from)), r = minR + rnd() * (maxR - minR);
+        const x = cx + Math.cos(a) * rx * r, y = cy + Math.sin(a) * ry * r;
+        const l = len * (0.6 + rnd() * 0.8), b = a + (rnd() - 0.5) * 0.8;
+        out.push(`M${r1(x)} ${r1(y)} q${r1(Math.cos(b) * l * 0.6)} ${r1(Math.sin(b) * l * 0.6 - 0.4)} ${r1(Math.cos(b) * l)} ${r1(Math.sin(b) * l)}`);
+    }
+    return out;
+}
+
+// testa: sopra liscia, sotto la gorgiera a ciuffi, più lunghi sulle guance
+const HEAD_FUR = furEllipse(66, 48.5, 34, 27, -30, 210, 26,
+    a => 2.2 + 3.6 * Math.pow(Math.abs(Math.cos(deg(a))), 0.7) + 1.4 * Math.max(0, Math.sin(deg(a))), 11);
+// guance e mento chiari, con la frangia verso l'alto
+const CHEEK_FUR = furEllipse(66, 62, 27, 12.5, 188, 352, 16, () => 2, 23);
+const HEAD_HATCH_D = furHatch(66, 46, 31, 24, 46, 5, {from: 190, to: 350, len: 2.6});
+const HEAD_HATCH_L = furHatch(66, 50, 32, 25, 34, 9, {from: 200, to: 340, len: 2.2});
+const RUFF_HATCH = furHatch(66, 50, 34, 27, 40, 17, {from: -15, to: 195, minR: 0.8, maxR: 1.15, len: 3.4});
+const SPOTS = (() => {                      // macchie della fronte, irregolari
+    const rnd = seeded(31), out = [];
+    for (const [x, y, s] of [[56, 29, 1.7], [61.5, 26.6, 1.9], [67, 26, 1.9], [72.5, 27, 1.7], [77, 29.5, 1.6],
+        [58.5, 33, 1.3], [64, 31.4, 1.5], [69.5, 31.6, 1.4], [74.5, 33.5, 1.2], [52, 32.5, 1.2], [81, 33, 1.1],
+        [61, 36.6, 0.9], [71, 36.4, 0.9], [48.5, 30, 0.8], [84.5, 30.5, 0.8]])
+        out.push([x, y, s * (0.85 + rnd() * 0.3), s * (0.6 + rnd() * 0.3), (rnd() - 0.5) * 70]);
+    return out;
+})();
+
 // ── le parti ─────────────────────────────────────────────────────────────
 // Luce dall'alto a sinistra: ogni volume ha un gradiente dal chiaro allo
-// scuro, il contorno esterno è più spesso di quelli interni, e il pelo ha
-// ciuffi e trama disegnati a tratti sottili.
-const FUR = '#b9ad96', FUR_L = '#d8cfbc', FUR_D = '#8f836e', FUR_DD = '#6f6453';
-const STRIPE = '#3b3229', CREAM = '#efe6d6';
+// scuro, il contorno esterno è più spesso di quelli interni, il pelo ha
+// frange di ciuffi e tratti sottili. I colori del manul vengono
+// dall'illustrazione di Pallasio: grigio caldo, guance chiare, bande nere.
+const FUR = '#aea594', FUR_L = '#dcd6ca', FUR_D = '#857c6d', FUR_DD = '#625a4f';
+const STRIPE = '#2b2621', CREAM = '#ece6de', BELLY = '#ddd0cc';
 const JACKET = '#e9dab6', JACKET_L = '#f6eed8', JACKET_D = '#c7b58a';
 const lin = (x0, y0, x1, y1, ...stops) => ['lin', x0, y0, x1, y1, stops];
 const rad = (cx, cy, r0, r1, ...stops) => ['rad', cx, cy, r0, cx, cy, r1, stops];
@@ -225,18 +295,53 @@ function furStrokes(cr, list, color, w, a = 1) {
         line(cr, d, color, w, LINE_CAP_ROUND, a);
 }
 
+function spot(cr, x, y, rx, ry, rot, color) {
+    cr.save();
+    cr.translate(x, y);
+    cr.rotate(deg(rot));
+    ellipse(cr, 0, 0, rx, ry, color);
+    cr.restore();
+}
+
+// la coda: folta, ad anelli, con i ciuffi ai lati e la punta nera
 function tail(cr, m) {
+    const ops = parsePath(m.d.tail);
+    const [, x0, y0] = ops[0], [, c1x, c1y, c2x, c2y, x1, y1] = ops[1];
+    const at = t => {
+        const u = 1 - t;
+        return [u * u * u * x0 + 3 * u * u * t * c1x + 3 * u * t * t * c2x + t * t * t * x1,
+            u * u * u * y0 + 3 * u * u * t * c1y + 3 * u * t * t * c2y + t * t * t * y1];
+    };
+    const tufts = [];
+    let s = 0, prev = at(0);
+    for (let i = 1; i <= 16; i++) {
+        const t = i / 17, p = at(t), q = at(t + 0.01);
+        s += Math.hypot(p[0] - prev[0], p[1] - prev[1]);
+        prev = p;
+        const tx = q[0] - p[0], ty = q[1] - p[1], n = Math.hypot(tx, ty) || 1;
+        const nx = -ty / n, ny = tx / n, side = i % 2 ? 1 : -1;
+        const dark = ((s + 6) % 11 + 11) % 11 < 4;           // come i trattini degli anelli
+        tufts.push({p, nx: nx * side, ny: ny * side, ux: tx / n, uy: ty / n, dark});
+    }
+    const tuft = (k, color) => {
+        for (const f of tufts) {
+            const bx2 = f.p[0] + f.nx * 4.6, by2 = f.p[1] + f.ny * 4.6;
+            shape(cr, `M${bx2 - f.ux * 3 * k} ${by2 - f.uy * 3 * k} Q${bx2 + f.nx * 3.4 * k} ${by2 + f.ny * 3.4 * k} ${bx2 + f.nx * 2.6 * k + f.ux * 2.6} ${by2 + f.ny * 2.6 * k + f.uy * 2.6} Q${bx2 + f.nx * 0.8} ${by2 + f.ny * 0.8} ${bx2 + f.ux * 3 * k} ${by2 + f.uy * 3 * k}Z`,
+                color ?? (f.dark ? STRIPE : FUR));
+        }
+    };
+    tuft(1.25, OUTLINE);
     line(cr, m.d.tail, OUTLINE, 15.8, LINE_CAP_ROUND);
+    tuft(1);
     line(cr, m.d.tail, FUR, 13, LINE_CAP_ROUND);
     cr.setDash([4, 7], -6);
     line(cr, m.d.tail, STRIPE, 13, LINE_CAP_BUTT);
     cr.setDash([], 0);
-    // riflesso lungo il dorso della coda
     cr.save();
     cr.translate(1.6, -1.4);
-    line(cr, m.d.tail, FUR_L, 3, LINE_CAP_ROUND, 0.55);
+    line(cr, m.d.tail, FUR_L, 2.6, LINE_CAP_ROUND, 0.5);
     cr.restore();
-    circle(cr, m.tailTip[0], m.tailTip[1], 6.5, rad(m.tailTip[0] - 2, m.tailTip[1] - 2, 0, 7, [0, '#4a4036'], [1, '#221c16']));
+    circle(cr, m.tailTip[0], m.tailTip[1], 6.6, rad(m.tailTip[0] - 2, m.tailTip[1] - 2, 0, 7, [0, '#4a4036'], [1, '#1d1814']));
 }
 
 function leg(cr, x, dark) {
@@ -246,13 +351,14 @@ function leg(cr, x, dark) {
     ellipse(cr, x + 8, 141, 10.5, 5, lin(0, 136, 0, 146, [0, dark ? FUR : FUR_L], [1, base]),
         {stroke: OUTLINE, w: W_OUT});
     line(cr, `M${x + 4} 138.6 v3.2 M${x + 8} 138.3 v3.8 M${x + 12} 138.6 v3.2`, OUTLINE, W_IN, LINE_CAP_ROUND);
-    furStrokes(cr, [`M${x + 3} 122 l2 2`, `M${x + 3} 128 l2 2`], FUR_DD, 0.7, 0.7);
+    furStrokes(cr, [`M${x + 2.5} 121 l2.4 2`, `M${x + 3} 127 l2.4 2`, `M${x + 10} 124 l2 1.6`, `M${x + 11} 130 l1.6 1.6`],
+        FUR_DD, 0.7, 0.7);
 }
 
 function beans(cr) {
-    ellipse(cr, 78, 141, 5, 3.6, rad(77, 140, 0, 5, [0, '#e0a7a2'], [1, '#bf7f7a']));
-    for (const [x, y] of [[72, 137], [76, 135.5], [80, 135.5], [84, 137]])
-        circle(cr, x, y, 1.8, '#c98a86');
+    ellipse(cr, 78, 141, 5.2, 3.8, rad(77, 140, 0, 5, [0, '#e6aaa8'], [1, '#c07f7d']));
+    for (const [x, y] of [[71.8, 137], [75.9, 135.3], [80.1, 135.3], [84.2, 137]])
+        ellipse(cr, x, y, 1.9, 1.7, '#cc8c89');
 }
 
 function body(cr) {
@@ -262,17 +368,15 @@ function body(cr) {
     // giacca, con la luce da sinistra
     shape(cr, 'M63 68 C 32 68 25 92 28 110 C 30 122 40 128 50 129 L66 126 L82 129 C 92 128 99 122 100 110 C 103 92 95 68 63 68 Z',
         lin(30, 72, 100, 124, [0, JACKET_L], [0.45, JACKET], [1, JACKET_D]), {stroke: OUTLINE, w: W_OUT});
-    // ombra del pancione e pieghe della stoffa
     shape(cr, 'M31 108 C 33 121 41 127 50 128 L58 127 C 46 122 38 113 35 97 Z', JACKET_D, {a: 0.55});
     shape(cr, 'M97 100 C 99 112 94 122 84 127 L82 128 C 90 120 93 111 92 100 Z', JACKET_D, {a: 0.6});
     line(cr, 'M36 84 q3 8 1 15 M93 85 q-2 7 0 13 M44 120 q6 3 12 3', JACKET_D, W_IN, LINE_CAP_ROUND, 0.9);
-    // tasca con la patta
     shape(cr, 'M79 109.5 L93 107.5 L93.6 111.6 L79.6 113.6Z', lin(0, 108, 0, 114, [0, JACKET], [1, JACKET_D]),
         {stroke: OUTLINE, w: W_IN});
-    // pancia che spunta sotto il bottone
-    shape(cr, 'M60 112 L66 107.5 L72 112 L71 127.5 L66 126 L61 127.5Z', lin(60, 110, 72, 128, [0, CREAM], [1, '#d9cdb8']),
+    // la pancia, rosata come nell'illustrazione, spunta sotto il bottone
+    shape(cr, 'M60 112 L66 107.5 L72 112 L71 127.5 L66 126 L61 127.5Z', lin(60, 110, 72, 128, [0, '#efe6e3'], [1, BELLY]),
         {stroke: OUTLINE, w: W_IN});
-    furStrokes(cr, ['M63 116 q1.4 1.6 0 3.2', 'M69 116 q1.4 1.6 0 3.2', 'M66 121 q1.4 1.6 0 3.2'], '#c3b6a0', 0.8);
+    furStrokes(cr, ['M63 116 q1.4 1.6 0 3.2', 'M69 116 q1.4 1.6 0 3.2', 'M66 121 q1.4 1.6 0 3.2', 'M63.5 124 l1 1.6'], '#bfaeaa', 0.8);
     // camicia, revers, colletto
     shape(cr, 'M55 74 L77 74 L70 102 L66 106 L62 102Z', lin(55, 74, 77, 104, [0, '#ffffff'], [1, '#e7e2d8']),
         {stroke: OUTLINE, w: W_IN});
@@ -289,117 +393,129 @@ function body(cr) {
     line(cr, 'M64.6 88 l-0.9 10', '#f08a8c', 0.7, LINE_CAP_ROUND, 0.6);
     shape(cr, 'M63.4 81 L68.6 81 L67.7 86.2 L64.3 86.2Z', lin(63, 81, 69, 86, [0, '#d8474c'], [1, '#9e1f25']),
         {stroke: OUTLINE, w: W_IN});
-    // la giacca tira sul bottone
     line(cr, 'M57.5 104 l4.6 2.2 M74.5 104 l-4.6 2.2 M56.5 109.5 l4.2 -1.2 M75.5 109.5 l-4.2 -1.2', '#b19f72', 0.8, LINE_CAP_ROUND);
     circle(cr, 66, 106.6, 2.1, rad(65.3, 105.9, 0, 2.2, [0, '#a07a52'], [1, '#5f4127']), {stroke: OUTLINE, w: W_IN});
     circle(cr, 65.4, 106, 0.55, '#e7cfa9');
 }
 
-// il tomo chiuso: si vede la copertina, in pelle con fregi dorati
+// copertina vecchia e consunta: pelle scolorita, angoli rovinati, macchie
+const LEATHER = ['#8b5a34', '#6e4224', '#4d2c16'];
+function wear(cr, spots) {
+    for (const [x, y, rx, ry, a] of spots)
+        ellipse(cr, x, y, rx, ry, '#c8a27a', {a});
+}
+
+// il tomo chiuso: si vede la copertina
 function bookClosed(cr) {
-    rect(cr, -13, -16.5, 26, 33, 1.6, lin(-13, -16, 13, 16, [0, '#8a4b29'], [0.6, '#6b371b'], [1, '#4a2410']),
+    rect(cr, -13, -16.5, 26, 33, 1.6, lin(-13, -16, 13, 16, [0, LEATHER[0]], [0.6, LEATHER[1]], [1, LEATHER[2]]),
         {stroke: OUTLINE, w: W_OUT});
-    rect(cr, -13, -16.5, 5, 33, 0, lin(-13, 0, -8, 0, [0, '#3f1f0d'], [1, '#5a2e16']));
-    line(cr, 'M-12.6 -11 h4.2 M-12.6 -6 h4.2 M-12.6 6 h4.2 M-12.6 11 h4.2', '#d1ac58', 0.9);
-    rect(cr, 13, -15.2, 2.2, 30.4, 0, lin(13, 0, 15, 0, [0, '#f3e8cb'], [1, '#d2c4a0']), {stroke: OUTLINE, w: W_IN});
-    rect(cr, -6, -13.5, 17, 27, 0, null, {stroke: '#c9a24a', w: 0.8});
-    rect(cr, -4.5, -12, 14, 24, 0, null, {stroke: '#c9a24a', w: 0.45});
-    rect(cr, -2, -6.5, 9, 6, 0.8, lin(0, -6.5, 0, -0.5, [0, '#e2c06a'], [1, '#a9832f']), {stroke: '#7c5c1c', w: 0.5});
-    line(cr, 'M-0.5 -4.6 h6 M-0.5 -2.6 h4', '#5a3e12', 0.6);
-    for (const [x, y] of [[10.6, -14], [10.6, 14]])          // cantonali di ottone
-        shape(cr, `M${x - 2.4} ${y} L${x + 2.4} ${y} L${x + 2.4} ${y + (y < 0 ? 2.4 : -2.4)}Z`, '#c9a24a');
-    line(cr, 'M-7 -15.8 L11 -15.8', '#a76a42', 0.7, LINE_CAP_BUTT, 0.7);   // luce sul bordo
+    rect(cr, -13, -16.5, 5, 33, 0, lin(-13, 0, -8, 0, [0, '#3f2410'], [1, '#5a3418']));
+    line(cr, 'M-12.6 -11 h4.2 M-12.6 -6 h4.2 M-12.6 6 h4.2 M-12.6 11 h4.2', '#b8964e', 0.9);
+    rect(cr, 13, -15.2, 2.2, 30.4, 0, lin(13, 0, 15, 0, [0, '#efe1bf'], [1, '#c9b78e']), {stroke: OUTLINE, w: W_IN});
+    line(cr, 'M14 -12 v2 M14 -6 v3 M14 3 v2 M14 9 v3', '#a9966e', 0.4);              // pagine ingiallite
+    wear(cr, [[3, 8, 5, 3, 0.28], [-4, -10, 3, 2, 0.22], [8, -12, 2.5, 1.6, 0.25], [9, 13, 3, 1.8, 0.3]]);
+    rect(cr, -6, -13.5, 17, 27, 0, null, {stroke: '#b8964e', w: 0.8});
+    rect(cr, -4.5, -12, 14, 24, 0, null, {stroke: '#b8964e', w: 0.45});
+    rect(cr, -2, -6.5, 9, 6, 0.8, lin(0, -6.5, 0, -0.5, [0, '#d7b866'], [1, '#9c7a30']), {stroke: '#6f521a', w: 0.5});
+    line(cr, 'M-0.5 -4.6 h6 M-0.5 -2.6 h4', '#4e3510', 0.6);
+    shape(cr, 'M13 13 L9.6 16.5 L13 16.5Z M13 -13.4 L10 -16.5 L13 -16.5Z', '#d9c39a', {stroke: OUTLINE, w: 0.6}); // angoli consumati
+    line(cr, 'M-7 -15.8 L10 -15.8', '#b27b4d', 0.7, LINE_CAP_BUTT, 0.7);
 }
 
-// il tomo aperto visto da chi guarda: le due copertine a libro e il dorso,
-// sopra il taglio delle pagine; le pagine scritte le vede solo Pallasio
+// il tomo aperto visto da chi guarda: le due copertine e il dorso, sopra il
+// taglio delle pagine; le pagine scritte le vede solo Pallasio
 function bookOpen(cr) {
-    shape(cr, 'M-24 -10.5 L0 -14.5 L24 -10.5 L22 -7.5 L0 -10.8 L-22 -7.5Z', lin(0, -14, 0, -8, [0, '#fbf3dc'], [1, '#d9caa3']),
+    shape(cr, 'M-24 -10.5 L0 -14.5 L24 -10.5 L22 -7.5 L0 -10.8 L-22 -7.5Z', lin(0, -14, 0, -8, [0, '#f4e7c6'], [1, '#cdb98d']),
         {stroke: OUTLINE, w: W_IN});
-    line(cr, 'M-20 -9.6 L0 -12.6 L20 -9.6', '#c8b88f', 0.5);
-    shape(cr, 'M-25 -9 L-2.2 -11.2 L-2.2 17 L-25 14.6Z', lin(-25, -9, -2, 17, [0, '#8a4b29'], [1, '#55290f']),
+    line(cr, 'M-20 -9.6 L0 -12.6 L20 -9.6 M-16 -9.2 L0 -11.6', '#b8a578', 0.45);
+    shape(cr, 'M-25 -9 L-2.2 -11.2 L-2.2 17 L-25 14.6Z', lin(-25, -9, -2, 17, [0, LEATHER[0]], [1, LEATHER[2]]),
         {stroke: OUTLINE, w: W_OUT});
-    shape(cr, 'M25 -9 L2.2 -11.2 L2.2 17 L25 14.6Z', lin(25, -9, 2, 17, [0, '#7a3f20'], [1, '#4a2410']),
+    shape(cr, 'M25 -9 L2.2 -11.2 L2.2 17 L25 14.6Z', lin(25, -9, 2, 17, [0, '#7c4e2c'], [1, '#43260f']),
         {stroke: OUTLINE, w: W_OUT});
-    shape(cr, 'M-2.6 -11.6 L2.6 -11.6 L2.6 17.6 L-2.6 17.6Z', lin(-2.6, 0, 2.6, 0, [0, '#3f1f0d'], [0.5, '#6a3519'], [1, '#3f1f0d']),
+    wear(cr, [[-15, 8, 5, 3, 0.25], [-20, -4, 2.4, 1.6, 0.2], [15, 9, 4, 2.4, 0.22], [19, -5, 2.6, 1.6, 0.25]]);
+    shape(cr, 'M-2.6 -11.6 L2.6 -11.6 L2.6 17.6 L-2.6 17.6Z', lin(-2.6, 0, 2.6, 0, [0, '#3f2410'], [0.5, '#6e4224'], [1, '#3f2410']),
         {stroke: OUTLINE, w: W_IN});
-    line(cr, 'M-2.4 -6 h4.8 M-2.4 -1 h4.8 M-2.4 9 h4.8 M-2.4 14 h4.8', '#d1ac58', 0.8);
-    shape(cr, 'M-22.5 -6.8 L-5 -8.6 L-5 13.8 L-22.5 12Z', null, {stroke: '#c9a24a', w: 0.7});
-    shape(cr, 'M22.5 -6.8 L5 -8.6 L5 13.8 L22.5 12Z', null, {stroke: '#c9a24a', w: 0.7});
-    shape(cr, 'M9 -1 L18.5 -1.9 L18.5 4.4 L9 5.3Z', lin(0, -2, 0, 5, [0, '#e2c06a'], [1, '#a9832f']), {stroke: '#7c5c1c', w: 0.5});
-    line(cr, 'M10.5 1 l6 -0.6 M10.5 3 l4 -0.4', '#5a3e12', 0.55);
+    line(cr, 'M-2.4 -6 h4.8 M-2.4 -1 h4.8 M-2.4 9 h4.8 M-2.4 14 h4.8', '#b8964e', 0.8);
+    shape(cr, 'M-22.5 -6.8 L-5 -8.6 L-5 13.8 L-22.5 12Z', null, {stroke: '#b8964e', w: 0.7});
+    shape(cr, 'M22.5 -6.8 L5 -8.6 L5 13.8 L22.5 12Z', null, {stroke: '#b8964e', w: 0.7});
+    shape(cr, 'M9 -1 L18.5 -1.9 L18.5 4.4 L9 5.3Z', lin(0, -2, 0, 5, [0, '#d7b866'], [1, '#9c7a30']), {stroke: '#6f521a', w: 0.5});
+    line(cr, 'M10.5 1 l6 -0.6 M10.5 3 l4 -0.4', '#4e3510', 0.55);
+    shape(cr, 'M-25 14.6 L-22 14.9 L-25 11.6Z M25 14.6 L22 14.9 L25 11.6Z', '#d9c39a', {stroke: OUTLINE, w: 0.6});
 }
 
-function arm(cr, d, crease, light, shade, paw, pawColor) {
+// zampa pelosa, con le unghie chiare come nell'illustrazione
+function paw(cr, p, color) {
+    const [x, y] = p;
+    shape(cr, `M${x - 5.6} ${y} Q${x - 6.6} ${y - 3.2} ${x - 4.4} ${y - 4.6} L${x - 3.8} ${y - 6.6} L${x - 2.4} ${y - 5.2} Q${x} ${y - 6.4} ${x + 2.4} ${y - 5.2} L${x + 3.8} ${y - 6.6} L${x + 4.4} ${y - 4.6} Q${x + 6.6} ${y - 3.2} ${x + 5.6} ${y} Q${x + 5.6} ${y + 5.8} ${x} ${y + 5.8} Q${x - 5.6} ${y + 5.8} ${x - 5.6} ${y}Z`,
+        rad(x - 1.6, y - 1.8, 0.5, 6.6, [0, FUR_L], [0.7, color], [1, FUR_D]), {stroke: OUTLINE, w: W_OUT});
+    line(cr, `M${x - 2.6} ${y + 1.4} v2.4 M${x} ${y + 2} v2.6 M${x + 2.6} ${y + 1.4} v2.4`, OUTLINE, 0.7, LINE_CAP_ROUND);
+    line(cr, `M${x - 3.2} ${y + 5} q0.3 0.8 0.9 1 M${x - 0.4} ${y + 5.5} q0.3 0.8 0.9 1 M${x + 2.4} ${y + 5} q0.3 0.8 0.9 1`,
+        '#e9e2d4', 0.7, LINE_CAP_ROUND, 0.9);
+}
+
+function arm(cr, d, crease, light, shade, p, pawColor) {
     line(cr, d, OUTLINE, 12.8, LINE_CAP_ROUND);
     line(cr, d, light, 10, LINE_CAP_ROUND);
     cr.save();
-    cr.translate(1.2, 1.4);                  // ombra lungo la manica
+    cr.translate(1.2, 1.4);
     line(cr, d, shade, 2.6, LINE_CAP_ROUND, 0.35);
     cr.restore();
-    line(cr, crease, shade, 1.6);            // polsino
-    circle(cr, paw[0], paw[1], 5.7, rad(paw[0] - 1.6, paw[1] - 1.8, 0.5, 6.4, [0, FUR_L], [0.7, pawColor], [1, FUR_D]),
-        {stroke: OUTLINE, w: W_OUT});
-    line(cr, `M${paw[0] - 2.6} ${paw[1] + 1.4} v2.2 M${paw[0]} ${paw[1] + 2.2} v2.4 M${paw[0] + 2.6} ${paw[1] + 1.4} v2.2`,
-        OUTLINE, 0.7, LINE_CAP_ROUND);
+    line(cr, crease, shade, 1.6);
+    paw(cr, p, pawColor);
 }
 
-const HEAD = 'M66 22 C 44 22 32 34 32 48 L26 52 L32 55 L27 61 L34 62 L31 68 L40 67 L39 73 L48 70 L50 77 L57 72 L62 79 L66 73 L70 79 L75 72 L82 77 L84 70 L93 73 L92 67 L101 68 L98 62 L105 61 L100 55 L106 52 L100 48 C 100 34 88 22 66 22 Z';
-// trama del pelo: ciuffi sulla gorgiera, sulla fronte e sulle guance
-const FUR_TUFTS = ['M29 53 l4 1', 'M30 60 l5 0', 'M34 66 l5 -1', 'M42 71 l4 -2', 'M51 75 l3 -3', 'M60 77 l2 -4',
-    'M103 53 l-4 1', 'M102 60 l-5 0', 'M98 66 l-5 -1', 'M90 71 l-4 -2', 'M81 75 l-3 -3', 'M72 77 l-2 -4'];
-const FUR_FINE = ['M44 32 q2 -2 4 -2', 'M84 32 q-2 -2 -4 -2', 'M40 40 q1 -3 3 -4', 'M92 40 q-1 -3 -3 -4',
-    'M58 24 q2 -1 4 -1', 'M70 23 q2 0 4 1', 'M38 50 l-3 2', 'M94 50 l3 2'];
-
 function head(cr, m) {
-    group(cr, m.tr.earL, 1, () => {
-        shape(cr, 'M30 42 Q28 32 42 32 Q40 40 30 42Z', lin(28, 32, 42, 42, [0, FUR], [1, FUR_D]), {stroke: OUTLINE, w: W_OUT});
-        shape(cr, 'M33 39 Q32 34 39 34 Q37 38 33 39Z', lin(32, 34, 39, 39, [0, '#e4c4b8'], [1, '#c49c91']));
-        line(cr, 'M33 37 l3 -1', '#f3ece0', 0.6);
-    });
-    group(cr, m.tr.earR, 1, () => {
-        shape(cr, 'M102 42 Q104 32 90 32 Q92 40 102 42Z', lin(104, 32, 90, 42, [0, FUR_D], [1, FUR_DD]), {stroke: OUTLINE, w: W_OUT});
-        shape(cr, 'M99 39 Q100 34 93 34 Q95 38 99 39Z', lin(100, 34, 93, 39, [0, '#d9b6aa'], [1, '#b38c82']));
-        line(cr, 'M99 37 l-3 -1', '#f3ece0', 0.6);
-    });
-    // testa larga con la gorgiera a punte
-    shape(cr, HEAD, rad(58, 36, 4, 48, [0, '#ddd4c2'], [0.55, '#c5baa5'], [1, '#9c907b']), {stroke: OUTLINE, w: W_OUT});
-    shape(cr, 'M38 60 L34 66 L42 66 L44 72 L52 68 L58 76 L66 70 L74 76 L80 68 L88 72 L90 66 L98 66 L94 60 Q80 72 66 70 Q52 72 38 60Z',
-        lin(0, 60, 0, 76, [0, '#f2ebdd'], [1, '#d9cfbd']));
-    furStrokes(cr, FUR_TUFTS, '#f4eee2', 0.8, 0.85);
-    furStrokes(cr, FUR_FINE, FUR_D, 0.7, 0.8);
-    for (const [x, y, r] of [[56, 29, 1.6], [62, 26.5, 1.8], [70, 26.5, 1.8], [76, 29, 1.6], [59, 33, 1.3],
-        [66, 31, 1.5], [73, 33, 1.3], [52, 33, 1.1], [80, 33, 1.1], [48, 30.5, 0.8], [84, 30.5, 0.8]])
-        ellipse(cr, x, y, r, r * 0.85, '#3d342b');
-    line(cr, 'M62 36 q4 3 8 0 M63 39 q3 2 6 0', '#7d725f', 0.9, LINE_CAP_ROUND);
-    // le bande scure delle guance, con i bordi sfrangiati
-    shape(cr, 'M34 50 q8 8 16 8 l-1 3 q-9 -1 -16 -7Z M33 57 q8 8 17 8 l-1 3 q-10 -1 -17 -7Z M98 50 q-8 8 -16 8 l1 3 q9 -1 16 -7Z M99 57 q-8 8 -17 8 l1 3 q10 -1 17 -7Z',
+    for (const [side, t, flip] of [[-1, m.tr.earL, 1], [1, m.tr.earR, -1]]) {
+        group(cr, t, 1, () => {
+            const x = side < 0 ? 30 : 102;
+            shape(cr, side < 0 ? 'M30 42 Q27 31 42 31.5 Q40.5 40 30 42Z' : 'M102 42 Q105 31 90 31.5 Q91.5 40 102 42Z',
+                lin(x, 31, x + 12 * flip, 42, [0, FUR], [1, FUR_DD]), {stroke: OUTLINE, w: W_OUT});
+            shape(cr, side < 0 ? 'M33 39.4 Q32 34 39.5 34 Q37.5 38 33 39.4Z' : 'M99 39.4 Q100 34 92.5 34 Q94.5 38 99 39.4Z',
+                lin(x, 34, x + 7 * flip, 39, [0, '#d9b8ae'], [1, '#a98479']));
+            line(cr, side < 0 ? 'M33.6 37.6 l2.8 -2 M35 38.4 l3 -1.4' : 'M98.4 37.6 l-2.8 -2 M97 38.4 l-3 -1.4', '#f6f1e8', 0.6, LINE_CAP_ROUND);
+        });
+    }
+    // testa: gradiente caldo, frangia di ciuffi, trama del pelo
+    shape(cr, HEAD_FUR, rad(58, 34, 4, 50, [0, '#dcd6ca'], [0.55, '#b8ae9d'], [1, '#8a8072']), {stroke: OUTLINE, w: 1.25});
+    furStrokes(cr, HEAD_HATCH_D, FUR_DD, 0.55, 0.45);
+    furStrokes(cr, HEAD_HATCH_L, '#f2ede4', 0.5, 0.5);
+    furStrokes(cr, RUFF_HATCH, '#efe9de', 0.6, 0.7);
+    // guance e mento chiari
+    shape(cr, CHEEK_FUR, lin(0, 50, 0, 76, [0, '#f3eee6'], [1, '#d8d0c3']));
+    for (const [x, y, rx, ry, rot] of SPOTS)
+        spot(cr, x, y, rx, ry, rot, '#2f2924');
+    line(cr, 'M61.5 39.5 q4.5 2.6 9 0 M62.6 42 q3.4 1.8 6.8 0', '#6c6356', 0.8, LINE_CAP_ROUND);   // fronte corrugata
+    // le bande nere delle guance, spesse, con le punte sfrangiate
+    shape(cr, 'M33.6 49.5 q8 8.6 17 8.6 l-0.8 3.2 q-10 -0.6 -17.2 -7.8 l-2 0.6Z M32.6 57 q8.4 8.4 17.6 8.2 l-0.8 3.4 q-10.6 -0.8 -17.8 -7.6 l-1.8 0.4Z M98.4 49.5 q-8 8.6 -17 8.6 l0.8 3.2 q10 -0.6 17.2 -7.8 l2 0.6Z M99.4 57 q-8.4 8.4 -17.6 8.2 l0.8 3.4 q10.6 -0.8 17.8 -7.6 l1.8 0.4Z',
         STRIPE);
-    furStrokes(cr, ['M37 55 l-1 2', 'M42 59 l-1 2', 'M37 62 l-1 2', 'M95 55 l1 2', 'M90 59 l1 2', 'M95 62 l1 2'], STRIPE, 0.8);
+    furStrokes(cr, ['M37 55.6 l-1.2 2.4', 'M42 59.2 l-1 2.4', 'M37 62.4 l-1.2 2.4', 'M45 65.6 l-0.8 2',
+        'M95 55.6 l1.2 2.4', 'M90 59.2 l1 2.4', 'M95 62.4 l1.2 2.4', 'M87 65.6 l0.8 2'], STRIPE, 0.8);
     // muso
     shape(cr, 'M66 54 C 56 54 52 60 53 64 C 54 69 60 71 66 71 C 72 71 78 69 79 64 C 80 60 76 54 66 54 Z',
-        rad(63, 58, 1, 15, [0, '#ffffff'], [0.7, '#f3ede2'], [1, '#dcd2c1']), {stroke: OUTLINE, w: W_IN});
-    for (const [x, y] of [[58, 61], [60, 63.5], [57.5, 64.5], [74, 61], [72, 63.5], [74.5, 64.5]])
-        circle(cr, x, y, 0.45, '#8f836e');       // attaccature dei baffi
-    // occhi
+        rad(63, 58, 1, 15, [0, '#ffffff'], [0.7, '#f1ebe1'], [1, '#d8cebf']), {stroke: OUTLINE, w: W_IN});
+    for (const [x, y] of [[58, 61], [60, 63.5], [57.5, 64.5], [59.6, 59.4], [74, 61], [72, 63.5], [74.5, 64.5], [72.4, 59.4]])
+        circle(cr, x, y, 0.45, '#7d7364');
+    // occhi: pelle chiara attorno, borse sotto, iride gialla
     for (const cx of [55, 77]) {
+        ellipse(cr, cx, 48.4, 7.6, 6.2, '#e9e3d8', {a: 0.85});
         circle(cr, cx, 47, 5.1, '#fbf6e6', {stroke: OUTLINE, w: W_IN});
-        circle(cr, cx, 47, 4.4, rad(cx - 0.8, 46, 0.5, 4.6, [0, '#f6dd6e'], [0.65, '#e0b53a'], [1, '#a9791c']));
+        circle(cr, cx, 47, 4.4, rad(cx - 0.8, 46, 0.5, 4.6, [0, '#eee07a'], [0.6, '#d7bc3c'], [1, '#97741c']));
     }
     group(cr, m.tr.pup, 1, () => {
         for (const cx of [55, 77]) {
-            ellipse(cr, cx, 47, 1.25, 3.1, '#120f0b');
+            ellipse(cr, cx, 47, 1.2, 3.1, '#110e0a');
             circle(cr, cx + 1.4, 45.4, 0.8, '#ffffff');
             circle(cr, cx - 1.2, 48.6, 0.35, '#ffffff', {a: 0.8});
         }
     });
-    shape(cr, m.d.lid1, lin(49, 41, 49, 48, [0, '#cdc3ae'], [1, '#b2a68f']), {stroke: OUTLINE, w: W_IN});
-    shape(cr, m.d.lid2, lin(71, 41, 71, 48, [0, '#c4b9a3'], [1, '#a99d86']), {stroke: OUTLINE, w: W_IN});
-    line(cr, 'M51 52.3 q4 1.4 8 0 M73 52.3 q4 1.4 8 0', '#8f836e', 0.6, LINE_CAP_ROUND);
-    line(cr, m.d.brows, '#241d16', 2.9, LINE_CAP_ROUND);
+    shape(cr, m.d.lid1, lin(49, 41, 49, 48, [0, '#cfc8b9'], [1, '#aca394']), {stroke: OUTLINE, w: W_IN});
+    shape(cr, m.d.lid2, lin(71, 41, 71, 48, [0, '#c6bfb0'], [1, '#a1988a']), {stroke: OUTLINE, w: W_IN});
+    line(cr, 'M50.6 52.3 q4.4 1.6 8.8 0 M72.6 52.3 q4.4 1.6 8.8 0 M51.6 54 q3.4 1 6.8 0 M73.6 54 q3.4 1 6.8 0',
+        '#857a6b', 0.55, LINE_CAP_ROUND);
+    line(cr, m.d.brows, '#231c15', 2.9, LINE_CAP_ROUND);
     // occhialini tondi: lenti con il riflesso, montatura con la luce
     for (const cx of [55, 77]) {
-        circle(cr, cx, 47.5, 7.4, rad(cx - 2.5, 45, 0, 8, [0, 'rgba(255,255,255,0.32)'], [0.6, 'rgba(225,238,246,0.12)'], [1, 'rgba(200,220,235,0.22)']),
+        circle(cr, cx, 47.5, 7.4, rad(cx - 2.5, 45, 0, 8, [0, 'rgba(255,255,255,0.34)'], [0.6, 'rgba(225,238,246,0.12)'], [1, 'rgba(200,220,235,0.24)']),
             {stroke: '#1b1712', w: 1.8});
         line(cr, `M${cx - 5.4} ${45.2} q1.6 -3 5 -3.6`, '#ffffff', 1, LINE_CAP_ROUND, 0.9);
         line(cr, `M${cx + 3.5} ${51.5} q1.6 -1 2.4 -2.8`, '#ffffff', 0.7, LINE_CAP_ROUND, 0.5);
@@ -410,17 +526,43 @@ function head(cr, m) {
         cr.stroke();
     }
     line(cr, 'M62.4 46.6 q3.6 -2.6 7.2 0 M47.6 46.4 l-11 -4 M84.4 46.4 l11 -4', '#1b1712', 1.4, LINE_CAP_ROUND);
-    // naso, bocca, zanne, baffi
-    shape(cr, 'M62.5 56.5 q3.5 -1.5 7 0 l-3.5 4z', lin(62, 55, 66, 61, [0, '#dba19c'], [1, '#b0716d']), {stroke: OUTLINE, w: W_IN});
-    circle(cr, 64.6, 56.7, 0.6, '#f6d7d3');
+    // naso rosa, più grande, con le narici
+    shape(cr, 'M61.6 56.2 q4.4 -2 8.8 0 q-0.6 2.6 -4.4 4.8 q-3.8 -2.2 -4.4 -4.8z',
+        lin(62, 54, 66, 61, [0, '#e2a4a6'], [1, '#b26e72']), {stroke: OUTLINE, w: W_IN});
+    line(cr, 'M63.6 57.6 q0.8 0.6 1.4 0.1 M68.4 57.6 q-0.8 0.6 -1.4 0.1', '#6d3b3d', 0.6, LINE_CAP_ROUND);
+    circle(cr, 64.4, 56.4, 0.6, '#f7dcdc');
     if (m.op.snarl > 0.01)
         line(cr, 'M58 58 q2 -2 4 -1 M70 57 q2 -1 4 1 M60 59.6 q1.5 -1 3 -0.6', '#7d725f', 0.9, LINE_CAP_ROUND, m.op.snarl);
-    line(cr, 'M66 60.5 v2.5', OUTLINE, W_IN);
-    shape(cr, m.d.mouth, m.mouthFill ? lin(0, 62, 0, 72, [0, '#6e3232'], [1, '#3f1a1a']) : null, {stroke: OUTLINE, w: 1.1});
-    shape(cr, 'M61.6 64.6 l1.3 3.4 l1.2 -3', '#ffffff', {stroke: OUTLINE, w: 0.5});
-    if (m.op.fangR > 0.01)
-        shape(cr, 'M68 64.4 l1.2 3 l1.3 -3.4', '#ffffff', {stroke: OUTLINE, w: 0.5, a: m.op.fangR});
-    line(cr, 'M78 61 l20 -3 M78 64 l21 1 M78 67 l18 4 M54 61 l-20 -3 M54 64 l-21 1 M54 67 l-18 4', '#f7f3ea', 0.6, LINE_CAP_ROUND, 0.9);
+    line(cr, 'M66 61 v2', OUTLINE, W_IN);
+    // bocca: ringhiando mostra la fila di dentini, come nell'illustrazione
+    if (m.mouthFill) {
+        const o = m.mouthOpen ?? 0, depth = 66 + o * 2.2;
+        shape(cr, m.d.mouth, lin(0, 62, 0, depth, [0, '#7a3436'], [1, '#3c1617']), {stroke: OUTLINE, w: 1.1});
+        cr.save();
+        path(cr, m.d.mouth);
+        cr.clip();
+        if (o > 0.6)
+            ellipse(cr, 66, depth - 0.8, 4.2, Math.min(2.4, o * 0.5), '#c56a74');          // lingua
+        for (let x = 59.2; x <= 72.9; x += 1.55) {
+            const fang = Math.abs(x - 60.75) < 0.5 || Math.abs(x - 71.6) < 0.6;
+            const l = fang ? 2.8 : 1.3;
+            shape(cr, `M${x - 0.7} 62.6 L${x} ${63.2 + l} L${x + 0.7} 62.6Z`, '#fbf7ee', {stroke: OUTLINE, w: 0.3});
+        }
+        if (o > 1.2) {
+            const base = y => y;
+            for (let x = 60.4; x <= 71.8; x += 1.6) {
+                const k = (x - 66) / 8, y = base(64 + (depth - 64) * 0.5 * (1 - k * k) + 0.6);
+                shape(cr, `M${x - 0.6} ${y} L${x} ${y - 1.1} L${x + 0.6} ${y}Z`, '#f3ede0', {stroke: OUTLINE, w: 0.3});
+            }
+        }
+        cr.restore();
+    } else {
+        shape(cr, m.d.mouth, null, {stroke: OUTLINE, w: 1.1});
+        shape(cr, 'M61.6 64.6 l1.3 3.4 l1.2 -3', '#ffffff', {stroke: OUTLINE, w: 0.5});
+        if (m.op.fangR > 0.01)
+            shape(cr, 'M68 64.4 l1.2 3 l1.3 -3.4', '#ffffff', {stroke: OUTLINE, w: 0.5, a: m.op.fangR});
+    }
+    line(cr, 'M78 61 l21 -3.4 M78 64 l22 0.8 M78 67 l19 4.4 M54 61 l-21 -3.4 M54 64 l-22 0.8 M54 67 l-19 4.4', '#f7f3ea', 0.55, LINE_CAP_ROUND, 0.9);
     if (m.op.tear > 0.01)          // commosso: una lacrima che non ammetterà mai
         ellipse(cr, 49.5, 53, 1.1, 1.6, rad(49.2, 52.5, 0, 1.6, [0, '#ffffff'], [1, '#9fcbe6']), {a: m.op.tear});
 }
@@ -431,6 +573,81 @@ function puff(cr) {
     circle(cr, 111, 57, 1.5, '#d8d4cc');
 }
 
+function figure(cr, m) {
+    tail(cr, m);
+    group(cr, m.tr.legL, 1, () => leg(cr, 46, true));
+    group(cr, m.tr.legR, 1, () => {
+        leg(cr, 70, false);
+        if (m.op.beans > 0.01)
+            beans(cr);
+    });
+    body(cr);
+    group(cr, m.tr.book, 1 - m.op.open, () => bookClosed(cr));
+    group(cr, m.tr.bookOpen, m.op.open, () => bookOpen(cr));
+    arm(cr, m.d.armL, m.d.creaseL, JACKET_L, JACKET_D, m.pawL, FUR);
+    if (m.op.finger > 0.01) {      // l'indice alzato, sopra la zampa
+        line(cr, m.d.finger, OUTLINE, 4.6, LINE_CAP_ROUND, m.op.finger);
+        line(cr, m.d.finger, FUR_L, 2.4, LINE_CAP_ROUND, m.op.finger);
+    }
+    arm(cr, m.d.armR, m.d.creaseR, JACKET, '#b6a275', m.pawR, FUR_D);
+    group(cr, m.tr.head, 1, () => head(cr, m));
+    group(cr, m.tr.puff, m.op.puff, () => puff(cr));
+}
+
+// ── la magia: apparire dal nulla, sparire nel nulla ──────────────────────
+// Scintille dorate e rosa che girano a spirale, un lampo, un anello di fumo
+// color ametista. Tutto dentro il riquadro di 130 × 150 unità.
+const MAGIC_C = [65, 98];                      // il centro della magia: la pancia
+const SPARK_GOLD = '#ffd979', SPARK_PINK = '#f5b8d3', SMOKE = '#cba6ec';
+const ease = t => t < 0 ? 0 : t > 1 ? 1 : t * t * (3 - 2 * t);
+const backOut = t => {
+    const c = 1.9;
+    return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2);
+};
+const phase = (p, a, b) => Math.max(0, Math.min(1, (p - a) / (b - a)));
+
+function sparkle(cr, x, y, s, color, a) {
+    if (a <= 0.01 || s <= 0.05)
+        return;
+    circle(cr, x, y, s * 2.2, rad(x, y, 0, s * 2.2, [0, color, 0.55 * a], [1, color, 0]));
+    shape(cr, `M${x} ${y - s * 1.6} Q${x} ${y} ${x + s * 1.6} ${y} Q${x} ${y} ${x} ${y + s * 1.6} Q${x} ${y} ${x - s * 1.6} ${y} Q${x} ${y} ${x} ${y - s * 1.6}Z`,
+        color, {a});
+    circle(cr, x, y, s * 0.4, '#ffffff', {a});
+}
+
+function sparks(cr, p, inward, t, n = 14) {
+    const [cx, cy] = MAGIC_C;
+    for (let i = 0; i < n; i++) {
+        const k = (i * 0.618) % 1;                          // sfasate, mai in fila
+        const q = Math.max(0, Math.min(1, p * 1.25 - k * 0.25));
+        const r = inward ? 58 * (1 - q) + 4 : 6 + 58 * q;
+        const a = (i / n) * Math.PI * 2 + (inward ? q * 3.2 : -q * 2.4) + k;
+        const x = cx + Math.cos(a) * r * 0.95, y = cy + Math.sin(a) * r * 0.8;
+        const tw = 0.7 + 0.3 * Math.sin(t * 0.5 + i * 1.7);
+        const alpha = inward ? Math.min(1, q * 3) * (1 - phase(q, 0.85, 1)) : (1 - q);
+        sparkle(cr, x, y, (2 + 2.2 * k) * tw, i % 3 ? SPARK_GOLD : SPARK_PINK, alpha);
+    }
+}
+
+function smokeRing(cr, q) {
+    if (q <= 0 || q >= 1)
+        return;
+    const [cx, cy] = MAGIC_C, r = 10 + q * 48, a = (1 - q) * 0.85;
+    for (let i = 0; i < 9; i++) {
+        const ang = i / 9 * Math.PI * 2 + q;
+        const x = cx + Math.cos(ang) * r, y = cy + Math.sin(ang) * r * 0.62;
+        circle(cr, x, y, 5 + q * 7, rad(x, y, 0, 5 + q * 7, [0, SMOKE, a], [1, SMOKE, 0]));
+    }
+}
+
+function flash(cr, q) {
+    if (q <= 0 || q >= 1)
+        return;
+    const [cx, cy] = MAGIC_C, s = Math.sin(q * Math.PI);
+    circle(cr, cx, cy, 6 + 26 * s, rad(cx, cy, 0, 6 + 26 * s, [0, '#ffffff', 0.9 * s], [0.35, SPARK_GOLD, 0.5 * s], [1, SPARK_PINK, 0]));
+    sparkle(cr, cx, cy, 5 * s, '#fff4d6', s);
+}
+
 /** Disegna Pallasio. Il contesto è già scalato: 1 unità = 1/130 della
  *  larghezza del riquadro. */
 export function draw(cr, m) {
@@ -439,28 +656,50 @@ export function draw(cr, m) {
         cr.translate(BOX_W, 0);
         cr.scale(-1, 1);
     }
-    ellipse(cr, 65, 146, m.shadowRx, 3.8, ['rad', 65, 146, 0, 65, 146, m.shadowRx,
-        [[0, '#000000', 0.38], [0.7, '#000000', 0.18], [1, '#000000', 0]]], {});
-    group(cr, m.tr.all, 1, () => {
-        tail(cr, m);
-        group(cr, m.tr.legL, 1, () => leg(cr, 46, true));
-        group(cr, m.tr.legR, 1, () => {
-            leg(cr, 70, false);
-            if (m.op.beans > 0.01)
-                beans(cr);
-        });
-        body(cr);
-        group(cr, m.tr.book, 1 - m.op.open, () => bookClosed(cr));
-        group(cr, m.tr.bookOpen, m.op.open, () => bookOpen(cr));
-        arm(cr, m.d.armL, m.d.creaseL, JACKET_L, JACKET_D, m.pawL, FUR);
-        if (m.op.finger > 0.01) {      // l'indice alzato, sopra la zampa
-            line(cr, m.d.finger, OUTLINE, 4.6, LINE_CAP_ROUND, m.op.finger);
-            line(cr, m.d.finger, FUR_L, 2.4, LINE_CAP_ROUND, m.op.finger);
+    const mg = m.magic;
+    let alpha = 1, scale = 1, spin = 0;
+    if (mg) {
+        const p = mg.p;
+        if (mg.plain) {                                    // animazioni ridotte: solo dissolvenza
+            alpha = mg.kind === 'appear' ? p : 1 - p;
+        } else if (mg.kind === 'appear') {
+            const q = phase(p, 0.3, 0.78);
+            scale = q > 0 ? Math.max(0.02, backOut(q)) : 0;
+            alpha = Math.min(1, q * 1.8);
+        } else {
+            const q = phase(p, 0, 0.58);
+            scale = 1 - ease(q) * 0.98;
+            spin = ease(q) * 28;
+            alpha = q < 0.98 ? 1 - q * 0.6 : 0;
         }
-        arm(cr, m.d.armR, m.d.creaseR, JACKET, '#b6a275', m.pawR, FUR_D);
-        group(cr, m.tr.head, 1, () => head(cr, m));
-        group(cr, m.tr.puff, m.op.puff, () => puff(cr));
-    });
+    }
+    if (alpha > 0.01 && scale > 0.01) {
+        ellipse(cr, 65, 146, m.shadowRx * Math.min(1, scale), 3.8, ['rad', 65, 146, 0, 65, 146, m.shadowRx,
+            [[0, '#000000', 0.38 * alpha], [0.7, '#000000', 0.18 * alpha], [1, '#000000', 0]]], {});
+        cr.save();
+        if (scale !== 1 || spin) {
+            cr.translate(MAGIC_C[0], MAGIC_C[1]);
+            cr.rotate(deg(spin));
+            cr.scale(scale, scale);
+            cr.translate(-MAGIC_C[0], -MAGIC_C[1]);
+        }
+        group(cr, m.tr.all, alpha, () => figure(cr, m));
+        cr.restore();
+    }
+    if (mg && !mg.plain) {
+        const p = mg.p;
+        if (mg.kind === 'appear') {
+            sparks(cr, phase(p, 0, 0.45), true, mg.t);
+            flash(cr, phase(p, 0.22, 0.5));
+            smokeRing(cr, phase(p, 0.35, 0.95));
+            sparks(cr, phase(p, 0.55, 1), false, mg.t, 10);
+        } else {
+            sparks(cr, phase(p, 0, 0.55), true, mg.t);
+            flash(cr, phase(p, 0.45, 0.72));
+            smokeRing(cr, phase(p, 0.55, 1));
+            sparks(cr, phase(p, 0.58, 1), false, mg.t, 12);
+        }
+    }
     cr.restore();
 }
 

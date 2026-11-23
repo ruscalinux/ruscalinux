@@ -23,7 +23,7 @@ Il fumetto non mostra mai parole: la conversazione non si scrive e non si salva.
 ## Muoverlo
 
 - **Trascinalo** con il mouse; lasciato andare cade a terra, o sulla finestra che ha sotto.
-- **Clic destro**: «Zitto» e «Torna nello sgabuzzino». Per richiamarlo apri di nuovo RuscaPallas.
+- **Clic destro**: «Zitto» e «Torna nello sgabuzzino»: sparisce nel nulla in una nuvola di scintille. Richiamato, riappare dal nulla.
 - Nella panoramica delle attività e con le finestre a schermo intero non c'è.
 - Con le animazioni disattivate (Impostazioni → Accessibilità) sta fermo, ma parla lo stesso.
 

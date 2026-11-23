@@ -23,7 +23,7 @@ The bubble never shows words: the conversation is not written and not saved.
 ## Moving him
 
 - **Drag** him with the mouse; when released he falls to the ground, or onto the window below.
-- **Right click**: “Quiet” and “Back to the closet”. Open RuscaPallas again to call him back.
+- **Right click**: “Quiet” and “Back to the closet”: he vanishes into thin air in a cloud of sparkles. Called back, he appears out of nowhere.
 - He is not shown in the Activities overview or over full-screen windows.
 - With animations turned off (Settings → Accessibility) he stands still, but still talks.
 

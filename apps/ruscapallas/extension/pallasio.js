@@ -196,6 +196,7 @@ export class Pallasio {
             Main.overview.connect('hidden', () => this._updateShown()),
         ];
         this._updateShown();
+        this._anim.startMagic('appear');      // compare dal nulla
     }
 
     /** In scena solo se richiamato e fuori dalla panoramica. Gli attori si
@@ -268,9 +269,14 @@ export class Pallasio {
     Show() {
         if (this._visible)
             return;
+        if (this._vanishId) {            // stava sparendo: ci ripensa
+            GLib.source_remove(this._vanishId);
+            this._vanishId = 0;
+        }
         this._visible = true;
         this._world.x = null;          // ricompare in un punto a caso
         this._updateShown();
+        this._anim.startMagic('appear');
         this._dbus.emit_property_changed('Visible', GLib.Variant.new_boolean(true));
     }
 
@@ -280,7 +286,14 @@ export class Pallasio {
         this._visible = false;
         this._call('Stop');
         this._showBubble(false);
-        this._updateShown();
+        this._menu.close();
+        // sparisce nel nulla, poi esce di scena
+        const seconds = this._inChrome ? this._anim.startMagic('vanish') : 0;
+        this._vanishId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, Math.round(seconds * 1000) + 60, () => {
+            this._vanishId = 0;
+            this._updateShown();
+            return GLib.SOURCE_REMOVE;
+        });
         this._dbus.emit_property_changed('Visible', GLib.Variant.new_boolean(false));
         Main.notify(this._('name'), this._('hidden_hint'));
     }
@@ -360,6 +373,8 @@ export class Pallasio {
         }
         if (button !== Clutter.BUTTON_PRIMARY)
             return Clutter.EVENT_PROPAGATE;
+        if (this._anim.inMagic)          // mentre appare o sparisce non si tocca
+            return Clutter.EVENT_STOP;
         const [x, y] = ev.get_coords();
         this._press = {x, y, dx: x - this.actor.x, dy: y - this.actor.y, dragging: false};
         this._grab = global.stage.grab(this.actor);
@@ -432,7 +447,7 @@ export class Pallasio {
             }
         }
 
-        const canWalk = anim.mode === 'walk' && !anim.reduceMotion && !this._press;
+        const canWalk = anim.mode === 'walk' && !anim.reduceMotion && !this._press && !anim.inMagic;
         let moving = false;
         if (!this._press?.dragging)
             moving = world.step(dt, this._area(), this._windows(), canWalk);
@@ -472,6 +487,10 @@ export class Pallasio {
     }
 
     destroy() {
+        if (this._vanishId) {
+            GLib.source_remove(this._vanishId);
+            this._vanishId = 0;
+        }
         if (this._answerId) {
             GLib.source_remove(this._answerId);
             this._answerId = 0;

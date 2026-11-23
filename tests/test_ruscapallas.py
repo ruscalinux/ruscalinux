@@ -340,7 +340,7 @@ class TestServizio(unittest.TestCase):
 
 GJS_TEST = r"""
 import {parsePath, draw, drawBubble, BOX_W, BOX_H, BUBBLE_W, BUBBLE_H} from '%(ext)s/figure.js';
-import {Animator, MODES, EMOTIONS} from '%(ext)s/motion.js';
+import {Animator, MODES, EMOTIONS, MAGIC_TIME} from '%(ext)s/motion.js';
 import {World} from '%(ext)s/world.js';
 import Cairo from 'cairo';
 const fail = m => { print('FAIL ' + m); imports.system.exit(1); };
@@ -357,6 +357,15 @@ for (const mode of MODES) for (const emo of [null, ...EMOTIONS]) {
     for (let i = 0; i < 40; i++) { const m = a.step(1 / 30); draw(cr, m); }
 }
 for (const icon of ['ear', 'dots', 'waves', 'hourglass']) drawBubble(cr, icon, true, 3);
+// la magia: appare dal nulla e finisce, sparisce nel nulla e resta sparito
+const mg = new Animator(); mg.startMagic('appear');
+for (let i = 0; i < 120; i++) draw(cr, mg.step(1 / 60));
+if (mg.magic !== null || mg.inMagic) fail('l\'apparizione non finisce');
+const len = mg.startMagic('vanish'); if (len !== MAGIC_TIME) fail('durata della magia');
+for (let i = 0; i < 100; i++) draw(cr, mg.step(1 / 60));
+if (!mg.gone || mg.inMagic) fail('non sparisce del tutto');
+const rm = new Animator({reduceMotion: true}); if (rm.startMagic('appear') >= MAGIC_TIME) fail('magia lunga con le animazioni ridotte');
+draw(cr, rm.step(0.1));
 // il tomo: chiuso camminando, aperto leggendo
 const a = new Animator(); a.setMode('think'); let m; for (let i = 0; i < 120; i++) m = a.step(1 / 60);
 if (m.op.open < 0.95) fail('il tomo non si apre: ' + m.op.open);
