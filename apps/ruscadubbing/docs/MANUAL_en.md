@@ -98,7 +98,9 @@ For a careful dubbing: transcribe with RuscaTranscriber, correct the text, then 
 | Appearance | Light, dark or system theme |
 | Models | The model to transcribe, translate and give the voice |
 | Voice | Reference voice; model voice (for models with named voices); **maximum speed** (how much a line may be sped up, 1.3× by default); **seed** (the same seed gives the same performance) |
-| Engine | Graphics card on/off and which one; CPU threads; translation context |
+| Engine | Graphics card on/off; **one card for each step** (transcription, translation, voice); CPU threads; translation context |
+
+**Two graphics cards.** The steps run one after another, but each can use a different card: for example the language model, the largest, on the card with more memory and the voice on the other. On first start each step uses the card chosen in the matching app (RuscaTranscriber, RuscaTranslator, RuscaNarrator).
 
 ## 8. Privacy
 

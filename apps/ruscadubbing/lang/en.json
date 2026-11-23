@@ -126,7 +126,6 @@
   "group_engine": "Engine",
   "gpu": "Graphics Card (Vulkan)",
   "gpu_sub": "Much faster; turn off if the driver gives problems",
-  "gpu_device": "Graphics Card to Use",
   "gpu_device_auto": "Automatic",
   "threads": "CPU Threads",
   "threads_sub": "This computer has {n} physical cores: use as many",
@@ -203,5 +202,11 @@
   "finder_name_body": "The voice is saved among the RuscaNarrator voices and becomes the reference voice of the dubbing.",
   "finder_default_name": "Like {video}",
   "finder_failed": "Search Failed",
-  "err_no_voice": "There is not enough voice to measure"
+  "err_no_voice": "There is not enough voice to measure",
+  "whisper_device": "Graphics Card for Transcription",
+  "whisper_device_sub": "Whisper (ruscawhisper-engine)",
+  "llm_device": "Graphics Card for Translation",
+  "llm_device_sub": "The language model: the one with more memory, if the model is large",
+  "tts_device": "Graphics Card for the Voice",
+  "tts_device_sub": "Qwen3-TTS, also for “Find a Similar Voice”"
 }

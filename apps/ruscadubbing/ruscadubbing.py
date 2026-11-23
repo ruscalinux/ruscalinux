@@ -59,11 +59,14 @@ VIDEO_PATTERNS = ("mp4", "mkv", "webm", "mov", "avi", "m4v", "mpg", "mpeg", "ts"
 SOURCE_CODES = ["auto"] + dub.CODES + sorted(dub.EXTRA_SOURCE)
 DUCKING = ("light", "medium", "strong")
 THEMES = ("system", "light", "dark")
+# Una scheda grafica per passo: la trascrizione, la traduzione, la voce.
+DEVICE_KEYS = ("whisper_device", "llm_device", "tts_device")
 DEFAULTS = {
     "whisper_model": "", "llm_model": "", "voice_model": "", "speaker_file": "",
     "voice_name": "", "src": "auto", "tgt": "", "out_srt": True, "out_audio": False,
     "out_video": True, "fmt": "mkv", "ducking": "medium", "folder": "", "max_speed": 1.3,
-    "seed": 42, "context": 8192, "gpu": True, "gpu_device": "",
+    "seed": 42, "context": 8192, "gpu": True,
+    "whisper_device": "", "llm_device": "", "tts_device": "",
     "threads": tts.physical_cores(), "width": 760, "height": 720, "maximized": False,
     "theme": "system",
 }
@@ -138,10 +141,11 @@ def ensure_icon():
 # gli stessi modelli, la stessa voce di riferimento e lo stesso seme, invece
 # del primo file in ordine alfabetico (che può essere il modello piccolo).
 SIBLINGS = (
-    ("ruscatranscriber", {"model": "whisper_model"}),
-    ("ruscatranslator", {"model": "llm_model"}),
+    ("ruscatranscriber", {"model": "whisper_model", "gpu_device": "whisper_device"}),
+    ("ruscatranslator", {"model": "llm_model", "gpu_device": "llm_device"}),
     ("ruscanarrator", {"model": "voice_model", "speaker_file": "speaker_file",
-                       "voice_name": "voice_name", "seed": "seed", "max_speed": "max_speed"}),
+                       "voice_name": "voice_name", "seed": "seed", "max_speed": "max_speed",
+                       "gpu_device": "tts_device"}),
 )
 
 
@@ -177,6 +181,11 @@ def load_settings():
             if k in cfg and (isinstance(v, type(cfg[k])) or
                              (isinstance(cfg[k], float) and isinstance(v, int))):
                 cfg[k] = type(cfg[k])(v)
+        # Fino alla prima 1.99.3 c'era una sola scheda per tutti i passi.
+        old = data.get("gpu_device") if isinstance(data, dict) else None
+        if isinstance(old, str) and old and not any(k in data for k in DEVICE_KEYS):
+            for k in DEVICE_KEYS:
+                cfg[k] = old
     except (OSError, ValueError, AttributeError, TypeError):
         pass
     if cfg["tgt"] not in dub.CODES:
@@ -779,7 +788,8 @@ class DubbingWindow(Adw.ApplicationWindow):
             media=self.media, folder=cfg["folder"], src=src, tgt=cfg["tgt"],
             whisper_model=cfg["whisper_model"], llm_model=cfg["llm_model"], voice=voice,
             speaker_file=cfg["speaker_file"] if os.path.isfile(cfg["speaker_file"]) else "",
-            voice_name=cfg["voice_name"], gpu=cfg["gpu"], gpu_device=cfg["gpu_device"],
+            voice_name=cfg["voice_name"], gpu=cfg["gpu"], whisper_device=cfg["whisper_device"],
+            llm_device=cfg["llm_device"], tts_device=cfg["tts_device"],
             threads=cfg["threads"], context=cfg["context"], max_speed=cfg["max_speed"],
             seed=cfg["seed"], ducking=cfg["ducking"], outputs=self._outputs(), fmt=cfg["fmt"],
             titles=(language_name(src) if src != "auto" else "", dub.NATIVE[cfg["tgt"]]),
@@ -1053,14 +1063,17 @@ class DubbingWindow(Adw.ApplicationWindow):
         eng = Adw.PreferencesGroup(title=_("group_engine"))
         gpu = Adw.SwitchRow(title=_("gpu"), subtitle=_("gpu_sub"), active=self.cfg["gpu"])
         eng.add(gpu)
-        self.device_row = Adw.ComboRow(title=_("gpu_device"), use_subtitle=True,
-                                       sensitive=self.cfg["gpu"])
-        gpu.connect("notify::active", lambda r, _p: (self._set("gpu", r.get_active()),
-                                                     self.device_row and
-                                                     self.device_row.set_sensitive(r.get_active())))
+        # Una scheda per passo: i modelli lavorano uno dopo l'altro, ma su
+        # due schede il modello linguistico grande e la voce trovano ognuno
+        # tutta la memoria della sua.
+        self.device_rows = {}
+        for key in DEVICE_KEYS:
+            row = Adw.ComboRow(title=_(key), subtitle=_(f"{key}_sub"), sensitive=self.cfg["gpu"])
+            row.connect("notify::selected", self._on_device, key)
+            self.device_rows[key] = row
+            eng.add(row)
+        gpu.connect("notify::active", self._on_gpu)
         self._fill_device_row()
-        self.device_row.connect("notify::selected", self._on_device)
-        eng.add(self.device_row)
         self._load_devices()
         threads = Adw.SpinRow.new_with_range(1, max(1, os.cpu_count() or 1), 1)
         threads.set_title(_("threads"))
@@ -1078,7 +1091,7 @@ class DubbingWindow(Adw.ApplicationWindow):
 
         dialog = Adw.PreferencesDialog(title=_("preferences").rstrip("…"))
         dialog.add(page)
-        dialog.connect("closed", lambda _d: (setattr(self, "device_row", None),
+        dialog.connect("closed", lambda _d: (setattr(self, "device_rows", None),
                                              self._refresh_banner()))
         dialog.present(self)
 
@@ -1133,28 +1146,38 @@ class DubbingWindow(Adw.ApplicationWindow):
         self._fill_device_row()
         return False
 
+    def _on_gpu(self, row, _pspec):
+        self._set("gpu", row.get_active())
+        for r in (getattr(self, "device_rows", None) or {}).values():
+            r.set_sensitive(row.get_active())
+
     def _fill_device_row(self):
-        row = getattr(self, "device_row", None)
-        if row is None:
+        rows = getattr(self, "device_rows", None)
+        if not rows:
             return
         labels = [desc for _n, desc, _mib in self.devices]
         items = [_("gpu_device_auto")] + [f"{desc} ({max(1, round(mib / 1024))} GB)"
                                           for _n, desc, mib in self.devices]
-        saved = self.cfg["gpu_device"]
-        if saved and saved not in labels:
-            labels.append(saved)
-            items.append(saved)
+        # Una scheda salvata che ora non si vede (spenta, driver) resta nella
+        # lista, per non perdere la scelta.
+        for key in DEVICE_KEYS:
+            saved = self.cfg[key]
+            if saved and saved not in labels:
+                labels.append(saved)
+                items.append(saved)
         self._row_devices = labels
         self._updating = True
-        row.set_model(Gtk.StringList.new(items))
-        row.set_selected(labels.index(saved) + 1 if saved in labels else 0)
+        for key, row in rows.items():
+            saved = self.cfg[key]
+            row.set_model(Gtk.StringList.new(items))
+            row.set_selected(labels.index(saved) + 1 if saved in labels else 0)
         self._updating = False
 
-    def _on_device(self, row, _pspec):
+    def _on_device(self, row, _pspec, key):
         if self._updating:
             return
         i = row.get_selected()
-        self._set("gpu_device", self._row_devices[i - 1] if 0 < i <= len(self._row_devices) else "")
+        self._set(key, self._row_devices[i - 1] if 0 < i <= len(self._row_devices) else "")
 
     # ── altre finestre ────────────────────────────────────────────────────
     def show_log(self):
@@ -1305,7 +1328,7 @@ class VoiceFinder(Adw.Dialog):
         self.stack.set_visible_child_name("work")
         try:
             self.search.start(w.media, w.info["duration_ms"], self.cues, self.voice, cfg["tgt"],
-                              cfg["gpu"], cfg["gpu_device"], cfg["threads"])
+                              cfg["gpu"], cfg["tts_device"], cfg["threads"])
         except match.MatchError as e:
             self._fail(e)
 

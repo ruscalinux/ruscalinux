@@ -404,8 +404,10 @@ def output_paths(media, folder, src, tgt, fmt):
 STAGES = ("transcribe", "translate", "dub", "mix")
 Options = collections.namedtuple("Options", [
     "media", "folder", "src", "tgt", "whisper_model", "llm_model", "voice", "speaker_file",
-    "voice_name", "gpu", "gpu_device", "threads", "context", "max_speed", "seed", "ducking",
+    "voice_name", "gpu", "whisper_device", "llm_device", "tts_device", "threads", "context", "max_speed", "seed", "ducking",
     "outputs", "fmt", "titles", "source_srt"])
+# whisper_device, llm_device, tts_device: la scheda grafica di ogni passo
+# (descrizione di list_devices(), "" = scelta del motore).
 # outputs: insieme di "srt", "audio", "video". source_srt: file SRT della
 # lingua originale da usare al posto della trascrizione ("" = trascrivere).
 
@@ -533,7 +535,7 @@ class Dubbing:
             on_log=self.on_log, on_done=self._transcribed)
         try:
             self.transcriber.start(self.o.media, self.o.whisper_model, self.o.src,
-                                   self.o.threads, self.o.gpu, self.o.gpu_device)
+                                   self.o.threads, self.o.gpu, self.o.whisper_device)
         except whisper.WhisperError as e:
             self._finish(DubbingError(e.key, e.detail))
 
@@ -566,9 +568,9 @@ class Dubbing:
         try:
             args = ["-t", o.threads, "-c", o.context, "-b", 2048, "-ub", 1024, "--parallel", 1,
                     "--flash-attn", "on", "--reasoning", "off"]
-            if o.gpu and o.gpu_device:
+            if o.gpu and o.llm_device:
                 # list_devices apre un processo: qui, fuori dall'interfaccia.
-                device = engine.device_name(o.gpu_device, engine.list_devices())
+                device = engine.device_name(o.llm_device, engine.list_devices())
                 if device:
                     args += ["--device", device]
             self.engine.start(o.llm_model, args, o.gpu)
@@ -636,7 +638,7 @@ class Dubbing:
         try:
             self.speaker.start(pieces, o.voice, srt=True, language=o.tgt,
                                speaker_file=o.speaker_file, voice_name=o.voice_name,
-                               gpu=o.gpu, gpu_device=o.gpu_device, threads=o.threads,
+                               gpu=o.gpu, gpu_device=o.tts_device, threads=o.threads,
                                seed=o.seed, max_speed=o.max_speed, normalize=True)
         except tts.TTSError as e:
             self._finish(DubbingError(e.key, e.detail))

@@ -98,7 +98,9 @@ Per un doppiaggio curato: trascrivi con RuscaTranscriber, correggi il testo, poi
 | Aspetto | Tema chiaro, scuro o del sistema |
 | Modelli | Il modello per trascrivere, tradurre e dare la voce |
 | Voce | Voce di riferimento; voce del modello (per i modelli con voci con nome); **velocità massima** (quanto può accelerare una battuta, 1,3 volte se non la cambi); **seme** (lo stesso seme dà la stessa interpretazione) |
-| Motore | Scheda grafica sì/no e quale; thread della CPU; contesto della traduzione |
+| Motore | Scheda grafica sì/no; **una scheda per ogni passo** (trascrizione, traduzione, voce); thread della CPU; contesto della traduzione |
+
+**Due schede grafiche.** I passi lavorano uno dopo l'altro, ma ognuno può usare una scheda diversa: per esempio il modello linguistico, che è il più grande, sulla scheda con più memoria e la voce sull'altra. Alla prima apertura ogni passo usa la scheda scelta nell'app corrispondente (RuscaTranscriber, RuscaTranslator, RuscaNarrator).
 
 ## 8. Privacy
 

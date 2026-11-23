@@ -316,7 +316,7 @@ class Chain(unittest.TestCase):
         o = dict(media=self.video, folder=self.out, src="auto", tgt="it",
                  whisper_model=self.models["whisper.bin"], llm_model=self.models["llm.gguf"],
                  voice=rd.tts.Voice(self.models["voce.gguf"], self.models["mmproj-voce.gguf"]),
-                 speaker_file="", voice_name="", gpu=False, gpu_device="", threads=2,
+                 speaker_file="", voice_name="", gpu=False, whisper_device="", llm_device="", tts_device="", threads=2,
                  context=4096, max_speed=1.3, seed=42, ducking="medium",
                  outputs={"srt", "audio", "video"}, fmt="mkv", titles=("English", "Italiano"),
                  source_srt="")
@@ -420,14 +420,16 @@ class Siblings(unittest.TestCase):
         with tempfile.TemporaryDirectory() as t:
             for app, data in (("ruscanarrator", {"model": "/m/1.7B.gguf", "seed": 7,
                                                  "speaker_file": "/v/a.wav", "max_speed": 1}),
-                              ("ruscatranslator", {"model": "/m/gemma.gguf"}),
+                              ("ruscatranslator", {"model": "/m/gemma.gguf",
+                                                   "gpu_device": "AMD Radeon RX 7900"}),
                               ("ruscatranscriber", "non json")):
                 os.makedirs(os.path.join(t, app))
                 with open(os.path.join(t, app, "settings.json"), "w") as f:
                     f.write(json.dumps(data) if isinstance(data, dict) else data)
             got = ui.sibling_settings(t)
         self.assertEqual(got, {"voice_model": "/m/1.7B.gguf", "seed": 7, "speaker_file": "/v/a.wav",
-                               "max_speed": 1.0, "llm_model": "/m/gemma.gguf"})
+                               "max_speed": 1.0, "llm_model": "/m/gemma.gguf",
+                               "llm_device": "AMD Radeon RX 7900"})
 
 
 # llama-tts finto per la ricerca di voci: un tono armonico la cui altezza
@@ -567,6 +569,34 @@ class VoiceMatch(unittest.TestCase):
             self.assertEqual(left, [])
         finally:
             rd.tts.ENGINE_DIRS, rd.tts.FFMPEG_PATHS, rd.tts.WORK_DIR = saved
+
+
+    def test_one_card_becomes_three(self):
+        """Le impostazioni con una sola scheda la danno a tutti e tre i passi."""
+        try:
+            import gi
+            gi.require_version("Gtk", "4.0")
+            gi.require_version("Adw", "1")
+            import ruscadubbing as ui
+        except (ImportError, ValueError):
+            self.skipTest("GTK non disponibile")
+        with tempfile.TemporaryDirectory() as t:
+            path = os.path.join(t, "settings.json")
+            saved = ui.CONFIG_FILE
+            ui.CONFIG_FILE = path
+            try:
+                with open(path, "w") as f:
+                    json.dump({"gpu_device": "NVIDIA GeForce RTX 3060"}, f)
+                cfg = ui.load_settings()
+                self.assertEqual({k: cfg[k] for k in ui.DEVICE_KEYS},
+                                 dict.fromkeys(ui.DEVICE_KEYS, "NVIDIA GeForce RTX 3060"))
+                with open(path, "w") as f:
+                    json.dump({"gpu_device": "vecchia", "llm_device": "A", "tts_device": "B"}, f)
+                cfg = ui.load_settings()
+                self.assertEqual((cfg["whisper_device"], cfg["llm_device"], cfg["tts_device"]),
+                                 ("", "A", "B"))
+            finally:
+                ui.CONFIG_FILE = saved
 
 
 if __name__ == "__main__":
