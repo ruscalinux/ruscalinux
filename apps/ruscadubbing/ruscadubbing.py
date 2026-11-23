@@ -938,6 +938,12 @@ class DubbingWindow(Adw.ApplicationWindow):
     def _on_stage(self, stage, fraction=0.0, detail=""):
         if not self.dubbing.running:
             return
+        if stage == "dub" and detail.startswith("parallel:"):
+            # La voce in parallelo alla traduzione: si aggiorna solo la riga
+            # del doppiaggio, la traduzione resta in corso.
+            i, n = detail[len("parallel:"):].split("/")
+            self._stage_state(stage, "running", _("parallel_progress", i=i, n=n))
+            return
         order = dub.STAGES.index(stage)
         for earlier in dub.STAGES[:order]:
             if getattr(self.stage_rows[earlier][0], "_state", "") in ("pending", "running"):

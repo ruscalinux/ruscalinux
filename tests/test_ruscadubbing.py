@@ -314,6 +314,12 @@ class Cues(unittest.TestCase):
         self.assertEqual(stats["reused"], 4)
         self.assertEqual(len(calls), 1)
         self.assertNotIn("3|", calls[0].split("Lines to translate:")[-1])
+        # Primo gruppo più piccolo (voce in parallelo): 1 frase, poi 3 e 1.
+        batches = []
+        texts, stats = rd.translate_cues(chat, cues, "en", "it", batch=3, first=1,
+                                         on_batch=lambda idx, r: batches.append(list(idx)))
+        self.assertEqual(batches, [[0], [1, 2, 3], [4]])
+        self.assertEqual(texts[:4], ["Riga 0.", "Riga 1.", "Riga 2.", "Riga 3."])
 
     def test_shorten(self):
         cues = [rd.Cue(0, 800, "Yes.")]
@@ -493,7 +499,9 @@ class Chain(unittest.TestCase):
         def done(error, files, stats):
             seen["done"] = (error, files, stats)
             loop.quit()
-        d = rd.Dubbing(lambda s, f=0.0, x="": seen["stages"].append(s), lambda line: None, done)
+        d = rd.Dubbing(lambda s, f=0.0, x="": (seen["stages"].append(s),
+                                               seen.setdefault("details", []).append(x)),
+                       lambda line: None, done)
         d.start(options)
         if cancel_after:
             GLib.timeout_add(cancel_after, lambda: d.cancel() and False)
@@ -623,6 +631,13 @@ class Chain(unittest.TestCase):
         calls = [json.loads(line) for line in open(os.environ["FAKE_TTS_ARGS"])]
         said = [c for c in calls if c != ["--list-devices"] and "-p" in c]
         self.assertEqual(len(said), 12)                # nessuna frase detta due volte
+        # La riga del doppiaggio mostra la voce in parallelo già durante la
+        # traduzione (prima che la traduzione sia finita).
+        details = seen["details"]
+        first_said = next(i for i, x in enumerate(details) if x.startswith("parallel:"))
+        last_translate = max(i for i, s in enumerate(seen["stages"]) if s == "translate")
+        self.assertLess(first_said, last_translate)
+        self.assertIn("parallel:12/12", details)
 
     def test_burn(self):
         """Sottotitoli impressi: l'immagine si ricodifica in H.264 e cambia

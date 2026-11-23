@@ -83,6 +83,7 @@
   "stage_normalize": "Evening out the volume…",
   "detected_language": "Language: {language}",
   "cue_progress": "Line {i} of {n}",
+  "parallel_progress": "In parallel: {i} of {n} sentences already spoken",
   "elapsed": "Time elapsed: {time}",
   "stopped": "Dubbing stopped",
   "same_language": "The dubbing language is the original one: the lines are not translated.",

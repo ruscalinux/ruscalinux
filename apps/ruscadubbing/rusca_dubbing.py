@@ -89,6 +89,7 @@ EXTRA_SOURCE = {"nl": ("Dutch", "nld"), "pl": ("Polish", "pol"), "tr": ("Turkish
 CHARS_PER_SECOND = {"it": 14.0, "en": 15.0, "de": 13.5, "fr": 14.5, "es": 15.0,
                     "pt": 14.5, "ru": 13.0, "zh": 5.0, "ja": 7.5, "ko": 7.0}
 BATCH = 8                       # frasi per richiesta di traduzione
+PARALLEL_FIRST = 2              # con la voce in parallelo: primo gruppo piccolo
 CONTEXT_LINES = 3               # frasi già tradotte date come contesto
 # Frasi: battute consecutive che formano una frase si traducono e si dicono
 # insieme. Una frase si chiude dopo una battuta che finisce con un segno di
@@ -675,14 +676,15 @@ def parse_translations(text):
 
 
 def translate_cues(chat, cues, src, tgt, stop_event=None, on_progress=None, max_speed=1.3,
-                   batch=BATCH, known=None, notes="", on_batch=None):
+                   batch=BATCH, known=None, notes="", on_batch=None, first=None):
     """Traduce le frasi a gruppi. chat(body) -> testo è la funzione del
     motore (engine.Engine.chat). known: traduzioni già pronte (memoria del
     lavoro salvato), None o "" per quelle da fare. Restituisce
     (traduzioni, statistiche): statistiche = {"retried", "shortened",
     "kept", "reused"}. Una frase che non torna tradotta si chiede di nuovo
     da sola; se il modello non la restituisce ancora, resta l'originale
-    ("kept")."""
+    ("kept"). first: grandezza del primo gruppo, se diversa (con la voce
+    in parallelo un primo gruppo piccolo fa partire prima la voce)."""
     result = [t or None for t in (known or [None] * len(cues))]
     todo = [i for i in range(len(cues)) if not result[i]]
     stats = {"retried": 0, "shortened": 0, "kept": 0, "reused": len(cues) - len(todo)}
@@ -705,12 +707,16 @@ def translate_cues(chat, cues, src, tgt, stop_event=None, on_progress=None, max_
     known_idx = [i for i in range(len(cues)) if result[i]]
     if on_batch and known_idx:
         on_batch(known_idx, result)
-    for start in range(0, len(todo), batch):
+    head = first if first and first < batch else 0
+    groups = ([todo[:head]] if head and todo[:head] else []) + \
+        [todo[s:s + batch] for s in range(head, len(todo), batch)]
+    start = 0
+    for idx in groups:
         if stop_event is not None and stop_event.is_set():
             raise _Stopped()
         if on_progress:
             on_progress(start, len(todo))
-        idx = todo[start:start + batch]
+        start += len(idx)
         context = [f"{cues[j].text} => {result[j]}"
                    for j in range(max(0, idx[0] - CONTEXT_LINES), idx[0]) if result[j]]
         got = ask([line(i) for i in idx], context)
@@ -1287,6 +1293,7 @@ class Dubbing:
             else:
                 self._start_llm()
             on_batch = None
+            first = None
             if self._parallel():
                 # Due schede: la voce comincia a dire ogni gruppo di frasi
                 # appena è tradotto, mentre il modello traduce i successivi.
@@ -1297,10 +1304,12 @@ class Dubbing:
                              for k in idx if result[k]}
                     self._mark_stress_texts(texts)
                     self._emit(self._pregen_add, texts)
+                first = PARALLEL_FIRST
             texts, tstats = translate_cues(
                 self.engine.chat, self.units, self.src, self.o.tgt, self.stop_event,
                 lambda i, n: self._emit(self.on_stage, "translate", i / max(1, n), f"{i}/{n}"),
-                self.o.max_speed, known=self.known, notes=self.notes, on_batch=on_batch)
+                self.o.max_speed, known=self.known, notes=self.notes, on_batch=on_batch,
+                first=first)
             self.stats.update(tstats)
             self._set_translations(texts)
             if self.o.tgt in speech.HOMOGRAPHS:
@@ -1340,6 +1349,7 @@ class Dubbing:
             # La voce sta ancora dicendo le frasi già tradotte: si aspetta.
             self.waiting_dub = True
             self.on_stage("dub", 0.0, "")
+            self._pregen_progress(0)
             return
         self._dub()
 
@@ -1498,7 +1508,9 @@ class Dubbing:
         os.makedirs(folder, exist_ok=True)
         pieces = [tts.Piece(t, 0, self.units[k].start, self.units[k].end)
                   for k, t in zip(keys, said)]
+        self._pregen_progress(0)
         self.pre_speaker = tts.Speaker(
+            on_progress=lambda i, n: self._pregen_progress(i),
             on_log=self.on_log,
             on_done=lambda e, p, s: self._pregen_done(e, keys, said, folder))
         try:
@@ -1513,11 +1525,18 @@ class Dubbing:
             self.pre_queue.clear()
             self._pregen_next()
 
+    def _pregen_progress(self, i):
+        """Mostra sulla riga del doppiaggio quante frasi la voce ha già
+        detto in parallelo alla traduzione."""
+        if self.running:
+            self.on_stage("dub", 0.0, f"parallel:{len(self.pregen) + i}/{len(self.units)}")
+
     def _pregen_done(self, error, keys, said, folder):
         speaker, self.pre_speaker = self.pre_speaker, None
         if error is None:
             for j, (k, text) in enumerate(zip(keys, said)):
                 self.pregen[k] = (text, os.path.join(folder, f"{j:05d}.wav"))
+            self._pregen_progress(0)
         elif error != "cancelled":
             self.on_log(f"ruscadubbing: voce in parallelo non riuscita ({error}): "
                         "quelle frasi si diranno dopo")

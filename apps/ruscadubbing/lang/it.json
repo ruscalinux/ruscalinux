@@ -83,6 +83,7 @@
   "stage_normalize": "Volume uniforme…",
   "detected_language": "Lingua: {language}",
   "cue_progress": "Battuta {i} di {n}",
+  "parallel_progress": "In parallelo: {i} frasi su {n} già dette",
   "elapsed": "Tempo trascorso: {time}",
   "stopped": "Doppiaggio fermato",
   "same_language": "La lingua del doppiaggio è quella originale: le battute non si traducono.",
