@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- RuscaPallas — Pallasio, il manul con gli occhialini. GPL-3.0-or-later -->
+  <rect x="4" y="4" width="120" height="120" rx="28" fill="#2b2440"/>
+  <g transform="translate(64 66) scale(1.36) translate(-66 -54)" stroke-linejoin="round">
+    <path d="M55 74 L77 74 L74 86 L58 86Z" fill="#eadcbc" stroke="#332c24" stroke-width="1.1"/>
+    <path d="M56.5 76 L66 82 L60 87Z M75.5 76 L66 82 L72 87Z" fill="#fff" stroke="#332c24" stroke-width="1.1"/>
+    <path d="M63.4 81 L68.6 81 L67.7 86.2 L64.3 86.2Z" fill="#c8303a" stroke="#332c24" stroke-width="1.1"/>
+    <path d="M30 42 Q28 32 42 32 Q40 40 30 42Z M102 42 Q104 32 90 32 Q92 40 102 42Z" fill="#9c907a" stroke="#332c24" stroke-width="1.1"/>
+    <path d="M66 22 C 44 22 32 34 32 48 L26 52 L32 55 L27 61 L34 62 L31 68 L40 67 L39 73 L48 70 L50 77 L57 72 L62 79 L66 73 L70 79 L75 72 L82 77 L84 70 L93 73 L92 67 L101 68 L98 62 L105 61 L100 55 L106 52 L100 48 C 100 34 88 22 66 22 Z" fill="#c2b8a5" stroke="#332c24" stroke-width="1.1"/>
+    <path d="M38 60 L34 66 L42 66 L44 72 L52 68 L58 76 L66 70 L74 76 L80 68 L88 72 L90 66 L98 66 L94 60 Q80 72 66 70 Q52 72 38 60Z" fill="#ece4d6"/>
+    <g fill="#3f372d"><circle cx="56" cy="29" r="1.6"/><circle cx="62" cy="26.5" r="1.8"/><circle cx="70" cy="26.5" r="1.8"/><circle cx="76" cy="29" r="1.6"/><circle cx="59" cy="33" r="1.3"/><circle cx="66" cy="31" r="1.5"/><circle cx="73" cy="33" r="1.3"/></g>
+    <path d="M34 50 q8 8 16 8 l-1 3 q-9 -1 -16 -7Z M33 57 q8 8 17 8 l-1 3 q-10 -1 -17 -7Z M98 50 q-8 8 -16 8 l1 3 q9 -1 16 -7Z M99 57 q-8 8 -17 8 l1 3 q10 -1 17 -7Z" fill="#3f372d"/>
+    <path d="M66 54 C 56 54 52 60 53 64 C 54 69 60 71 66 71 C 72 71 78 69 79 64 C 80 60 76 54 66 54 Z" fill="#f6f2ea" stroke="#332c24" stroke-width="1.1"/>
+    <circle cx="55" cy="47" r="5" fill="#e3bf45" stroke="#332c24" stroke-width="1.1"/>
+    <circle cx="77" cy="47" r="5" fill="#e3bf45" stroke="#332c24" stroke-width="1.1"/>
+    <ellipse cx="55" cy="48" rx="1.2" ry="3.1" fill="#15120e"/><ellipse cx="77" cy="48" rx="1.2" ry="3.1" fill="#15120e"/>
+    <path d="M49 41 H61 V47 H49Z M71 41 H83 V47 H71Z" fill="#c2b8a5" stroke="#332c24" stroke-width="1"/>
+    <path d="M46 37 L62 44.5 M86 37 L70 44.5" stroke="#26201a" stroke-width="2.8" stroke-linecap="round"/>
+    <g fill="rgba(220,235,245,0.2)" stroke="#1f1b16" stroke-width="1.7"><circle cx="55" cy="47.5" r="7.4"/><circle cx="77" cy="47.5" r="7.4"/></g>
+    <path d="M62.4 46.6 q3.6 -2.6 7.2 0" stroke="#1f1b16" stroke-width="1.4" fill="none"/>
+    <path d="M62.5 56.5 q3.5 -1.5 7 0 l-3.5 4z" fill="#c98a86" stroke="#332c24" stroke-width="1.1"/>
+    <path d="M59 66 Q66 62 73 66" fill="none" stroke="#332c24" stroke-width="1.1"/>
+    <path d="M61.6 64.6 l1.3 3.4 l1.2 -3" fill="#fff" stroke="#332c24" stroke-width="0.5"/>
+  </g>
+</svg>

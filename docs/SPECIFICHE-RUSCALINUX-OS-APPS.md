@@ -67,6 +67,7 @@ Si trova nel repository in `docs/SPECIFICHE-RUSCALINUX-OS-APPS.md`. Durante lo s
 | ruscavosk-engine | Motore di riconoscimento vocale in tempo reale di RuscaLLisse: **Vosk, software esterno** | Componente di sistema, senza interfaccia | — | `ruscavosk-engine` | — |
 | ruscapiper-engine | Motore di sintesi vocale di RuscaLLisse: **Piper (piper1-gpl), software esterno** | Componente di sistema, senza interfaccia | — | `ruscapiper-engine` | — |
 | RuscaDubbing | Doppiaggio di un video in un’altra lingua: sottotitoli nelle due lingue, audio doppiato, video con due tracce audio e due di sottotitoli | Doppiaggio video | `org.ruscalinux.RuscaDubbing` | `ruscadubbing` | No |
+| RuscaPallas | Pallasio, un manul cinico con giacca, cravatta e occhialini, che cammina sul desktop e parla a voce con l’utente | Compagno del desktop (estensione di GNOME Shell) | `org.ruscalinux.RuscaPallas` | `ruscapallas` | No |
 
 ### 1.1 Gli strumenti di intelligenza artificiale
 
@@ -76,7 +77,7 @@ RuscaLLama e RuscaTranslator usano modelli linguistici in formato GGUF che giran
 - Il pacchetto del motore non ha interfaccia, quindi non ha traduzioni, icona né finestra Informazioni: lo dichiarano le finestre Informazioni di RuscaLLama e RuscaTranslator, nel gruppo “Componenti esterni”.
 - Programmi del pacchetto, in `/usr/lib/ruscallama-engine/`: `llama-server`, che avviano RuscaLLama e RuscaTranslator; `llama-cli` e `llama-bench` per diagnosticare e misurare dal terminale; `llama-tts` per la sintesi vocale, con modelli TTS in GGUF e il loro mmproj (per esempio Qwen3-TTS, Pocket TTS, Soprano): lo avvia RuscaNarrator (sezione 1.4), e si può usare dal terminale. La build controlla che `llama-tts` accetti le opzioni usate da RuscaNarrator (`OPZIONI_TTS`). L’elenco (`KEEP_BINARIES` in `make-deb.sh`) fa parte della firma della cache di compilazione: aggiungere un programma ricompila llama.cpp.
 - I modelli non fanno parte dei pacchetti: l’utente li copia in `~/.local/share/ruscallama/models/` o l’amministratore in `/usr/share/ruscallama/models/`. Ogni modello ha la propria licenza, che l’utente deve rispettare.
-- Il modulo `rusca_engine.py`, che avvia e interroga il motore, è identico in RuscaLLama, RuscaTranslator, RuscaLLisse e RuscaDubbing, come `style.css` (si modifica una volta e si copia).
+- Il modulo `rusca_engine.py`, che avvia e interroga il motore, è identico in RuscaLLama, RuscaTranslator, RuscaLLisse, RuscaDubbing e RuscaPallas, come `style.css` (si modifica una volta e si copia).
 - **Livelli sulla scheda: `-ngl auto`.** Con la scheda grafica il server parte con `-ngl auto`: llama.cpp (dalla 1.0.0) calcola quanti livelli stanno nella memoria libera della scheda (`--fit`, attivo da sé) e mette il resto sul processore. Con `-ngl 99` un modello più grande della scheda non partiva (verificato: gemma-4-26B Q4_0 su una RTX 3060 Laptop da 6 GB, `ErrorOutOfDeviceMemory`); ora parte, più lento. `-c` resta quello del programma: il fit non riduce il contesto, che è impostato. Senza scheda grafica resta `-ngl 0`.
 - Il modulo `rusca_markdown.py`, motore Markdown comune (sezione 1.2), è identico in RuscaLLama, RuscaMark, RuscaWriter (`src/ruscawriter/`), RuscaTranslator, RuscaNarrator e RuscaLLisse, con la stessa regola; accanto c’è `markdown_it_mark.py`, componente esterno usato dal motore (sezione 6), anch’esso identico nei sei programmi. RuscaTranslator mostra il Markdown come sorgente: il motore gli serve per dividere i documenti da tradurre senza spezzare un blocco.
 - Gli editor di RuscaMark e RuscaWriter mostrano tabelle, formule e immagini come Markdown sorgente; la resa completa è nell’anteprima. RuscaWriter usa il modulo `rusca_liveblocks.py` per i riquadri delle immagini dell’anteprima.
@@ -590,6 +591,30 @@ python3 -m unittest tests/test_ruscallisse.py
 python3 -m unittest tests/test_ruscadubbing.py
 ```
 
+### 1.10 Pallasio sul desktop
+
+**Stato: prototipo nella 1.99.3, da provare sulle due macchine RuscaLinux.** RuscaPallas (`apps/ruscapallas/`, versione 1.99.3) porta sul desktop **Pallasio**: un manul (gatto di Pallas) antropomorfo, vecchio, colto e incattivito, panciuto, con giacca color crema che tira sul bottone, camicia, cravatta rossa, occhialini tondi e un tomo sempre in mano. Vive chiuso in uno sgabuzzino e da una finestra osserva un mondo in mano agli zombi e ai maiali, riflettendo sul senso della vita e sull’assurdità di tutto. Cammina sul bordo basso dello schermo, salta sulle finestre e, se lo si clicca, ascolta e risponde a voce come Ellittica in RuscaLLisse.
+
+- **Eccezione all’interfaccia GNOME.** Su Wayland un’applicazione non può scegliere dove sta la sua finestra, restare sopra le altre o lasciar passare i clic: per questo Pallasio vive in un’**estensione di GNOME Shell** (`ruscapallas@ruscalinux.org`, JavaScript, `shell-version` 48), che lo disegna sopra le finestre (top chrome, solo lui riceve i clic). Non ha finestra `Adw`, `style.css`, preferenze né finestra «Informazioni» comune: non valgono le sezioni 3 e 4.5. Valgono invece: traduzioni (sezione 9), App ID, icone, `.desktop` e metainfo (sezione 5), pacchetto (sezione 7), privacy (sezione 11), nota IA (nel `copyright`). L’estensione va verificata a ogni nuova versione di GNOME Shell in Debian Stable.
+- **Tre parti in un pacchetto.** L’estensione (`figure.js` il disegno, `motion.js` le pose, `world.js` dove cammina e salta, `pallasio.js` l’attore, il fumetto e D-Bus); il **servizio di dialogo** `ruscapallas-service.py` (bus di sessione, nome `org.ruscalinux.RuscaPallas`, avviato da D-Bus al primo clic con un file in `/usr/share/dbus-1/services/`); il comando **`ruscapallas`**, che dalla griglia delle applicazioni attiva l’estensione se serve e lo richiama (`--hide`, `--quit`). Non apre finestre: avvisa con le notifiche.
+- **Il cervello è quello di RuscaLLisse.** `conversation.py`, `entity.py`, `rusca_engine.py`, `rusca_piper.py`, `rusca_vosk.py`, `speech_text.py`, `rusca_markdown.py`, `markdown_it_mark.py` e `pronunce.tsv` sono **copie identiche** di quelle di RuscaLLisse: `make-deb.sh` si rifiuta di costruire il pacchetto se una differisce, e il test lo controlla. Valgono quindi la regola della velocità (sezione 1.7.1), i tre motori e i loro modelli. Pallasio usa gli stessi file di RuscaLLisse: modelli Vosk e GGUF, voci Piper, lessico delle pronunce dell’utente, e le scelte salvate da RuscaLLisse (`~/.config/ruscallisse/settings.json`), sovrascritte da quelle di `~/.config/ruscapallas/settings.json` se ci sono.
+- **Ascolto a clic.** Un microfono sempre aperto sul desktop è invadente: Pallasio ascolta dopo un clic, resta in ascolto per il seguito finché sente una voce (livello ≥ 0,18) e, dopo 8 secondi di silenzio, torna a passeggiare (`LISTEN_WINDOW`). Un clic mentre parla o ascolta lo fa tacere. Il servizio esce da solo dopo 15 minuti senza conversare (`IDLE_EXIT`), liberando la memoria del modello; al clic successivo D-Bus lo riavvia.
+- **Interfaccia D-Bus** (`org.ruscalinux.RuscaPallas`): metodi `Talk`, `Stop`, `Quit`, `GetState`; segnali `State` (`idle`, `waking`, `listening`, `thinking`, `speaking`), `Emotion` (le etichette d’emozione di `speech_text.py`), `Mouth` (volume della voce da 0 a 1, ogni 40 ms mentre parla, da `Speaker.level_at()`), `Error` (chiave e dettaglio, tradotti dall’estensione). L’estensione offre a sua volta `org.ruscalinux.RuscaPallas.Shell` (`Show`, `Hide`, proprietà `Visible`) per il comando.
+- **Il personaggio.** Disegno vettoriale originale (non copiato da illustrazioni esistenti), in un riquadro di 130 × 150 unità mostrato a 1,3 px per unità: testa larga con la gorgiera a punte, macchie sulla fronte, bande scure sulle guance, occhi gialli a mezz’asta con le sopracciglia a V, una zanna sempre fuori, orecchie appiattite, coda folta ad anelli con la punta nera. Luce dall’alto a sinistra: ogni volume ha un gradiente dal chiaro allo scuro, il contorno esterno è più spesso di quelli interni, il pelo ha ciuffi e trama a tratti sottili, le lenti hanno il riflesso. Il tomo, chiuso o aperto, mostra sempre la **copertina** (pelle, fregi e cartiglio dorati, cantonali): le pagine scritte le vede solo Pallasio. Le braccia hanno spalla, gomito e zampa, e passano da una posa all’altra in circa mezzo secondo. Pose: **passeggia** col tomo sotto il braccio, passo pesante e un po’ curvo; **ascolta** a braccia conserte stringendo il tomo, un sopracciglio alzato, batte il piede; **pensa** seduto, col tomo aperto; **parla** ringhiando, l’indice alzato che fa «no», la coda che frusta, la bocca mossa dal volume vero della voce; ogni tanto si siede a leggere, alza gli occhi al cielo e sbuffa. Le emozioni del modello cambiano l’espressione (ghigno di traverso, sopracciglio scettico, sguardo duro; «commossa»: lo sguardo si ammorbidisce e spunta una lacrima).
+- **Il fumetto** mostra solo un simbolo disegnato, mai parole (come in RuscaLLisse la conversazione non si scrive): orecchio, puntini, onde, clessidra mentre carica i modelli. Colori fissi scuro su chiaro, leggibili con ogni tema.
+- **Dove cammina.** Sul bordo basso dell’area di lavoro del monitor principale. Ogni 25–70 secondi può scegliere una finestra normale abbastanza larga, con spazio sopra per lui: ci va sotto, salta e ci passeggia sopra; se la finestra si sposta la segue, se si chiude, si riduce a icona o gli scappa da sotto i piedi, cade. Sul bordo di una finestra a volte si affaccia e sbuffa. Si trascina con il mouse; lasciato andare cade a terra o sulla finestra che ha sotto. Non legge il contenuto delle finestre: ne usa solo i rettangoli. Non c’è nella panoramica delle attività e sopra le finestre a schermo intero. Clic destro: «Zitto», «Torna nello sgabuzzino».
+- **Animazioni ridotte.** Con le animazioni spente nelle impostazioni (`org.gnome.desktop.interface enable-animations`) sta fermo e non dondola, ma parla. Si legge la preferenza dell’utente e non `St.Settings`, che spegne le animazioni anche quando lo schermo è disegnato via software (macchine virtuali).
+- **La personalità** è `entities/pallasio.md`, nel formato della sezione 1.7.5, copiata in `~/.local/share/ruscapallas/pallasio.md` alla prima conversazione. Zombi e maiali sono metafore (chi vive senza pensare, chi si ingozza e comanda), mai violenza. «Non fa mai»: non insulta chi gli parla (il bersaglio è il mondo), non dà risposte false per fare il cattivo, e se la persona sta male davvero lascia il cinismo e ascolta. Voce indicata: `it_IT-riccardo-x_low`, velocità 0,9; se manca, quella scelta in RuscaLLisse. Saluto: «Ancora tu. Che c’è?».
+- **Primo avvio.** GNOME vede le estensioni installate solo al successivo accesso: dopo l’installazione si esce e si rientra, poi si apre RuscaPallas. Se i modelli mancano, la notifica rimanda a «Quali file scaricare?» di RuscaLLisse (`Recommends: ruscallisse`).
+
+**Da fare dopo le prove:** le altre lingue della sezione 9 (ora italiano e inglese, come RuscaLLisse); una finestra di preferenze libadwaita (dimensione, frequenza dei salti, voce, personalità); attivazione dell’estensione per i nuovi utenti nella ISO; la cancellazione dell’eco per interromperlo parlando.
+
+**Test.** `tests/test_ruscapallas.py` controlla le copie identiche dei moduli di RuscaLLisse, le traduzioni, i metadati dell’estensione, la personalità e il suo prompt, le impostazioni ereditate da RuscaLLisse, il servizio con una conversazione e una voce finte (motori o pezzi mancanti, stati, ascolto a tempo, rumore che non tiene aperto, bocca, emozioni, «Zitto», uscita dopo l’inattività) e l’assenza di moduli di rete. Con `gjs` prova anche l’estensione senza GNOME Shell: lettura dei percorsi SVG, disegno di ogni posa con ogni emozione, tomo che si apre e si chiude, animazioni ridotte, salti sulle finestre, finestra che si sposta o sparisce, trascinamento.
+
+```bash
+python3 -m unittest tests/test_ruscapallas.py
+```
+
 Gli identificatori di ogni tool devono coincidere tra loro (vedi sezione 5.2).
 
 Fino alla versione 1.99.1 RuscaMark usava l’App ID `org.ruscalinux.ruscamark`. Dalla 1.99.2 usa `org.ruscalinux.RuscaMark`: l’aggiornamento del pacchetto rimuove il vecchio file `.desktop`, e la metainfo dichiara il vecchio identificativo con `<replaces>` perché GNOME Software riconosca l’applicazione. Le impostazioni restano in `~/.config/ruscamark/`, che prende il nome dal comando e non dall’App ID. Il nome del tool e la parte finale dell’App ID usano la stessa grafia CamelCase: `RuscaMark` → `org.ruscalinux.RuscaMark`.
@@ -619,6 +644,7 @@ Regole tecniche:
 6. Mantenere il codice semplice, stabile e mantenibile. Un file principale è accettabile per tool piccoli; oltre le 1.500 righe circa, dividere in moduli.
 7. La versione dei tool deve essere identica alla versione di RuscaLinux (vedi sezione 8).
 8. **Eccezione: RuscaPinball** è un gioco e usa pygame (`python3-pygame`, in Debian Stable) al posto di GTK e libadwaita (sezione 1.5).
+9. **Eccezione: RuscaPallas** vive in un’estensione di GNOME Shell (JavaScript) al posto di una finestra GTK e libadwaita: su Wayland è l’unico modo di stare sul desktop sopra le finestre (sezione 1.10). Il servizio di dialogo e il comando sono in Python, senza GTK.
 
 ---
 
@@ -1358,7 +1384,7 @@ Tedesco, russo e francese possono essere fino al 40% più lunghi dell’inglese;
 |---|---|
 | RuscaWriter | Sì, sempre (ortografia e sillabazione del PDF) |
 | RuscaMark | Sì, se è presente il controllo ortografico |
-| RuscaCleaner, RuscaHub, RuscaLLama, RuscaTranslator, RuscaTranscriber, RuscaNarrator, RuscaPinball, RuscaLLisse | No |
+| RuscaCleaner, RuscaHub, RuscaLLama, RuscaTranslator, RuscaTranscriber, RuscaNarrator, RuscaPinball, RuscaLLisse, RuscaPallas | No |
 
 Pacchetti: `hunspell-en-gb` (ortografia) e `hyphen-en-gb` (sillabazione, particolarmente consigliato per RuscaWriter, che lo usa con `python3-pyphen`).
 
@@ -1527,6 +1553,8 @@ Un tool è pronto quando:
 
 Per RuscaPinball i punti 2–5, 8 e 9 valgono nella forma della sezione 1.5: è un gioco pygame, con i colori, i contrasti e la nota IA di RuscaLinux disegnati dal gioco stesso.
 
+Per RuscaPallas i punti 2–9 e 12 valgono nella forma della sezione 1.10: è un’estensione di GNOME Shell con un comando senza finestra; la nota IA è nel `copyright` del pacchetto.
+
 ---
 
 # 🇮🇹 14. GUIDA UTENTE IN ITALIANO
@@ -1688,6 +1716,16 @@ Puoi interromperla parlando, come in una conversazione vera. Se il sistema non h
 
 RuscaLLisse usa **ruscavosk-engine** (Vosk, licenza Apache 2.0), **ruscallama-engine** (llama.cpp, licenza MIT) e **ruscapiper-engine** (Piper, licenza GPL-3.0). Non usa la rete: il modello linguistico ascolta solo su 127.0.0.1 e l’audio non viene mai salvato. Ogni modello e ogni voce hanno la propria licenza, mostrata nelle Preferenze: molte voci Piper sono solo per uso non commerciale. Le risposte vanno verificate: Ellittica è un personaggio, non un’esperta.
 
+## 🐈 RuscaPallas
+
+Pallasio, un manul cinico e incattivito con giacca color crema, cravatta rossa, occhialini e un tomo sempre in mano, cammina sul desktop e parla con te.
+
+1. Dopo l’installazione uscire dalla sessione e rientrare, poi aprire RuscaPallas dalla cartella RuscaLinux Apps: Pallasio compare in basso.
+2. Cliccarlo e parlare: ascolta a braccia conserte, pensa consultando il tomo, risponde a voce. Dopo la risposta resta in ascolto qualche secondo.
+3. Un clic mentre parla lo fa tacere; si trascina con il mouse; clic destro: «Zitto» e «Torna nello sgabuzzino».
+
+Usa gli stessi modelli e le stesse voci di RuscaLLisse. Il fumetto mostra solo simboli: la conversazione non si scrive e non si salva, e il modello linguistico ascolta solo su 127.0.0.1. Pallasio è un personaggio, non un esperto: le sue risposte vanno verificate.
+
 ## 🎱 RuscaPinball
 
 Flipper con il tavolo «Amethyst», visto in prospettiva come nei flipper per home computer degli anni ’80.
@@ -1752,6 +1790,7 @@ Tutti i dati elaborati dalle RuscaLinux OS Apps rimangono in locale. Nessun dato
 | RuscaLLisse | Voice conversation with an animated digital entity whose personality you decide (the first one is Ellittica) |
 | ruscavosk-engine | Real-time speech recognition engine of RuscaLLisse: Vosk, an external component (Apache 2.0) |
 | ruscapiper-engine | Speech synthesis engine of RuscaLLisse: Piper (piper1-gpl), an external component (GPL-3.0) |
+| RuscaPallas | Pallasio, a cynical Pallas's cat in jacket, tie and glasses who walks on the desktop and talks aloud |
 
 ## 🚀 Requirements
 
@@ -1909,6 +1948,16 @@ It is a conversation like in real life: only her face is on screen, nothing is w
 You can interrupt her by speaking, as in a real conversation. If the system has no echo cancellation, with speakers you interrupt her with Space or Esc; with headphones turn on "I Use Headphones" in Preferences.
 
 RuscaLLisse uses **ruscavosk-engine** (Vosk, Apache 2.0 license), **ruscallama-engine** (llama.cpp, MIT license) and **ruscapiper-engine** (Piper, GPL-3.0 license). It does not use the network: the language model listens only on 127.0.0.1 and audio is never saved. Every model and voice has its own license, shown in Preferences: many Piper voices are for non-commercial use only. Answers must be checked: Ellittica is a character, not an expert.
+
+## 🐈 RuscaPallas
+
+Pallasio, a cynical and embittered Pallas's cat with a cream jacket, a red tie, small glasses and a tome always in hand, walks on your desktop and talks with you.
+
+1. After installing, log out and back in, then open RuscaPallas from the RuscaLinux Apps folder: Pallasio appears at the bottom.
+2. Click him and speak: he listens with his arms crossed, thinks while checking his tome and answers aloud. After answering he keeps listening for a few seconds.
+3. A click while he speaks makes him quiet; drag him with the mouse; right click: “Quiet” and “Back to the closet”.
+
+He uses the same models and voices as RuscaLLisse. The bubble only shows symbols: the conversation is not written or saved, and the language model only listens on 127.0.0.1. Pallasio is a character, not an expert: check his answers.
 
 ## 🎱 RuscaPinball
 

@@ -1,0 +1,7 @@
+# Lessico delle pronunce di RuscaLLisse: parola<TAB>come scriverla per la voce.
+# espeak-ng rispetta l'accento grafico: per correggere l'accento tonico basta
+# scriverlo, acuto sulle vocali chiuse e grave su quelle aperte.
+#   ancora<TAB>ancóra
+# Il file dell'utente (~/.local/share/ruscallisse/pronunce.tsv) vale di più.
+# I fonemi IPA fra [[ ]] non si usano: libpiper non li capisce, e la riga
+# si salta.
