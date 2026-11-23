@@ -402,5 +402,34 @@ class Transcription(unittest.TestCase):
         self.assertEqual(e.exception.key, "err_no_engine")
 
 
+class SpokenLanguage(unittest.TestCase):
+    """La lingua del parlato è «Automatica» finché non la sceglie l'utente:
+    quella dell'interfaccia, data al primo avvio, faceva inventare a
+    Whisper una traduzione di un video in un'altra lingua."""
+
+    def test_default_auto(self):
+        try:
+            import gi
+            gi.require_version("Gtk", "4.0")
+            gi.require_version("Adw", "1")
+            sys.path.insert(0, os.path.join(REPO, "apps", "ruscatranscriber"))
+            import ruscatranscriber as ui
+        except (ImportError, ValueError):
+            self.skipTest("GTK non disponibile")
+        with tempfile.TemporaryDirectory() as t:
+            saved = ui.CONFIG_FILE
+            ui.CONFIG_FILE = os.path.join(t, "settings.json")
+            try:
+                self.assertEqual(ui.load_settings()["language"], "auto")
+                for data, expected in (({"language": "it"}, "auto"),
+                                       ({"language": "ru", "language_chosen": True}, "ru"),
+                                       ({"language": "xx", "language_chosen": True}, "auto")):
+                    with open(ui.CONFIG_FILE, "w") as f:
+                        json.dump(data, f)
+                    self.assertEqual(ui.load_settings()["language"], expected, data)
+            finally:
+                ui.CONFIG_FILE = saved
+
+
 if __name__ == "__main__":
     unittest.main()

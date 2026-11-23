@@ -62,7 +62,7 @@ MEDIA_PATTERNS = ("mp4", "mkv", "webm", "mov", "avi", "m4v", "mpg", "mpeg", "ogv
                   "m4a", "aac", "wma", "aiff", "mka", "amr")
 DEFAULTS = {
     "model": "", "gpu": False, "gpu_device": "", "threads": whisper.physical_cores(),
-    "language": "", "font_size": 0, "width": 760, "height": 620,
+    "language": "auto", "language_chosen": False, "font_size": 0, "width": 760, "height": 620,
     "maximized": False, "theme": "system",
 }
 THEMES = ("system", "light", "dark")         # ordine delle voci nel menu
@@ -146,10 +146,13 @@ def load_settings():
                 cfg[k] = v
     except (OSError, ValueError, AttributeError):
         pass
-    if cfg["language"] not in CODES and cfg["language"] != "auto":
-        # Primo avvio: la lingua dell'interfaccia, se Whisper la conosce.
-        base = LANG.split("_")[0]
-        cfg["language"] = base if base in CODES else "auto"
+    # La lingua del parlato è «Automatica» finché non la sceglie l'utente.
+    # Fino alla prima 1.99.3 era quella dell'interfaccia: un video russo
+    # trascritto «in italiano» diventava una traduzione inventata, piena di
+    # frasi ripetute. Quella scelta non fatta dall'utente non si tiene.
+    if not cfg["language_chosen"] or (cfg["language"] not in CODES
+                                      and cfg["language"] != "auto"):
+        cfg["language"] = "auto"
     cfg["threads"] = max(1, min(cfg["threads"], os.cpu_count() or 1))
     return cfg
 
@@ -522,6 +525,7 @@ class TranscriberWindow(FontSizeMixin, Adw.ApplicationWindow):
 
     def _on_language(self, drop, _pspec):
         i = drop.get_selected()
+        self.cfg["language_chosen"] = True
         self._set("language", CODES[i - 1] if 0 < i <= len(CODES) else "auto")
 
     def _set(self, key, value):

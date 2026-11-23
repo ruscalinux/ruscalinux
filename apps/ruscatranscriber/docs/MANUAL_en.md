@@ -45,6 +45,8 @@ How long it takes depends on the model and on the computer: with a large model a
 
 In the Markdown file speech stays text: asterisks, hash signs, addresses and other characters that Markdown would read as formatting are protected with a backslash.
 
+**Spoken language.** Leave it on **Automatic**, or choose the language actually spoken in the video. A wrong language (for example “Italian” for a Russian video) does not translate: Whisper invents a text in the language given, often with sentences repeated endlessly. To translate, transcribe in the original language and use RuscaTranslator or RuscaDubbing.
+
 **Automatic transcription must be reviewed.** A model can get names, numbers and rare words wrong, and during silence or music it can write sentences nobody said. To correct the text, open the saved file with RuscaMark; for subtitles, use a text or subtitle editor.
 
 ## 5. Input formats

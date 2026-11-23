@@ -45,6 +45,8 @@ La durata dipende dal modello e dal computer: con un modello grande e senza sche
 
 Nel Markdown il parlato resta testo: asterischi, cancelletti, indirizzi e altri caratteri che Markdown leggerebbe come formattazione sono protetti con la barra rovesciata.
 
+**Lingua del parlato.** Lasciala su **Automatica**, oppure scegli quella che si parla davvero nel video. Una lingua sbagliata (per esempio «Italiano» per un video russo) non traduce: Whisper inventa un testo nella lingua indicata, spesso con frasi ripetute all'infinito. Per tradurre, trascrivi nella lingua originale e usa RuscaTranslator o RuscaDubbing.
+
 **La trascrizione automatica va riletta.** Un modello può sbagliare nomi, numeri e parole rare, e nei tratti di silenzio o di musica può scrivere frasi che nessuno ha detto. Per correggere il testo apri il file salvato con RuscaMark; per i sottotitoli, con un editor di testo o di sottotitoli.
 
 ## 5. Formati di ingresso
