@@ -649,6 +649,58 @@ def translate_cues(chat, cues, src, tgt, stop_event=None, on_progress=None, max_
     return result, stats
 
 
+# Verifica dopo la voce: una frase detta che non sta nel suo tempo nemmeno
+# alla velocità massima si fa riscrivere più corta e si ridice (una volta).
+REFIT_TOLERANCE_MS = 150
+REFIT_MARGIN = 0.9
+
+
+def too_long(pieces, durations, max_speed):
+    """[(indice, caratteri massimi)] delle frasi dette che non stanno nel
+    loro tempo (fino all'inizio della successiva) nemmeno accelerate a
+    max_speed. Il massimo si ricava dalla velocità reale della voce su
+    quella frase. L'ultima frase non ha limite: può finire dopo."""
+    out = []
+    for i, (piece, ms) in enumerate(zip(pieces, durations)):
+        if i + 1 >= len(pieces) or ms <= 0:
+            continue
+        slot = max(1, pieces[i + 1].start - piece.start)
+        if ms / max(1.0, max_speed) > slot + REFIT_TOLERANCE_MS:
+            chars = len(piece.text)
+            target = int(chars * slot * max(1.0, max_speed) * REFIT_MARGIN / ms)
+            out.append((i, max(8, min(target, chars - 1))))
+    return out
+
+
+def shorten_translations(chat, originals, texts, targets, src, tgt, stop_event=None,
+                         batch=BATCH):
+    """Versioni più corte delle traduzioni troppo lunghe da dire.
+    targets: {indice: caratteri massimi}. Restituisce {indice: testo}
+    solo per quelle davvero più corte."""
+    system = build_prompt(src, tgt)
+    order = sorted(targets)
+    out = {}
+    for start in range(0, len(order), batch):
+        if stop_event is not None and stop_event.is_set():
+            raise _Stopped()
+        idx = order[start:start + batch]
+        user = ("These translations are too long to be spoken in the time of the original. "
+                "Rewrite each one in at most MAX characters, as a professional dubbing "
+                "adapter would: same meaning, natural spoken language, nothing important "
+                "lost.\n" + "\n".join(f"{i + 1}: {texts[i]}" for i in idx)
+                + "\n\nLines to translate:\n"
+                + "\n".join(f"{i + 1}|{targets[i]}|{originals[i]}" for i in idx))
+        body = dict(SAMPLING, messages=[{"role": "system", "content": system},
+                                        {"role": "user", "content": user}],
+                    max_tokens=MAX_TOKENS, reasoning_effort="none")
+        got = parse_translations(chat(body))
+        for i in idx:
+            new = got.get(i + 1)
+            if new and len(new) < len(texts[i]):
+                out[i] = new
+    return out
+
+
 class _Stopped(Exception):
     pass
 
@@ -908,6 +960,9 @@ class Dubbing:
         self.running = True
         self.files, self.stats = {}, {}
         self.cues, self.translated = [], []
+        self.paths = None
+        self.units = None
+        self.refit_done = False
         os.makedirs(WORK_DIR, mode=0o700, exist_ok=True)
         os.chmod(WORK_DIR, 0o700)
         self.run_dir = tempfile.mkdtemp(prefix="run-", dir=WORK_DIR)
@@ -1080,18 +1135,7 @@ class Dubbing:
         o = self.o
         error = None
         try:
-            args = ["-t", o.threads, "-c", o.context, "-b", 2048, "-ub", 1024, "--parallel", 1,
-                    "--flash-attn", "on", "--reasoning", "off"]
-            if o.gpu and o.llm_device:
-                # list_devices apre un processo: qui, fuori dall'interfaccia.
-                device = engine.device_name(o.llm_device, engine.list_devices())
-                if device:
-                    args += ["--device", device]
-            self.engine.start(o.llm_model, args, o.gpu)
-            if not self.engine.wait_ready(self.stop_event):
-                if self.stop_event.is_set():
-                    raise _Stopped()
-                raise engine.EngineError("engine_not_ready")
+            self._start_llm()
             texts, tstats = translate_cues(
                 self.engine.chat, self.units, self.src, self.o.tgt, self.stop_event,
                 lambda i, n: self._emit(self.on_stage, "translate", i / max(1, n), f"{i}/{n}"),
@@ -1132,8 +1176,9 @@ class Dubbing:
 
     def _write_subtitles(self):
         o = self.o
-        self.paths = output_paths(o.media, o.folder, self.src, o.tgt, o.fmt,
-                                  ".prova" if o.preview else "")
+        if not self.paths:
+            self.paths = output_paths(o.media, o.folder, self.src, o.tgt, o.fmt,
+                                      ".prova" if o.preview else "")
         self.work_srt_src = os.path.join(self.run_dir, "originale.srt")
         self.work_srt_tgt = os.path.join(self.run_dir, "tradotto.srt")
         # Sottotitoli divisi con le regole professionali: gli originali
@@ -1164,13 +1209,17 @@ class Dubbing:
                 f.write(bilingual_srt(self.cues, self.translated))
             self.files["srt_both"] = self.paths["srt_both"]
 
-    def _dub(self):
+    def _dub(self, reuse=None):
         o = self.o
         self.on_stage("dub", 0.0, "")
         # La voce dice ogni frase intera, dall'inizio della prima battuta.
-        pieces = [tts.Piece(t, 0, c.start, c.end)
-                  for c, t in zip(block_cues(self.parts, self.blocks), self.block_texts)
-                  if t.strip()]
+        units = block_cues(self.parts, self.blocks)
+        self.piece_units = [k for k, t in enumerate(self.block_texts) if t.strip()]
+        pieces = [tts.Piece(self.block_texts[k], 0, units[k].start, units[k].end)
+                  for k in self.piece_units]
+        self.pieces = pieces
+        self.keep_dir = os.path.join(self.run_dir, "frasi")
+        os.makedirs(self.keep_dir, exist_ok=True)
         self.speaker = tts.Speaker(
             on_progress=lambda i, n: self.on_stage("dub", i / max(1, n), f"{i + 1}/{n}"),
             on_stage=lambda stage: self.on_stage("dub", 1.0, stage),
@@ -1179,7 +1228,8 @@ class Dubbing:
             self.speaker.start(pieces, o.voice, srt=True, language=o.tgt,
                                speaker_file=o.speaker_file, voice_name=o.voice_name,
                                gpu=o.gpu, gpu_device=o.tts_device, threads=o.threads,
-                               seed=o.seed, max_speed=o.max_speed, normalize=True)
+                               seed=o.seed, max_speed=o.max_speed, normalize=True,
+                               keep_dir=self.keep_dir, reuse=reuse)
         except tts.TTSError as e:
             self._finish(DubbingError(e.key, e.detail))
 
@@ -1190,10 +1240,89 @@ class Dubbing:
                 speaker.discard()
             self._finish(error if error == "cancelled" else DubbingError(error.key, error.detail))
             return
+        durations = stats.pop("durations", [])
         self.stats.update(stats)
+        # Verifica: le frasi che, dette, non stanno nel loro tempo si fanno
+        # accorciare e si ridicono; le altre si riusano. Una volta sola, e
+        # solo se c'è stata una traduzione (un testo da riscrivere).
+        if not self.refit_done and getattr(self, "units", None) and self.src != self.o.tgt:
+            long_ones = too_long(self.pieces, durations, self.o.max_speed)
+            if long_ones:
+                self.refit_done = True
+                speaker.discard()
+                self.on_log(f"ruscadubbing: {len(long_ones)} frasi troppo lunghe da dire, "
+                            "si accorciano")
+                self.on_stage("dub", 1.0, "refit")
+                targets = {self.piece_units[i]: chars for i, chars in long_ones}
+                threading.Thread(target=self._refit_work, args=(targets,), daemon=True).start()
+                return
         self.on_stage("dub", 1.0, "")
         self.on_stage("mix", 0.0, "")
         threading.Thread(target=self._mix_work, args=(path, speaker), daemon=True).start()
+
+    def _start_llm(self):
+        """Avvia llama-server con il modello di traduzione (nel thread di
+        lavoro) e aspetta che sia pronto."""
+        o = self.o
+        args = ["-t", o.threads, "-c", o.context, "-b", 2048, "-ub", 1024, "--parallel", 1,
+                "--flash-attn", "on", "--reasoning", "off"]
+        if o.gpu and o.llm_device:
+            # list_devices apre un processo: qui, fuori dall'interfaccia.
+            device = engine.device_name(o.llm_device, engine.list_devices())
+            if device:
+                args += ["--device", device]
+        self.engine.start(o.llm_model, args, o.gpu)
+        if not self.engine.wait_ready(self.stop_event):
+            if self.stop_event.is_set():
+                raise _Stopped()
+            raise engine.EngineError("engine_not_ready")
+
+    def _refit_work(self, targets):
+        """Accorcia le frasi troppo lunghe (targets: {frase: caratteri})."""
+        error, changed = None, {}
+        try:
+            self._start_llm()
+            changed = shorten_translations(
+                self.engine.chat, [u.text for u in self.units], self.block_texts, targets,
+                self.src, self.o.tgt, self.stop_event)
+        except _Stopped:
+            error = "cancelled"
+        except engine.EngineError as e:
+            error = "cancelled" if self.stop_event.is_set() else DubbingError(e.key, e.detail)
+        except Exception as e:      # noqa: BLE001 — connessione persa, risposta rotta
+            error = "cancelled" if self.stop_event.is_set() else DubbingError("connection_error", str(e))
+        self.engine.stop(wait=True)
+        if error:
+            self._emit(self._finish, error)
+        else:
+            self._emit(self._refitted, changed)
+
+    def _refitted(self, changed):
+        """Le frasi accorciate entrano nella traduzione, nei sottotitoli e
+        nella memoria; la voce ridice solo quelle."""
+        self.stats["refit"] = len(changed)
+        for k, text in changed.items():
+            self.block_texts[k] = clean_translation(self.units[k].text, text)
+        if changed:
+            self.translated = translations_per_cue(self.cues, self.parts, self.blocks,
+                                                   self.block_texts)
+            memory = self.project.setdefault("memory", {}).setdefault(self.memory_key, {})
+            for k in changed:
+                memory[self.units[k].text] = self.block_texts[k]
+            save_project(self.o.media, self.project)
+            try:
+                self._write_subtitles()
+            except OSError as e:
+                self._finish(DubbingError("save_error", str(e)))
+                return
+        reuse = {}
+        for i, k in enumerate(self.piece_units):
+            if k not in changed:
+                reuse[i] = os.path.join(self.keep_dir, f"{i:05d}.wav")
+        # Se il numero dei pezzi resta lo stesso (sempre: nessuna frase
+        # diventa vuota), gli indici coincidono.
+        self._dub(reuse=reuse)
+        return False
 
     def _run(self, cmd):
         self._emit(self.on_log, "$ " + " ".join(cmd))

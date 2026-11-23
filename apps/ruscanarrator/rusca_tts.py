@@ -486,10 +486,14 @@ class Speaker:
         return self._thread is not None and self._thread.is_alive()
 
     def start(self, pieces, voice, srt=False, language="it", speaker_file="", voice_name="",
-              gpu=True, gpu_device="", threads=None, seed=42, max_speed=1.3, normalize=True):
+              gpu=True, gpu_device="", threads=None, seed=42, max_speed=1.3, normalize=True,
+              keep_dir="", reuse=None):
         """Avvia la lettura in background e ritorna subito. gpu_device e' la
         descrizione di una scheda di list_devices(), o "" per la scelta del
-        motore."""
+        motore. keep_dir: cartella in cui copiare ogni pezzo detto, prima di
+        accelerarlo o spostarlo («00000.wav»…); reuse: {indice: file} dei
+        pezzi già detti da riusare invece di rigenerarli. Le durate dei
+        pezzi (in ms, prima di accelerarli) arrivano in stats["durations"]."""
         if self.running:
             return
         if not find_binary():
@@ -506,7 +510,8 @@ class Speaker:
         options = dict(srt=srt, language=language, speaker_file=speaker_file,
                        voice_name=voice_name, gpu=gpu, gpu_device=gpu_device,
                        threads=int(threads or physical_cores()), seed=int(seed),
-                       max_speed=max(1.0, float(max_speed)), normalize=normalize)
+                       max_speed=max(1.0, float(max_speed)), normalize=normalize,
+                       keep_dir=keep_dir, reuse=dict(reuse or {}))
         self._thread = threading.Thread(target=self._work, args=(list(pieces), voice, options),
                                         daemon=True)
         self._thread.start()
@@ -618,6 +623,15 @@ class Speaker:
             clips = []                     # (file pulito, durata in ms)
             for i, piece in enumerate(pieces):
                 self._emit(self.on_progress, i, len(pieces))
+                clean = os.path.join(self.run_dir, f"{i:05d}.wav")
+                old = o["reuse"].get(i)
+                if old and os.path.isfile(old):
+                    # Pezzo già detto (per esempio in un passaggio precedente).
+                    shutil.copyfile(old, clean)
+                    info = wav_info(clean)
+                    rate = rate or info[0]
+                    clips.append((clean, info[3] * 1000 // info[0]))
+                    continue
                 raw = os.path.join(self.run_dir, f"{i:05d}-tts.wav")
                 cmd, env = self._tts_command(piece.text, raw, voice, o, device)
                 code, tail = self._run(cmd, env)
@@ -635,11 +649,13 @@ class Speaker:
                                    if code != 0 else tail)
                 if rate is None:
                     rate = wav_info(raw)[0]
-                clean = os.path.join(self.run_dir, f"{i:05d}.wav")
                 self._ffmpeg(raw, clean, TRIM_FILTER, rate)
                 os.unlink(raw)
                 info = wav_info(clean)
                 clips.append((clean, info[3] * 1000 // rate))
+                if o["keep_dir"]:
+                    shutil.copyfile(clean, os.path.join(o["keep_dir"], f"{i:05d}.wav"))
+            stats["durations"] = [ms for _clip, ms in clips]
 
             self._emit(self.on_stage, "assemble")
             joined = os.path.join(self.run_dir, "joined.wav")

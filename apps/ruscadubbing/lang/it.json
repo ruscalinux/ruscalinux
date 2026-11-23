@@ -221,5 +221,7 @@
   "working_preview": "Prova di «{name}»",
   "stage_preview": "Preparo il primo minuto…",
   "done_reused_all": "Trascrizione e traduzione riprese dal lavoro salvato: rifatti solo voce e missaggio.",
-  "done_reused_some": "Una parte del lavoro è stata ripresa da quello salvato."
+  "done_reused_some": "Una parte del lavoro è stata ripresa da quello salvato.",
+  "stage_refit": "Accorcio le frasi troppo lunghe da dire…",
+  "done_refit": "{n} frasi troppo lunghe da dire sono state accorciate e ridette."
 }

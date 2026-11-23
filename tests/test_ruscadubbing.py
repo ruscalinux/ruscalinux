@@ -70,12 +70,17 @@ class H(http.server.BaseHTTPRequestHandler):
         if self.headers.get("Authorization") != "Bearer " + key:
             return self.send(401, {"error": "key"})
         body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
-        user = body["messages"][-1]["content"].split("Lines to translate:\n")[-1]
+        content = body["messages"][-1]["content"]
+        short = "too long to be spoken" in content
+        user = content.split("Lines to translate:\n")[-1]
         out = []
         for line in user.splitlines():
             m = re.match(r"(\d+)\|(\d+)\|(.*)", line)
             if m:
-                out.append(f"{m.group(1)}|IT {m.group(3)}")
+                text = "IT " + m.group(3)
+                if short:                       # versione breve: al massimo MAX
+                    text = text[:int(m.group(2))].rstrip()
+                out.append(f"{m.group(1)}|{text}")
         self.send(200, {"choices": [{"message": {"content": "\n".join(out)}}]})
 http.server.HTTPServer(("127.0.0.1", int(opt("--port"))), H).serve_forever()
 '''
@@ -504,6 +509,35 @@ class Chain(unittest.TestCase):
         self.assertEqual((self.count("FAKE_WHISPER_LOG"), self.count("FAKE_ARGS")), (2, 2))
         rd.forget_project(self.video)
         self.assertEqual(rd.project_summary(self.video), (False, []))
+
+    def test_refit(self):
+        """Una frase che, detta, non sta nel suo tempo si fa accorciare e
+        si ridice; l'altra si riusa."""
+        srt = os.path.join(self.dir.name, "lunga.srt")
+        with open(srt, "w", encoding="utf-8") as f:
+            f.write("1\n00:00:00,000 --> 00:00:01,000\n"
+                    "Hello there, this is a rather long sentence that cannot be said in one "
+                    "second at all.\n\n2\n00:00:01,800 --> 00:00:03,000\nBye.\n")
+        seen = self.run_chain(self.options(source_srt=srt, src="en", outputs={"srt", "video"}))
+        error, files, stats = seen["done"]
+        self.assertIsNone(error, error)
+        self.assertEqual(stats.get("refit"), 1)
+        self.assertEqual(self.count("FAKE_ARGS"), 2)           # tradurre, poi accorciare
+        self.assertEqual(self.count("FAKE_TTS_ARGS"), 3)       # 2 frasi + 1 ridetta
+        tgt = open(files["srt_tgt"], encoding="utf-8").read()
+        self.assertNotIn("at all.", tgt)                        # la versione breve
+        memory = rd.load_project(self.video)["memory"]
+        self.assertTrue(any("at all" not in t for m in memory.values() for t in m.values()))
+        self.assertEqual(sorted(os.listdir(os.path.join(self.dir.name, "uscita"))),
+                         sorted(os.path.basename(p) for p in files.values()))
+
+    def test_too_long(self):
+        P = rd.tts.Piece
+        pieces = [P("a" * 50, 0, 0, 1000), P("b" * 10, 0, 2000, 3000), P("c", 0, 4000, 4100)]
+        out = rd.too_long(pieces, [4000, 900, 9000], 1.3)
+        self.assertEqual([i for i, _ in out], [0])               # l'ultima non conta
+        self.assertLess(out[0][1], 50)
+        self.assertGreater(out[0][1], 20)
 
     def test_preview(self):
         """La prova: solo il primo tratto, file «.prova», niente salvato

@@ -904,6 +904,8 @@ class DubbingWindow(Adw.ApplicationWindow):
         elif stage in ("translate", "dub") and "/" in detail:
             i, n = detail.split("/")
             text = _("cue_progress", i=i, n=n)
+        elif stage == "dub" and detail == "refit":
+            text = _("stage_refit")
         elif stage == "dub" and detail == "normalize":
             text = _("stage_normalize")
         elif stage == "dub" and detail == "assemble":
@@ -956,6 +958,8 @@ class DubbingWindow(Adw.ApplicationWindow):
         if stats.get("faster") or stats.get("late"):
             lines.append(_("done_timing", faster=stats.get("faster", 0),
                            late=stats.get("late", 0)))
+        if stats.get("refit"):
+            lines.append(_("done_refit", n=stats["refit"]))
         if stats.get("kept"):
             lines.append(_("done_kept", n=stats["kept"]))
         if stats.get("reused_transcript") and stats.get("reused") == stats.get("blocks"):
