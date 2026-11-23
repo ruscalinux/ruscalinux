@@ -183,6 +183,9 @@ python3-pil
 
 # RuscaPinball: il flipper (finestra, suoni e gamepad con SDL 2)
 python3-pygame
+
+# RuscaDubbing: i numeri in lettere per la voce («16» -> «sedici»)
+python3-num2words
 # RuscaWriter: PDF tipografico (Esporta -> PDF tipografico), composto da
 # LuaLaTeX. Bastano questi due, circa 200 MB: la sillabazione la fa Pyphen
 # con i dizionari hyphen-*, quindi niente texlive-lang-*, e i caratteri

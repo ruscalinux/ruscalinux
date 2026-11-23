@@ -78,6 +78,15 @@ RuscaDubbing **remembers** the transcription and translation of each video. If y
 
 The **Glossary** is optional and applies to the open video: names and terms to translate always the same way, separated by semicolons, for example `Polyglot = Poliglotta; Dmitry Petrov`. A term without “=” stays as it is. Before translating, the model reads the whole talk anyway and prepares notes with topic, register and recurring terms: the glossary is for when you want to decide.
 
+### Pronunciation
+
+The voice does not read the subtitles exactly, but a copy prepared for it:
+- **numbers** are written in words (“16” → “sixteen”), if `python3-num2words` is installed;
+- in Italian, **ambiguous words** such as “principi” (princìpi or prìncipi?) get the right stress for their meaning: the translation model decides;
+- the words of the **pronunciation lexicon** are written as they should be said. If the voice always gets a word wrong, add it: Preferences → Voice → **Pronunciation Lexicon** opens your file. One line per word: the word, a Tab, the word with the accent on the right syllable.
+
+The subtitles do not change.
+
 ## 4. The files
 
 Next to the video, or in the folder chosen in **Output Folder**. A video `film.mp4` dubbed from English to Italian gives:

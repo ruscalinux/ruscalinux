@@ -232,5 +232,10 @@
   "glossary": "Glossario (facoltativo)",
   "glossary_tip": "Nomi e termini di questo video, separati da punto e virgola: «Polyglot = Poliglotta; RuscaLinux». Un termine senza «=» non si traduce.",
   "glossary_saved": "Glossario salvato per questo video",
-  "stage_brief": "Leggo tutto il discorso…"
+  "stage_brief": "Leggo tutto il discorso…",
+  "stage_stress": "Segno l’accento delle parole ambigue…",
+  "done_stressed": "In {n} frasi l’accento delle parole ambigue (come «princìpi» o «prìncipi») è stato segnato per la voce.",
+  "lexicon": "Lessico delle pronunce",
+  "lexicon_sub": "Parole che la voce sbaglia, scritte come vanno dette (una riga: parola, tabulazione, pronuncia)",
+  "lexicon_header": "# Lessico delle pronunce di RuscaDubbing: parola<TAB>come scriverla per la voce.\n# Per correggere l'accento basta scriverlo: tienila<TAB>tiènila\n# Vale per la voce, non per i sottotitoli."
 }

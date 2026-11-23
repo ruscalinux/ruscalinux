@@ -41,6 +41,7 @@ import threading
 from gi.repository import GLib
 
 import rusca_engine as engine
+import rusca_speech as speech
 import rusca_tts as tts
 import rusca_whisper as whisper
 
@@ -53,6 +54,9 @@ whisper.WORK_DIR = os.path.join(WORK_DIR, "whisper")
 # voce e missaggio. Testo dell'utente: cartella 0700, file 0600, si
 # cancella dalla finestra («Dimentica»).
 PROJECT_DIR = os.path.join(GLib.get_user_data_dir(), "ruscadubbing", "progetti")
+# Lessico delle pronunce: quello del programma e quello dell'utente.
+LEXICON_DIRS = (os.path.dirname(os.path.abspath(__file__)),
+                os.path.join(GLib.get_user_data_dir(), "ruscadubbing"))
 PREVIEW_MS = 60000          # «Prova su un minuto»
 PROMPT_VERSION = 3          # cambia quando cambia il modo di tradurre
 BRIEF_CHARS = 12000         # trascrizione data al modello per la scheda
@@ -1255,6 +1259,9 @@ class Dubbing:
                 self.o.max_speed, known=self.known, notes=self.notes)
             self.stats.update(tstats)
             self._set_translations(texts)
+            if self.o.tgt in speech.HOMOGRAPHS:
+                self._emit(self.on_stage, "translate", 1.0, "stress")
+                self._mark_stress(range(len(self.block_texts)))
             memory = self.project.setdefault("memory", {}).setdefault(self.memory_key, {})
             for u, t, k in zip(self.units, self.block_texts, self.known):
                 # Le frasi lasciate nell'originale non si ricordano.
@@ -1328,7 +1335,14 @@ class Dubbing:
         # La voce dice ogni frase intera, dall'inizio della prima battuta.
         units = block_cues(self.parts, self.blocks)
         self.piece_units = [k for k, t in enumerate(self.block_texts) if t.strip()]
-        pieces = [tts.Piece(self.block_texts[k], 0, units[k].start, units[k].end)
+        # Il testo per la voce: omografi segnati, lessico, numeri in lettere.
+        lexicon = speech.load_lexicon(*[os.path.join(d, f"pronunce-{o.tgt}.tsv")
+                                        for d in LEXICON_DIRS])
+        stress = ((self.project.get("stress") or {}).get(getattr(self, "memory_key", ""))
+                  or {})
+        pieces = [tts.Piece(speech.speech_text(self.block_texts[k], o.tgt, lexicon,
+                                               stress.get(self.block_texts[k])),
+                            0, units[k].start, units[k].end)
                   for k in self.piece_units]
         self.pieces = pieces
         self.keep_dir = os.path.join(self.run_dir, "frasi")
@@ -1392,6 +1406,33 @@ class Dubbing:
             self._emit(self.on_log, f"ruscadubbing: altezza della voce non misurata ({e})")
             return 0
 
+    def _mark_stress(self, indices):
+        """Con il modello acceso: gli omografi delle frasi indicate, segnati
+        con l'accento secondo il senso (solo per la voce), nella memoria."""
+        lang = self.o.tgt
+        memory = self.project.setdefault("stress", {}).setdefault(self.memory_key, {})
+        todo = [k for k in indices if speech.needs_stress(self.block_texts[k], lang)
+                and self.block_texts[k] not in memory]
+        for start in range(0, len(todo), BATCH):
+            if self.stop_event.is_set():
+                raise _Stopped()
+            idx = todo[start:start + BATCH]
+            try:
+                got = parse_translations(self.engine.chat(speech.stress_request(
+                    [(k + 1, self.block_texts[k]) for k in idx], lang)))
+            except engine.EngineError:
+                raise
+            except Exception:      # noqa: BLE001 — gli accenti sono un aiuto
+                if self.stop_event.is_set():
+                    raise _Stopped()
+                continue
+            for k in idx:
+                marked = speech.apply_stress(self.block_texts[k], got.get(k + 1, ""), lang)
+                memory[self.block_texts[k]] = marked
+        if todo:
+            self.stats["stressed"] = sum(1 for k in todo
+                                         if memory.get(self.block_texts[k]) != self.block_texts[k])
+
     def _start_llm(self):
         """Avvia llama-server con il modello di traduzione (nel thread di
         lavoro) e aspetta che sia pronto."""
@@ -1417,6 +1458,13 @@ class Dubbing:
             changed = shorten_translations(
                 self.engine.chat, [u.text for u in self.units], self.block_texts, targets,
                 self.src, self.o.tgt, self.stop_event, notes=getattr(self, "notes", ""))
+            if changed and self.o.tgt in speech.HOMOGRAPHS:
+                saved = {k: self.block_texts[k] for k in changed}
+                for k, text in changed.items():
+                    self.block_texts[k] = clean_translation(self.units[k].text, text)
+                self._mark_stress(list(changed))
+                for k, text in saved.items():
+                    self.block_texts[k] = text
         except _Stopped:
             error = "cancelled"
         except engine.EngineError as e:

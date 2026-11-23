@@ -116,7 +116,10 @@
   of RuscaTranscriber, RuscaTranslator and RuscaNarrator: nothing new to
   download, and nothing leaves the computer. “Find a Similar Voice” measures
   the original speaker and suggests invented voices in the dubbing language
-  with a similar register, so the dubbing keeps a natural accent.
+  with a similar register, so the dubbing keeps a natural accent. It
+  translates whole sentences with notes on the whole talk, checks that each
+  spoken sentence fits its time, splits subtitles by professional rules,
+  remembers the work done on each video and can try just the first minute.
 - **A pinball game.** RuscaPinball brings the “Amethyst” table, seen in
   perspective like the 1980s home computer pinball games: mushroom
   bumpers, a centre target that lights double bumpers, a dome kicker, the

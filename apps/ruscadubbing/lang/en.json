@@ -232,5 +232,10 @@
   "glossary": "Glossary (Optional)",
   "glossary_tip": "Names and terms of this video, separated by semicolons: “Polyglot = Polyglot; RuscaLinux”. A term without “=” is not translated.",
   "glossary_saved": "Glossary saved for this video",
-  "stage_brief": "Reading the whole talk…"
+  "stage_brief": "Reading the whole talk…",
+  "stage_stress": "Marking the stress of ambiguous words…",
+  "done_stressed": "In {n} sentences the stress of ambiguous words was marked for the voice.",
+  "lexicon": "Pronunciation Lexicon",
+  "lexicon_sub": "Words the voice gets wrong, written as they should be said (one line: word, tab, pronunciation)",
+  "lexicon_header": "# RuscaDubbing pronunciation lexicon: word<TAB>how to write it for the voice.\n# To fix the stress, write the accent: tienila<TAB>tiènila\n# It applies to the voice, not to the subtitles."
 }

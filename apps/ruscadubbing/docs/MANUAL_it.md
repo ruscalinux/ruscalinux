@@ -78,6 +78,15 @@ RuscaDubbing **ricorda** trascrizione e traduzione di ogni video. Se lo doppi di
 
 Il **Glossario** è facoltativo e vale per il video aperto: nomi e termini da tradurre sempre allo stesso modo, separati da punto e virgola, per esempio `Polyglot = Poliglotta; Dmitrij Petrov`. Un termine senza «=» resta com'è. Prima di tradurre, il modello legge comunque tutto il discorso e si prepara una scheda con argomento, registro e termini ricorrenti: il glossario serve quando vuoi decidere tu.
 
+### Pronuncia
+
+La voce non legge esattamente i sottotitoli, ma una loro copia preparata per lei:
+- i **numeri** si scrivono in lettere («16» → «sedici»), se è installato `python3-num2words`;
+- le **parole ambigue** come «principi» (princìpi o prìncipi?) o «ancora» ricevono l'accento giusto per il senso: lo decide il modello di traduzione;
+- le parole del **lessico delle pronunce** si scrivono come vanno dette. Se la voce sbaglia sempre una parola, aggiungila: Preferenze → Voce → **Lessico delle pronunce** apre il tuo file. Una riga per parola: la parola, un tasto Tab, la parola con l'accento sulla sillaba giusta (`tienila` Tab `tiènila`).
+
+I sottotitoli non cambiano.
+
 ## 4. I file
 
 Accanto al video, o nella cartella scelta in **Cartella dei file**. Un video `film.mp4` doppiato dall'inglese all'italiano dà:

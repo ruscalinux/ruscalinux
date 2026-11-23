@@ -1,0 +1,12 @@
+# Lessico delle pronunce di RuscaDubbing (italiano): parola<TAB>come scriverla
+# per la voce. Il modello della voce legge l'accento grafico: per correggere
+# l'accento tonico basta scriverlo, grave sulle vocali aperte, su i e u,
+# acuto sulle e e o chiuse.
+#   tienila<TAB>tiènila
+# Il file dell'utente (~/.local/share/ruscadubbing/pronunce-it.tsv) vale di
+# più e si può arricchire. I sottotitoli non cambiano.
+tienila	tiènila
+tienilo	tiènilo
+ascoltane	ascóltane
+ascoltala	ascóltala
+ascoltalo	ascóltalo

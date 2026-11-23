@@ -210,6 +210,33 @@ class Cues(unittest.TestCase):
         self.assertLess(len(body["messages"][0]["content"]), rd.BRIEF_CHARS + 2000)
         self.assertNotEqual(rd._memory_key("ru", "it", "", "male|"), rd._memory_key("ru", "it", ""))
 
+    def test_speech_text(self):
+        import rusca_speech as sp
+        if sp.numbers_available():
+            self.assertEqual(sp.spell_numbers("Dura 16 ore, il 50% nel 2023; 3,5 punti.", "it"),
+                             "Dura sedici ore, il cinquanta per cento nel duemilaventitré; "
+                             "tre virgola cinque punti.")
+            self.assertEqual(sp.spell_numbers("Alle 10:30 del 12/03, A23, il 3° corso.", "it"),
+                             "Alle 10:30 del 12/03, A23, il 3° corso.")
+            self.assertEqual(sp.spell_numbers("1,500 people", "en"), "one thousand, five hundred people")
+        self.assertEqual(sp.spell_numbers("16", "zh"), "16")
+        lex = sp.load_lexicon(os.path.join(APP, "pronunce-it.tsv"))
+        self.assertEqual(sp.apply_lexicon("Tienila, poi ascoltane un'altra.", lex),
+                         "Tiènila, poi ascóltane un'altra.")
+        orig = "Questi sono i principi del metodo, e ancora non basta."
+        self.assertTrue(sp.needs_stress(orig, "it"))
+        self.assertFalse(sp.needs_stress("Buongiorno a tutti.", "it"))
+        self.assertFalse(sp.needs_stress(orig, "en"))
+        good = "Questi sono i princìpi del metodo, e ancóra non basta."
+        self.assertEqual(sp.apply_stress(orig, good, "it"), good)
+        # Il modello cambia altro: quelle parole restano com'erano.
+        self.assertEqual(sp.apply_stress(orig, "Queste sono i princìpi del metodò, e ancóra non basta.",
+                                         "it"), good)
+        self.assertEqual(sp.apply_stress(orig, "Una frase diversa.", "it"), orig)
+        self.assertEqual(sp.speech_text("Il 16 sono i principi.", "it", {}, "Il 16 sono i princìpi."),
+                         ("Il sedici sono i princìpi." if sp.numbers_available()
+                          else "Il 16 sono i princìpi."))
+
     def test_wrap(self):
         wrap = rd.wrap_lines
         self.assertEqual(wrap("Breve."), "Breve.")
@@ -333,7 +360,7 @@ class Source(unittest.TestCase):
         """Solo rusca_engine.py parla (con llama-server, su 127.0.0.1)."""
         net = {"socket", "urllib", "requests", "http", "ftplib", "smtplib", "ssl"}
         for name in ("rusca_dubbing.py", "ruscadubbing.py", "rusca_whisper.py", "rusca_tts.py",
-                     "rusca_voicematch.py"):
+                     "rusca_voicematch.py", "rusca_speech.py"):
             path = os.path.join(APP, name)
             if not os.path.isfile(path):
                 continue

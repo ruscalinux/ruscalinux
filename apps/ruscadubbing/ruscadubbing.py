@@ -931,6 +931,8 @@ class DubbingWindow(Adw.ApplicationWindow):
         text = ""
         if stage == "transcribe" and fraction >= 1.0 and detail:
             text = _("detected_language", language=language_name(detail))
+        elif stage == "translate" and detail == "stress":
+            text = _("stage_stress")
         elif stage == "translate" and detail == "brief":
             text = _("stage_brief")
         elif stage == "transcribe" and detail == "preview":
@@ -996,6 +998,8 @@ class DubbingWindow(Adw.ApplicationWindow):
         if stats.get("faster") or stats.get("late"):
             lines.append(_("done_timing", faster=stats.get("faster", 0),
                            late=stats.get("late", 0)))
+        if stats.get("stressed"):
+            lines.append(_("done_stressed", n=stats["stressed"]))
         if stats.get("refit"):
             lines.append(_("done_refit", n=stats["refit"]))
         if stats.get("kept"):
@@ -1151,6 +1155,10 @@ class DubbingWindow(Adw.ApplicationWindow):
         seed.set_value(self.cfg["seed"])
         seed.connect("notify::value", lambda r, _p: self._set("seed", int(r.get_value())))
         voice.add(seed)
+        lexicon = Adw.ActionRow(title=_("lexicon"), subtitle=_("lexicon_sub"), activatable=True)
+        lexicon.add_suffix(Gtk.Image(icon_name="document-edit-symbolic"))
+        lexicon.connect("activated", lambda _r: self._open_lexicon())
+        voice.add(lexicon)
         page.add(voice)
 
         eng = Adw.PreferencesGroup(title=_("group_engine"))
@@ -1187,6 +1195,22 @@ class DubbingWindow(Adw.ApplicationWindow):
         dialog.connect("closed", lambda _d: (setattr(self, "device_rows", None),
                                              self._refresh_banner()))
         dialog.present(self)
+
+    def _open_lexicon(self):
+        """Il lessico delle pronunce dell'utente per la lingua del
+        doppiaggio, creato con un'intestazione se non c'è."""
+        tgt = self.cfg["tgt"]
+        folder = dub.LEXICON_DIRS[-1]
+        path = os.path.join(folder, f"pronunce-{tgt}.tsv")
+        try:
+            os.makedirs(folder, exist_ok=True)
+            if not os.path.exists(path):
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write(_("lexicon_header") + "\n")
+        except OSError as e:
+            self._show_error(_("save_error"), str(e))
+            return
+        self._launch(path)
 
     def _open_dir(self, folder):
         try:
