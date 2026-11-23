@@ -250,7 +250,11 @@ class Engine:
             f.write(self.key)
         cmd = [binary, "-m", model, "--host", HOST, "--port", str(self.port),
                "--api-key-file", self._key_file, "--no-webui", "--jinja",
-               "-ngl", "99" if gpu else "0"] + [str(a) for a in args]
+               "-ngl", "auto" if gpu else "0"] + [str(a) for a in args]
+        # -ngl auto: llama.cpp mette sulla scheda tutti i livelli che ci
+        # stanno (--fit, attivo da sé) e il resto sul processore. Con -ngl 99
+        # un modello più grande della memoria della scheda non partiva affatto
+        # (gemma-4-26B su una RTX 3060 da 6 GB: ErrorOutOfDeviceMemory).
         env = os.environ.copy()
         if not gpu:
             # Senza scheda grafica i driver Vulkan vengono nascosti: alcuni
