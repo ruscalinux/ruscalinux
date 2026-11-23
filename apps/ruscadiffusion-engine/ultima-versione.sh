@@ -41,8 +41,16 @@ tag_remoti() {
         | grep -E '^master-[0-9]+-[0-9a-f]{7,40}$' | sort -t- -k2,2nr
 }
 
-# ── Versione fissata a mano ──────────────────────────────────────────────────
-RICHIESTA="${RUSCADIFFUSION_SD_VERSION:-latest}"
+# ── Versione fissata ─────────────────────────────────────────────────────────
+# Dalla master-1116 (commit 6cd0ef1, "Diffusion Graph Language", #2396)
+# sd-cli non ha piu' --high-noise-cfg-scale, --high-noise-sampling-method e
+# --image-preprocess, che rusca_diffusion.py usa: sono passate ai grafi .dgl.
+# Finche' RuscaLLama non e' adattata, si costruisce l'ultima release con le
+# vecchie opzioni. Per provare comunque l'ultima:
+#   RUSCADIFFUSION_SD_VERSION=latest ./make-deb.sh
+# Quando RuscaLLama sara' adattata, rimetti FISSATA="latest".
+FISSATA="master-1111-6874e49"
+RICHIESTA="${RUSCADIFFUSION_SD_VERSION:-$FISSATA}"
 if [ "$RICHIESTA" != latest ]; then
     if valido "$RICHIESTA"; then
         echo "$RICHIESTA"
