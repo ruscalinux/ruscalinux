@@ -1,25 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
-  <!-- RuscaPallas — Pallasio, il manul con gli occhialini. GPL-3.0-or-later -->
-  <rect x="4" y="4" width="120" height="120" rx="28" fill="#2b2440"/>
-  <g transform="translate(64 66) scale(1.36) translate(-66 -54)" stroke-linejoin="round">
-    <path d="M55 74 L77 74 L74 86 L58 86Z" fill="#eadcbc" stroke="#332c24" stroke-width="1.1"/>
-    <path d="M56.5 76 L66 82 L60 87Z M75.5 76 L66 82 L72 87Z" fill="#fff" stroke="#332c24" stroke-width="1.1"/>
-    <path d="M63.4 81 L68.6 81 L67.7 86.2 L64.3 86.2Z" fill="#c8303a" stroke="#332c24" stroke-width="1.1"/>
-    <path d="M30 42 Q28 32 42 32 Q40 40 30 42Z M102 42 Q104 32 90 32 Q92 40 102 42Z" fill="#9c907a" stroke="#332c24" stroke-width="1.1"/>
-    <path d="M66 22 C 44 22 32 34 32 48 L26 52 L32 55 L27 61 L34 62 L31 68 L40 67 L39 73 L48 70 L50 77 L57 72 L62 79 L66 73 L70 79 L75 72 L82 77 L84 70 L93 73 L92 67 L101 68 L98 62 L105 61 L100 55 L106 52 L100 48 C 100 34 88 22 66 22 Z" fill="#c2b8a5" stroke="#332c24" stroke-width="1.1"/>
-    <path d="M38 60 L34 66 L42 66 L44 72 L52 68 L58 76 L66 70 L74 76 L80 68 L88 72 L90 66 L98 66 L94 60 Q80 72 66 70 Q52 72 38 60Z" fill="#ece4d6"/>
-    <g fill="#3f372d"><circle cx="56" cy="29" r="1.6"/><circle cx="62" cy="26.5" r="1.8"/><circle cx="70" cy="26.5" r="1.8"/><circle cx="76" cy="29" r="1.6"/><circle cx="59" cy="33" r="1.3"/><circle cx="66" cy="31" r="1.5"/><circle cx="73" cy="33" r="1.3"/></g>
-    <path d="M34 50 q8 8 16 8 l-1 3 q-9 -1 -16 -7Z M33 57 q8 8 17 8 l-1 3 q-10 -1 -17 -7Z M98 50 q-8 8 -16 8 l1 3 q9 -1 16 -7Z M99 57 q-8 8 -17 8 l1 3 q10 -1 17 -7Z" fill="#3f372d"/>
-    <path d="M66 54 C 56 54 52 60 53 64 C 54 69 60 71 66 71 C 72 71 78 69 79 64 C 80 60 76 54 66 54 Z" fill="#f6f2ea" stroke="#332c24" stroke-width="1.1"/>
-    <circle cx="55" cy="47" r="5" fill="#e3bf45" stroke="#332c24" stroke-width="1.1"/>
-    <circle cx="77" cy="47" r="5" fill="#e3bf45" stroke="#332c24" stroke-width="1.1"/>
-    <ellipse cx="55" cy="48" rx="1.2" ry="3.1" fill="#15120e"/><ellipse cx="77" cy="48" rx="1.2" ry="3.1" fill="#15120e"/>
-    <path d="M49 41 H61 V47 H49Z M71 41 H83 V47 H71Z" fill="#c2b8a5" stroke="#332c24" stroke-width="1"/>
-    <path d="M46 37 L62 44.5 M86 37 L70 44.5" stroke="#26201a" stroke-width="2.8" stroke-linecap="round"/>
-    <g fill="rgba(220,235,245,0.2)" stroke="#1f1b16" stroke-width="1.7"><circle cx="55" cy="47.5" r="7.4"/><circle cx="77" cy="47.5" r="7.4"/></g>
-    <path d="M62.4 46.6 q3.6 -2.6 7.2 0" stroke="#1f1b16" stroke-width="1.4" fill="none"/>
-    <path d="M62.5 56.5 q3.5 -1.5 7 0 l-3.5 4z" fill="#c98a86" stroke="#332c24" stroke-width="1.1"/>
-    <path d="M59 66 Q66 62 73 66" fill="none" stroke="#332c24" stroke-width="1.1"/>
-    <path d="M61.6 64.6 l1.3 3.4 l1.2 -3" fill="#fff" stroke="#332c24" stroke-width="0.5"/>
+  <title>RuscaPallas</title>
+  <desc>Icona di RuscaPallas: l’emblema di RuscaLinux con il simbolo del tool al posto dell’aeroplanino. Generata da gen_icons.py.</desc>
+  <defs>
+    <linearGradient id="ring" x1="0.15" y1="0" x2="0.75" y2="1">
+      <stop offset="0" stop-color="#8a2b5f"/>
+      <stop offset="0.5" stop-color="#7a2357"/>
+      <stop offset="1" stop-color="#5c1a40"/>
+    </linearGradient>
+    <radialGradient id="disc" cx="0.4" cy="0.35" r="0.75">
+      <stop offset="0" stop-color="#fff7f0"/>
+      <stop offset="1" stop-color="#f8d7e6"/>
+    </radialGradient>
+  </defs>
+  <!-- disco interno: dà al simbolo un fondo chiaro su qualsiasi sfondo -->
+  <circle cx="72.29" cy="51.06" r="42.05" fill="url(#disc)"/>
+  <!-- ombra sottile dell'anello (niente sfocature: resta nitida a ogni dimensione) -->
+  <path d="M213.2,385.4c-81.2-13.6-137.1-89.8-125-171.8c10.7-72.2,71.2-127.3,144-131.2c84.2-4.5,156.4,60.8,161.1,145c3.2,57.1-23.7,110.1-66.7,141.4c-15.3,11.1-34.8,19.3-51.2,12.5c-15.6-6.5-19.1-26.6-11.4-39.8c15.1-25.9,50.7-27.1,73.5-47.8c34.3-31.1,48.2-82.7,33-126.7c-18.7-54-78.5-87.1-133.1-73.8c-55.7,13.6-94,68-85.1,124.9c7,44.7,42.2,81.1,87,88.2c16.1,2.5,23.3,23.1,13.4,36.2C241.6,411.3,222.8,387,213.2,385.4z" transform="translate(-26.390 -21.883) scale(0.37662)" fill="#2d0a1d" opacity="0.22"/>
+  <!-- anello dell'emblema RuscaLinux -->
+  <path d="M213.2,385.4c-81.2-13.6-137.1-89.8-125-171.8c10.7-72.2,71.2-127.3,144-131.2c84.2-4.5,156.4,60.8,161.1,145c3.2,57.1-23.7,110.1-66.7,141.4c-15.3,11.1-34.8,19.3-51.2,12.5c-15.6-6.5-19.1-26.6-11.4-39.8c15.1-25.9,50.7-27.1,73.5-47.8c34.3-31.1,48.2-82.7,33-126.7c-18.7-54-78.5-87.1-133.1-73.8c-55.7,13.6-94,68-85.1,124.9c7,44.7,42.2,81.1,87,88.2c16.1,2.5,23.3,23.1,13.4,36.2C241.6,411.3,222.8,387,213.2,385.4z" transform="translate(-26.390 -23.883) scale(0.37662)" fill="url(#ring)"/>
+  <!-- simbolo del tool -->
+  <g transform="translate(46.012 24.792) scale(0.5255)">
+  <!-- Pallasio: manul cinico, occhialini tondi, giacca crema e cravatta rossa -->
+  <defs>
+    <radialGradient id="pal-fur" cx="0.42" cy="0.3" r="0.75">
+      <stop offset="0" stop-color="#e2dccf"/><stop offset="0.6" stop-color="#b9af9e"/><stop offset="1" stop-color="#8c8274"/>
+    </radialGradient>
+    <linearGradient id="pal-jacket" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f6eed8"/><stop offset="1" stop-color="#cdbb90"/>
+    </linearGradient>
+  </defs>
+  <path d="M12 100C14 87 30 80 50 80C70 80 86 87 88 100Z" fill="url(#pal-jacket)" stroke="#2d0a1d" stroke-width="1.6"/>
+  <path d="M41 80 50 100 59 80Z" fill="#fbfaf6"/>
+  <path d="M38 81 47 100H40L32 86Z M62 81 53 100H60L68 86Z" fill="#d6c59b"/>
+  <path d="M47.5 84H52.5L54.5 99 50 102 45.5 99Z" fill="#b3262b"/>
+  <path d="M46.6 79.5H53.4L52.4 85H47.6Z" fill="#c8303a"/>
+  <path d="M12 34Q9 17 27 18Q24 30 12 34Z M88 34Q91 17 73 18Q76 30 88 34Z" fill="#9d9282" stroke="#2d0a1d" stroke-width="1.6" stroke-linejoin="round"/>
+  <path d="M15 30Q14 22 24 22Q22 28 15 30Z M85 30Q86 22 76 22Q78 28 85 30Z" fill="#f2a7c8" opacity="0.8"/>
+  <path d="M84.4 31.4 Q87.7 31.4 90.4 31.2 Q91.8 31.5 91.2 32.7 Q88.8 34.6 87.2 36.4 Q90.3 37.0 93.1 37.7 Q94.3 38.3 93.4 39.2 Q90.7 40.3 88.7 41.7 Q92.0 42.8 94.8 43.9 Q96.1 44.6 94.8 45.4 Q91.4 46.1 88.9 47.1 Q91.9 48.9 94.7 49.8 Q95.9 50.8 94.4 51.4 Q90.6 52.0 87.7 52.5 Q90.1 54.7 92.5 56.1 Q93.4 57.2 91.8 57.6 Q88.0 57.5 85.2 57.5 Q86.6 60.0 88.2 61.6 Q88.6 62.8 87.2 62.9 Q83.9 62.5 81.4 62.2 Q82.8 65.3 84.2 68.0 Q84.5 69.5 82.8 69.2 Q79.4 67.3 76.6 66.2 Q76.7 69.0 77.4 71.0 Q77.3 72.2 75.9 71.9 Q73.1 70.5 70.8 69.5 Q70.6 72.7 70.3 75.5 Q69.9 76.8 68.5 76.2 Q66.5 73.6 64.3 72.0 Q63.2 74.3 62.3 76.3 Q61.5 77.3 60.4 76.7 Q59.0 74.8 57.3 73.5 Q55.6 75.0 53.7 76.3 Q52.8 76.8 51.8 76.4 Q51.5 75.0 50.0 74.0 Q48.1 75.5 46.1 76.8 Q45.1 77.3 44.2 76.6 Q44.0 74.9 42.7 73.5 Q40.6 74.9 39.4 76.3 Q38.2 76.8 37.5 75.9 Q36.6 73.7 35.7 72.0 Q32.9 73.9 30.9 75.8 Q29.5 76.4 29.1 75.1 Q29.4 72.0 29.2 69.5 Q26.1 71.0 23.9 72.6 Q22.5 73.1 22.4 71.7 Q23.1 68.6 23.4 66.2 Q20.2 67.2 17.2 68.0 Q15.7 68.1 15.9 66.8 Q17.8 64.4 18.6 62.2 Q15.5 62.5 12.7 62.7 Q11.3 62.6 11.7 61.4 Q13.7 59.5 14.8 57.5 Q11.5 57.4 8.9 57.8 Q7.5 57.5 8.2 56.4 Q10.6 54.2 12.3 52.5 Q8.8 51.8 5.7 51.0 Q4.3 50.4 5.4 49.5 Q8.7 48.5 11.1 47.1 Q7.7 45.8 4.6 45.0 Q3.3 44.2 4.7 43.4 Q8.4 42.6 11.3 41.7 Q8.6 39.9 6.2 38.4 Q5.3 37.3 6.6 36.8 Q10.1 36.8 12.8 36.4 Q10.2 34.0 8.0 31.4 Q7.2 30.2 8.9 30.0 Q12.5 31.2 15.6 31.4 Q20.6 24.3 29.9 20.1 Q39.2 16.0 50.0 16.0 Q60.8 16.0 70.1 20.1 Q79.4 24.3 84.4 31.4Z" fill="url(#pal-fur)" stroke="#2d0a1d" stroke-width="1.8" stroke-linejoin="round"/>
+  <path d="M19.5 55.7 Q18.6 54.8 17.7 54.2 Q17.5 53.7 18.1 53.5 Q19.8 53.4 21.1 53.3 Q20.6 52.1 20.0 51.2 Q19.9 50.7 20.8 50.6 Q22.4 50.9 24.0 50.9 Q24.0 49.8 24.1 48.8 Q24.3 48.3 25.1 48.3 Q26.4 48.8 27.8 48.9 Q28.0 47.5 27.6 46.4 Q27.8 45.7 28.8 45.9 Q30.9 46.7 32.5 47.3 Q33.3 46.0 33.5 45.0 Q34.0 44.4 34.9 44.6 Q36.5 45.5 38.0 46.0 Q39.0 44.7 40.4 43.4 Q41.0 42.8 41.9 43.2 Q42.4 44.4 43.9 45.3 Q45.2 44.0 46.7 42.8 Q47.4 42.3 48.3 42.8 Q48.7 44.1 50.0 45.0 Q51.6 44.0 53.0 43.1 Q53.8 42.7 54.6 43.2 Q55.1 44.3 56.1 45.3 Q58.0 44.1 59.6 43.0 Q60.6 42.6 61.2 43.3 Q61.3 44.8 62.0 46.0 Q64.0 45.1 65.6 44.3 Q66.6 44.0 67.0 44.7 Q67.0 46.1 67.5 47.3 Q69.3 46.8 71.0 46.5 Q71.8 46.5 72.1 47.0 Q71.9 48.0 72.2 48.9 Q74.2 48.6 76.0 48.4 Q76.9 48.4 77.0 49.0 Q76.2 49.9 76.0 50.9 Q77.7 51.0 78.9 50.9 Q79.6 51.1 79.6 51.6 Q79.1 52.5 78.9 53.3 Q80.5 53.5 82.0 53.9 Q82.7 54.1 82.4 54.6 Q81.2 55.0 80.5 55.7 Q83.0 61.7 73.7 66.4 Q64.5 71.0 50.0 71.0 Q35.5 71.0 26.3 66.4 Q17.0 61.7 19.5 55.7Z" fill="#f1ece3"/>
+  <g fill="#2d0a1d">
+    <ellipse cx="38" cy="22" rx="2" ry="1.5"/><ellipse cx="45" cy="19" rx="2.2" ry="1.6"/><ellipse cx="52.5" cy="18.4" rx="2.2" ry="1.6"/>
+    <ellipse cx="59.5" cy="20" rx="2" ry="1.5"/><ellipse cx="41.5" cy="26.5" rx="1.6" ry="1.2"/><ellipse cx="49" cy="24.4" rx="1.8" ry="1.3"/>
+    <ellipse cx="56.5" cy="26" rx="1.6" ry="1.2"/><ellipse cx="65" cy="23" rx="1.4" ry="1.1"/><ellipse cx="33" cy="25" rx="1.3" ry="1"/>
+    <path d="M12 46Q22 57 34 57L33 61Q20 60 11 51Z M11 55Q22 66 34 65L33 69Q19 68 10 60Z"/>
+    <path d="M88 46Q78 57 66 57L67 61Q80 60 89 51Z M89 55Q78 66 66 65L67 69Q81 68 90 60Z"/>
+  </g>
+  <path d="M50 50C38 50 34 57 35 62C36 68 43 71 50 71C57 71 64 68 65 62C66 57 62 50 50 50Z" fill="#fbf8f2" stroke="#2d0a1d" stroke-width="1.2"/>
+  <circle cx="36" cy="40" r="6.4" fill="#fbf6e6"/><circle cx="64" cy="40" r="6.4" fill="#fbf6e6"/>
+  <circle cx="36" cy="40" r="5.4" fill="#e0bf3c"/><circle cx="64" cy="40" r="5.4" fill="#e0bf3c"/>
+  <ellipse cx="36" cy="41" rx="1.5" ry="3.8" fill="#2d0a1d"/><ellipse cx="64" cy="41" rx="1.5" ry="3.8" fill="#2d0a1d"/>
+  <path d="M29 33H43V39.5L29 37.5Z M71 33H57V39.5L71 37.5Z" fill="#b5ab9a"/>
+  <path d="M27 31 44 38M73 31 56 38" stroke="#2d0a1d" stroke-width="3.4" stroke-linecap="round"/>
+  <g fill="#fff7f0" fill-opacity="0.25" stroke="#2d0a1d" stroke-width="2.6">
+    <circle cx="36" cy="40.5" r="9.4"/><circle cx="64" cy="40.5" r="9.4"/>
+  </g>
+  <path d="M45.4 39.5Q50 36.6 54.6 39.5M26.6 39 16 35M73.4 39 84 35" fill="none" stroke="#2d0a1d" stroke-width="2.2" stroke-linecap="round"/>
+  <path d="M31 35.5Q33 33 36.5 32.6M59 35.5Q61 33 64.5 32.6" fill="none" stroke="#ffffff" stroke-width="1.4" stroke-linecap="round" opacity="0.85"/>
+  <path d="M44.5 52.5Q50 50 55.5 52.5Q55 55.8 50 58.6Q45 55.8 44.5 52.5Z" fill="#d98f95" stroke="#2d0a1d" stroke-width="1.1"/>
+  <path d="M42 66Q50 60.5 58 66" fill="none" stroke="#2d0a1d" stroke-width="2" stroke-linecap="round"/>
+  <path d="M44.5 64.4 46.2 68.8 47.8 64.6Z" fill="#ffffff" stroke="#2d0a1d" stroke-width="0.8" stroke-linejoin="round"/>
   </g>
 </svg>

@@ -28,6 +28,37 @@ P900, P800, P600, P500 = "#2d0a1d", "#3a1028", "#7a2357", "#8a2b5f"
 P_MID = "#5c1a40"            # già usato nelle icone precedenti
 R300, R200, R50, CREAM = "#f2a7c8", "#f8d7e6", "#fbf4f7", "#fff7f0"
 
+def _fur(cx, cy, rx, ry, a0, a1, n, length, seed):
+    """Contorno d'ellisse con una frangia di ciuffi fra gli angoli a0 e a1
+    (gradi, senso orario): la gorgiera di Pallasio. Seme fisso, sempre uguale."""
+    import math, random
+    rnd = random.Random(seed)
+    pt = lambda a, rr=0: (cx + math.cos(math.radians(a)) * (rx + rr), cy + math.sin(math.radians(a)) * (ry + rr))
+    f = lambda p: f"{p[0]:.1f} {p[1]:.1f}"
+    step = (a1 - a0) / n
+    d = "M" + f(pt(a0))
+    for i in range(n):
+        b0 = a0 + i * step
+        b1 = b0 + step
+        am = b0 + step * (0.45 + rnd.random() * 0.2)
+        l = length(am) * (0.8 + rnd.random() * 0.4)
+        d += f" Q{f(pt(b0 + step * 0.25, l * 0.5))} {f(pt(am - step * 0.12, l * 0.95))}"
+        d += f" Q{f(pt(am, l * 1.15))} {f(pt(am + step * 0.12, l * 0.95))}"
+        d += f" Q{f(pt(b1 - step * 0.2, l * 0.4))} {f(pt(b1))}"
+    rest = 360 - (a1 - a0)
+    k = 1 / math.cos(math.radians(rest / 8))
+    for i in range(4):
+        b0 = a1 + i * rest / 4
+        b1 = b0 + rest / 4
+        c = (cx + math.cos(math.radians((b0 + b1) / 2)) * rx * k, cy + math.sin(math.radians((b0 + b1) / 2)) * ry * k)
+        d += f" Q{f(c)} {f(pt(b1))}"
+    return d + "Z"
+
+
+_HEAD = _fur(50, 45, 39, 29, -28, 208, 22,
+             lambda a: 2.5 + 4 * abs(__import__("math").cos(__import__("math").radians(a))) ** 0.7, 7)
+_CHEEKS = _fur(50, 58, 31, 13, 190, 350, 14, lambda a: 2.4, 3)
+
 # ── Simboli dei tool, disegnati in un riquadro 100 × 100 (centro 50, 50) ──
 # Colori sul disco crema: prugna per il segno, rosa per i dettagli.
 GLYPHS = {
@@ -163,10 +194,51 @@ GLYPHS = {
   <circle cx="59.2" cy="63.8" r="2.5" fill="#ffffff"/>''',
 }
 
+GLYPHS["ruscapallas"] = f'''
+  <!-- Pallasio: manul cinico, occhialini tondi, giacca crema e cravatta rossa -->
+  <defs>
+    <radialGradient id="pal-fur" cx="0.42" cy="0.3" r="0.75">
+      <stop offset="0" stop-color="#e2dccf"/><stop offset="0.6" stop-color="#b9af9e"/><stop offset="1" stop-color="#8c8274"/>
+    </radialGradient>
+    <linearGradient id="pal-jacket" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f6eed8"/><stop offset="1" stop-color="#cdbb90"/>
+    </linearGradient>
+  </defs>
+  <path d="M12 100C14 87 30 80 50 80C70 80 86 87 88 100Z" fill="url(#pal-jacket)" stroke="{P900}" stroke-width="1.6"/>
+  <path d="M41 80 50 100 59 80Z" fill="#fbfaf6"/>
+  <path d="M38 81 47 100H40L32 86Z M62 81 53 100H60L68 86Z" fill="#d6c59b"/>
+  <path d="M47.5 84H52.5L54.5 99 50 102 45.5 99Z" fill="#b3262b"/>
+  <path d="M46.6 79.5H53.4L52.4 85H47.6Z" fill="#c8303a"/>
+  <path d="M12 34Q9 17 27 18Q24 30 12 34Z M88 34Q91 17 73 18Q76 30 88 34Z" fill="#9d9282" stroke="{P900}" stroke-width="1.6" stroke-linejoin="round"/>
+  <path d="M15 30Q14 22 24 22Q22 28 15 30Z M85 30Q86 22 76 22Q78 28 85 30Z" fill="{R300}" opacity="0.8"/>
+  <path d="{_HEAD}" fill="url(#pal-fur)" stroke="{P900}" stroke-width="1.8" stroke-linejoin="round"/>
+  <path d="{_CHEEKS}" fill="#f1ece3"/>
+  <g fill="{P900}">
+    <ellipse cx="38" cy="22" rx="2" ry="1.5"/><ellipse cx="45" cy="19" rx="2.2" ry="1.6"/><ellipse cx="52.5" cy="18.4" rx="2.2" ry="1.6"/>
+    <ellipse cx="59.5" cy="20" rx="2" ry="1.5"/><ellipse cx="41.5" cy="26.5" rx="1.6" ry="1.2"/><ellipse cx="49" cy="24.4" rx="1.8" ry="1.3"/>
+    <ellipse cx="56.5" cy="26" rx="1.6" ry="1.2"/><ellipse cx="65" cy="23" rx="1.4" ry="1.1"/><ellipse cx="33" cy="25" rx="1.3" ry="1"/>
+    <path d="M12 46Q22 57 34 57L33 61Q20 60 11 51Z M11 55Q22 66 34 65L33 69Q19 68 10 60Z"/>
+    <path d="M88 46Q78 57 66 57L67 61Q80 60 89 51Z M89 55Q78 66 66 65L67 69Q81 68 90 60Z"/>
+  </g>
+  <path d="M50 50C38 50 34 57 35 62C36 68 43 71 50 71C57 71 64 68 65 62C66 57 62 50 50 50Z" fill="#fbf8f2" stroke="{P900}" stroke-width="1.2"/>
+  <circle cx="36" cy="40" r="6.4" fill="#fbf6e6"/><circle cx="64" cy="40" r="6.4" fill="#fbf6e6"/>
+  <circle cx="36" cy="40" r="5.4" fill="#e0bf3c"/><circle cx="64" cy="40" r="5.4" fill="#e0bf3c"/>
+  <ellipse cx="36" cy="41" rx="1.5" ry="3.8" fill="{P900}"/><ellipse cx="64" cy="41" rx="1.5" ry="3.8" fill="{P900}"/>
+  <path d="M29 33H43V39.5L29 37.5Z M71 33H57V39.5L71 37.5Z" fill="#b5ab9a"/>
+  <path d="M27 31 44 38M73 31 56 38" stroke="{P900}" stroke-width="3.4" stroke-linecap="round"/>
+  <g fill="{CREAM}" fill-opacity="0.25" stroke="{P900}" stroke-width="2.6">
+    <circle cx="36" cy="40.5" r="9.4"/><circle cx="64" cy="40.5" r="9.4"/>
+  </g>
+  <path d="M45.4 39.5Q50 36.6 54.6 39.5M26.6 39 16 35M73.4 39 84 35" fill="none" stroke="{P900}" stroke-width="2.2" stroke-linecap="round"/>
+  <path d="M31 35.5Q33 33 36.5 32.6M59 35.5Q61 33 64.5 32.6" fill="none" stroke="#ffffff" stroke-width="1.4" stroke-linecap="round" opacity="0.85"/>
+  <path d="M44.5 52.5Q50 50 55.5 52.5Q55 55.8 50 58.6Q45 55.8 44.5 52.5Z" fill="#d98f95" stroke="{P900}" stroke-width="1.1"/>
+  <path d="M42 66Q50 60.5 58 66" fill="none" stroke="{P900}" stroke-width="2" stroke-linecap="round"/>
+  <path d="M44.5 64.4 46.2 68.8 47.8 64.6Z" fill="#ffffff" stroke="{P900}" stroke-width="0.8" stroke-linejoin="round"/>'''
+
 TITLES = {"ruscacleaner": "RuscaCleaner", "ruscahub": "RuscaHub", "ruscamark": "RuscaMark",
           "ruscawriter": "RuscaWriter", "ruscallama": "RuscaLLama", "ruscatranslator": "RuscaTranslator",
           "ruscallisse": "RuscaLLisse", "ruscapinball": "RuscaPinball",
-          "ruscadubbing": "RuscaDubbing"}
+          "ruscadubbing": "RuscaDubbing", "ruscapallas": "RuscaPallas"}
 
 
 def full_icon(tool):
