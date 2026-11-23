@@ -37,6 +37,7 @@ import shutil
 import subprocess
 import tempfile
 import threading
+import wave
 
 from gi.repository import GLib
 
@@ -89,6 +90,7 @@ EXTRA_SOURCE = {"nl": ("Dutch", "nld"), "pl": ("Polish", "pol"), "tr": ("Turkish
 CHARS_PER_SECOND = {"it": 14.0, "en": 15.0, "de": 13.5, "fr": 14.5, "es": 15.0,
                     "pt": 14.5, "ru": 13.0, "zh": 5.0, "ja": 7.5, "ko": 7.0}
 BATCH = 8                       # frasi per richiesta di traduzione
+MIN_SPEED = 0.9                 # una voce molto corta si rallenta fin qui
 PARALLEL_FIRST = 2              # con la voce in parallelo: primo gruppo piccolo
 CONTEXT_LINES = 3               # frasi già tradotte date come contesto
 # Frasi: battute consecutive che formano una frase si traducono e si dicono
@@ -532,22 +534,30 @@ def translations_per_cue(cues, parts, blocks, block_texts):
 
 _ELLIPSIS_END = re.compile(r"\s*(?:\.\.\.|…)+\s*$")
 _ELLIPSIS_START = re.compile(r"^\s*(?:\.\.\.|…)+\s*")
+_DOUBLE_DOT = re.compile(r"(?<!\.)\.\.(?!\.)")
+_SPACE_PUNCT = re.compile(r"\s+([.,;:!?…])")
+_END_MARKS = (".", "!", "?", "…", ";", ":", ",", "。", "！", "？")
 
 
 def clean_translation(source, text):
     """Toglie i puntini di sospensione che il modello aggiunge ai capi di
     una frase e che nell'originale non ci sono: nei sottotitoli sono
     brutti e la voce li legge come una frase sospesa."""
-    text = " ".join(text.split())
+    # «|» è il separatore del formato `N|testo`: nella traduzione non ha
+    # senso (il modello a volte lo lascia in fondo) e la voce lo legge.
+    text = " ".join(text.replace("|", " ").split())
+    text = _SPACE_PUNCT.sub(r"\1", text)
     if not _ELLIPSIS_END.search(source):
         stripped = _ELLIPSIS_END.sub("", text)
         if stripped:
             # «…» al posto di un punto: se l'originale finisce la frase, il
-            # punto resta.
-            text = stripped + ("." if source.rstrip().endswith((".", "。")) else "")
+            # punto resta (uno solo, se la traduzione ha già il suo segno).
+            end = source.rstrip().endswith((".", "。")) and not stripped.endswith(_END_MARKS)
+            text = stripped + ("." if end else "")
     if not _ELLIPSIS_START.search(source):
         text = _ELLIPSIS_START.sub("", text) or text
-    return text
+    # Due punti di fila (non tre) sono un errore: un punto solo.
+    return _DOUBLE_DOT.sub(".", text)
 
 
 # ── traduzione ──────────────────────────────────────────────────────────────
@@ -836,15 +846,61 @@ def probe(path, ffmpeg=None):
     return info
 
 
-def mix_command(ffmpeg, media, dub_wav, out_wav, has_audio, ducking="medium"):
+GATE_RATE = 1000                # campioni al secondo della traccia «chiave»
+GATE_LEVEL = 0.1                # sopra la soglia di ogni DUCKING
+GATE_JOIN_MS = 1000             # frasi più vicine: un tratto solo
+
+
+def gate_spans(spans, join_ms=GATE_JOIN_MS):
+    """I tratti (inizio, fine) in ms ordinati e uniti quando si toccano o
+    sono più vicini di join_ms."""
+    out = []
+    for a, b in sorted((int(a), int(b)) for a, b in spans if b > a):
+        if out and a - out[-1][1] < join_ms:
+            out[-1][1] = max(out[-1][1], b)
+        else:
+            out.append([a, b])
+    return [tuple(x) for x in out]
+
+
+def write_gate(path, spans, rate=GATE_RATE):
+    """La traccia che comanda l'abbassamento dell'originale: un livello
+    costante nei tratti delle frasi doppiate, silenzio fuori. Così
+    l'originale resta basso per tutta la frase, anche quando la voce
+    italiana finisce prima di quella originale."""
+    spans = gate_spans(spans)
+    level = int(GATE_LEVEL * 32767).to_bytes(2, "little", signed=True)
+    zero = b"\0\0"
+    with wave.open(path, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(rate)
+        pos = 0
+        for a, b in spans:
+            a, b = a * rate // 1000, b * rate // 1000
+            if a > pos:
+                w.writeframes(zero * (a - pos))
+            w.writeframes(level * (b - max(a, pos)))
+            pos = max(pos, b)
+        w.writeframes(zero * rate)                  # un secondo di coda
+
+
+def mix_command(ffmpeg, media, dub_wav, out_wav, has_audio, ducking="medium", gate_wav=""):
     """La traccia doppiata: originale abbassato sotto la voce, più la voce.
-    Senza audio originale, la sola voce. Stereo, 48 kHz."""
+    Senza audio originale, la sola voce. Stereo, 48 kHz. gate_wav (da
+    write_gate()): l'originale si abbassa anche per tutta la durata delle
+    frasi, non solo dove c'è la voce."""
     cmd = [ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error",
            "-protocol_whitelist", "file"]
     if has_audio:
-        cmd += ["-i", media, "-i", dub_wav, "-filter_complex",
-                "[0:a:0]aresample=48000,aformat=channel_layouts=stereo[orig];"
-                "[1:a]aresample=48000,aformat=channel_layouts=stereo,asplit=2[voice][key];"
+        key = ("[1:a]aresample=48000,aformat=channel_layouts=stereo,asplit=2[voice][key];")
+        if gate_wav:
+            key = ("[1:a]aresample=48000,aformat=channel_layouts=stereo,asplit=2[voice][said];"
+                   "[2:a]aresample=48000,aformat=channel_layouts=stereo[gate];"
+                   "[said][gate]amix=inputs=2:duration=longest:normalize=0[key];")
+        cmd += ["-i", media, "-i", dub_wav] + (["-i", gate_wav] if gate_wav else []) + [
+                "-filter_complex",
+                "[0:a:0]aresample=48000,aformat=channel_layouts=stereo[orig];" + key +
                 f"[orig][key]sidechaincompress={DUCKING.get(ducking, DUCKING['medium'])}[duck];"
                 "[duck][voice]amix=inputs=2:duration=longest:dropout_transition=0:normalize=0,"
                 f"alimiter=limit=0.95,{FINAL_LOUDNESS}[out]",
@@ -1418,6 +1474,7 @@ class Dubbing:
                                speaker_file=o.speaker_file, voice_name=o.voice_name,
                                gpu=o.gpu, gpu_device=o.tts_device, threads=o.threads,
                                seed=o.seed, max_speed=o.max_speed, normalize=True,
+                               min_speed=MIN_SPEED,
                                keep_dir=self.keep_dir, reuse=reuse)
         except tts.TTSError as e:
             self._finish(DubbingError(e.key, e.detail))
@@ -1670,8 +1727,12 @@ class Dubbing:
         try:
             has_audio = self.info["audio"] > 0
             mix = os.path.join(self.run_dir, "doppiaggio.wav")
+            gate = ""
+            if has_audio and getattr(self, "pieces", None):
+                gate = os.path.join(self.run_dir, "chiave.wav")
+                write_gate(gate, [(p.start, p.end) for p in self.pieces])
             code, tail = self._run(mix_command(ffmpeg, self.media_work, voice_wav, mix, has_audio,
-                                               o.ducking))
+                                               o.ducking, gate))
             if code != 0 or not os.path.isfile(mix):
                 raise DubbingError("err_mix", tail)
             self._emit(self.on_stage, "mix", 0.4, "")

@@ -324,6 +324,18 @@ class Narrator(unittest.TestCase):
         first = loud[0] * 1000 // 24000
         self.assertAlmostEqual(first, 1000, delta=60)
 
+    def test_srt_slower(self):
+        """Con min_speed una voce molto più corta del suo sottotitolo si
+        rallenta (al massimo fino a min_speed); quella che ci sta quasi no."""
+        cues = [tts.Piece("[durata 1000]", 0, 0, 3000),          # 1150 in 3000: 0,9
+                tts.Piece("[durata 1800]", 0, 3000, 5000)]       # 1950 in 2000: resta
+        seen = self.speak(cues, srt=True, normalize=False, min_speed=0.9)
+        error, path, stats = seen["done"]
+        self.assertIsNone(error)
+        self.assertEqual(stats.get("slower"), 1)
+        seen = self.speak(cues, srt=True, normalize=False)
+        self.assertNotIn("slower", seen["done"][2])
+
     def test_cpu_and_device(self):
         self.speak([tts.Piece("Uno.")], gpu=False, gpu_device="NVIDIA GeForce RTX 4060",
                    normalize=False)

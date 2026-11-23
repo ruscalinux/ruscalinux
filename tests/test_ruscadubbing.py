@@ -20,6 +20,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import wave
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 APP = os.path.join(REPO, "apps", "ruscadubbing")
@@ -189,6 +190,26 @@ class Cues(unittest.TestCase):
         self.assertEqual(clean("Спасибо.", "Grazie…"), "Grazie.")
         self.assertEqual(clean("Ну...", "Beh..."), "Beh...")
         self.assertEqual(clean("и", "…e poi"), "e poi")
+        # Separatori e punti doppi lasciati dal modello.
+        self.assertEqual(clean("Курс.", "Il corso non è lungo. ..."), "Il corso non è lungo.")
+        self.assertEqual(clean("Курс.", "Il corso non è lungo.."), "Il corso non è lungo.")
+        self.assertEqual(clean("языку.", "la lingua.|."), "la lingua.")
+        self.assertEqual(clean("души,", "dell'anima,|"), "dell'anima,")
+        self.assertEqual(clean("Ну...", "Beh... vediamo."), "Beh... vediamo.")
+
+    def test_gate(self):
+        self.assertEqual(rd.gate_spans([(0, 1000), (1500, 3000), (5000, 6000), (2000, 2500)]),
+                         [(0, 3000), (5000, 6000)])
+        path = os.path.join(tempfile.mkdtemp(), "chiave.wav")
+        rd.write_gate(path, [(1000, 2000)])
+        with wave.open(path, "rb") as w:
+            data = w.readframes(w.getnframes())
+            self.assertEqual(w.getnframes(), 3 * rd.GATE_RATE)       # fino a 2 s + 1 di coda
+        samples = [int.from_bytes(data[i:i + 2], "little", signed=True)
+                   for i in range(0, len(data), 2)]
+        self.assertEqual(samples[500], 0)
+        self.assertGreater(samples[1500], 0)
+        self.assertEqual(samples[2500], 0)
 
     def test_context(self):
         self.assertEqual(rd.parse_glossary("Polyglot = Poliglotta; RuscaLinux\nDmitry=Dmitrij"),

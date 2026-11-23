@@ -538,13 +538,15 @@ class Speaker:
 
     def start(self, pieces, voice, srt=False, language="it", speaker_file="", voice_name="",
               gpu=True, gpu_device="", threads=None, seed=42, max_speed=1.3, normalize=True,
-              keep_dir="", reuse=None):
+              keep_dir="", reuse=None, min_speed=1.0):
         """Avvia la lettura in background e ritorna subito. gpu_device e' la
         descrizione di una scheda di list_devices(), o "" per la scelta del
         motore. keep_dir: cartella in cui copiare ogni pezzo detto, prima di
         accelerarlo o spostarlo («00000.wav»…); reuse: {indice: file} dei
         pezzi già detti da riusare invece di rigenerarli. Le durate dei
-        pezzi (in ms, prima di accelerarli) arrivano in stats["durations"]."""
+        pezzi (in ms, prima di accelerarli) arrivano in stats["durations"].
+        min_speed < 1 (solo con srt): un pezzo molto più corto del suo
+        sottotitolo si rallenta un poco, fino a min_speed, per riempirlo."""
         if self.running:
             return
         if not find_binary():
@@ -562,7 +564,8 @@ class Speaker:
                        voice_name=voice_name, gpu=gpu, gpu_device=gpu_device,
                        threads=int(threads or physical_cores()), seed=int(seed),
                        max_speed=max(1.0, float(max_speed)), normalize=normalize,
-                       keep_dir=keep_dir, reuse=dict(reuse or {}))
+                       keep_dir=keep_dir, reuse=dict(reuse or {}),
+                       min_speed=min(1.0, max(0.5, float(min_speed))))
         self._thread = threading.Thread(target=self._work, args=(list(pieces), voice, options),
                                         daemon=True)
         self._thread.start()
@@ -717,7 +720,8 @@ class Speaker:
             line = _Timeline(joined, rate)
             try:
                 if o["srt"]:
-                    self._place_srt(line, pieces, clips, rate, o["max_speed"], stats)
+                    self._place_srt(line, pieces, clips, rate, o["max_speed"], stats,
+                                    o["min_speed"])
                 else:
                     for piece, (clip, _ms) in zip(pieces, clips):
                         line.append(clip)
@@ -747,12 +751,13 @@ class Speaker:
             result = None
         self._emit(self.on_done, error, result, stats)
 
-    def _place_srt(self, line, cues, clips, rate, max_speed, stats):
+    def _place_srt(self, line, cues, clips, rate, max_speed, stats, min_speed=1.0):
         """Ogni voce all'ora del suo sottotitolo. Lo spazio di una voce va
         fino all'inizio del sottotitolo dopo (o alla sua fine, per
         l'ultimo): se non basta si accelera fino a max_speed, poi si
-        sposta in avanti. Il risultato dura almeno fino alla fine
-        dell'ultimo sottotitolo."""
+        sposta in avanti. Una voce molto più corta del suo sottotitolo si
+        rallenta, al massimo fino a min_speed. Il risultato dura almeno
+        fino alla fine dell'ultimo sottotitolo."""
         for i, (cue, (clip, ms)) in enumerate(zip(cues, clips)):
             if self._cancel.is_set():
                 raise _Cancelled()
@@ -766,6 +771,17 @@ class Speaker:
                     os.replace(fast, clip)
                     ms = wav_info(clip)[3] * 1000 // rate
                     stats["faster"] += 1
+            elif min_speed < 1.0:
+                # Più corta del sottotitolo (e c'è posto): un poco più lenta,
+                # così finisce più vicino a dove finisce l'originale.
+                target = min(slot, cue.end - cue.start)
+                speed = max(min_speed, ms / max(1, target))
+                if speed < 0.97:
+                    slow = clip[:-4] + "-slow.wav"
+                    self._ffmpeg(clip, slow, _atempo(speed), rate)
+                    os.replace(slow, clip)
+                    ms = wav_info(clip)[3] * 1000 // rate
+                    stats["slower"] = stats.get("slower", 0) + 1
             start = max(cue.start, line.ms)
             late = start - cue.start
             if late > 40:                       # meno di due fotogrammi non conta
