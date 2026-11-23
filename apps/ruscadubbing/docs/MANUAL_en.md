@@ -59,8 +59,8 @@ The window shows the four steps:
 | Step | What happens |
 |---|---|
 | **Transcription** | Whisper writes the original subtitles. Pieces of one sentence separated by a short pause become a single line, so the voice says them together. |
-| **Translation** | The language model translates the lines in groups, with the previous lines as context. For each line it knows **how many characters** it may use to fit its time; if a translation is much longer, it is asked for a short version, as an adapter would do. Then the model is closed, to leave the graphics card to the voice. |
-| **Dubbing** | The voice says each line **at its time**. If it is too long it is sped up without changing the pitch, up to the maximum speed; if that is not enough it moves later: two lines never overlap. |
+| **Translation** | The lines are grouped into **whole sentences**, even when a sentence is split across lines or ends in the middle of one. The language model translates the sentences in groups, with the previous ones as context: the translation flows, with no dangling pieces. The translated subtitles are split back onto the original lines, which keep their times. For each sentence it knows **how many characters** it may use to fit its time; if a translation is much longer, it is asked for a short version, as an adapter would do. Then the model is closed, to leave the graphics card to the voice. |
+| **Dubbing** | The voice says each **whole sentence at its time**, with the intonation of a real sentence. If it is too long it is sped up without changing the pitch, up to the maximum speed; if that is not enough it moves later: two lines never overlap. |
 | **Mixing** | FFmpeg lowers the original audio while the voice speaks (music and effects stay, quieter) and writes the files. The picture is **copied** without re-encoding: no quality loss and a few seconds even for a film. |
 
 **Stop** (Esc) interrupts at any time. At the end RuscaDubbing lists the files: a click opens them, **Watch** opens the video.

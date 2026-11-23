@@ -75,8 +75,19 @@ EXTRA_SOURCE = {"nl": ("Dutch", "nld"), "pl": ("Polish", "pol"), "tr": ("Turkish
 # voce chiara; il doppiaggio può poi accelerare fino a max_speed.
 CHARS_PER_SECOND = {"it": 14.0, "en": 15.0, "de": 13.5, "fr": 14.5, "es": 15.0,
                     "pt": 14.5, "ru": 13.0, "zh": 5.0, "ja": 7.5, "ko": 7.0}
-BATCH = 12                      # battute per richiesta di traduzione
-CONTEXT_LINES = 4               # battute già tradotte date come contesto
+BATCH = 8                       # frasi per richiesta di traduzione
+CONTEXT_LINES = 3               # frasi già tradotte date come contesto
+# Frasi: battute consecutive che formano una frase si traducono e si dicono
+# insieme. Una frase si chiude dopo una battuta che finisce con un segno di
+# fine frase, dopo una pausa lunga, o quando diventa troppo lunga; superata
+# BLOCK_SOFT_MS si chiude anche a una virgola.
+BLOCK_MAX_MS = 30000
+BLOCK_SOFT_MS = 15000
+BLOCK_MAX_CHARS = 420
+BLOCK_GAP_MS = 1500
+BLOCK_MIN_MS = 8000         # sotto, una frase finita si unisce alla successiva
+BLOCK_JOIN_GAP_MS = 700     # … se fra le due la pausa è breve
+CLAUSE_END = (",", ";", ":", "—", "–")
 MAX_TOKENS = 2048
 SAMPLING = dict(temperature=0.2, top_p=0.92, top_k=40, min_p=0.08, repeat_penalty=1.05)
 # Battute che Whisper spezza: si uniscono se la pausa è breve e la frase non
@@ -190,20 +201,186 @@ def budget_chars(cues, i, tgt, max_speed=1.3):
     return max(8, int(slot_ms(cues, i) / 1000 * cps * allowed))
 
 
+# ── frasi ───────────────────────────────────────────────────────────────────
+Part = collections.namedtuple("Part", "cue start end text")
+# cue: indice della battuta da cui viene; start, end: tempi stimati (ms).
+
+_SENTENCE_SPLIT = re.compile(r"(?<=[.!?…。？！])\s+(?=\S)")
+
+
+def cue_parts(cues):
+    """Le battute divise anche dove una frase finisce in mezzo a una
+    battuta («…до автоматизма. Еще один важный принцип. Очень…»): così una
+    frase si traduce e si dice intera anche quando le battute la tagliano
+    altrove. I tempi dei pezzi sono stimati in proporzione ai caratteri.
+    I sottotitoli restano sulle battute originali."""
+    parts = []
+    for i, cue in enumerate(cues):
+        pieces = [p for p in _SENTENCE_SPLIT.split(cue.text) if p.strip()]
+        # Un pezzo cortissimo («Ну.») resta attaccato al precedente.
+        merged = []
+        for p in pieces:
+            if merged and len(p) < 4:
+                merged[-1] += " " + p
+            else:
+                merged.append(p)
+        pieces = merged or [cue.text]
+        total = sum(len(p) for p in pieces) or 1
+        span = cue.end - cue.start
+        acc = 0
+        for p in pieces:
+            a = cue.start + span * acc // total
+            acc += len(p)
+            parts.append(Part(i, a, cue.start + span * acc // total, p))
+    return parts
+
+
+def group_blocks(cues):
+    """Le battute raggruppate in frasi: liste di indici consecutivi.
+
+    Tradurre battuta per battuta costringeva il modello a far tornare i
+    pezzi di una frase spezzata (il russo e l'italiano mettono le parole in
+    ordine diverso): chiudeva le frasi in anticipo, spostava parole,
+    aggiungeva «…». Una frase intera si traduce bene e la voce la dice con
+    l'intonazione giusta."""
+    blocks, current = [], []
+
+    def fits(block, j):
+        """La battuta j si può aggiungere alla frase block?"""
+        first, last = cues[block[0]], cues[block[-1]]
+        chars = sum(len(cues[k].text) + 1 for k in block) + len(cues[j].text)
+        return (cues[j].start - last.end <= BLOCK_GAP_MS
+                and cues[j].end - first.start <= BLOCK_MAX_MS and chars <= BLOCK_MAX_CHARS)
+
+    for i, cue in enumerate(cues):
+        if current and not fits(current, i):
+            blocks.append(current)
+            current = []
+        current.append(i)
+        text = cue.text.rstrip()
+        if text.endswith(SENTENCE_END):
+            # Una frase breve si unisce alla successiva, se anche quella è
+            # una frase intera, ci sta e segue senza una vera pausa.
+            nxt = i + 1
+            short = cue.end - cues[current[0]].start < BLOCK_MIN_MS
+            if not (short and nxt < len(cues) and fits(current, nxt)
+                    and cues[nxt].start - cue.end <= BLOCK_JOIN_GAP_MS
+                    and cues[nxt].text.rstrip().endswith(SENTENCE_END)):
+                blocks.append(current)
+                current = []
+        elif text.endswith(CLAUSE_END) and cue.end - cues[current[0]].start >= BLOCK_SOFT_MS:
+            # Frase già lunga: si chiude alla virgola, a meno che la battuta
+            # dopo finisca la frase e ci stia ancora.
+            nxt = i + 1
+            if not (nxt < len(cues) and fits(current, nxt)
+                    and cues[nxt].text.rstrip().endswith(SENTENCE_END)):
+                blocks.append(current)
+                current = []
+    if current:
+        blocks.append(current)
+    return blocks
+
+
+def block_cues(cues, blocks):
+    """Una Cue per frase: dall'inizio della prima battuta alla fine
+    dell'ultima, con i testi uniti."""
+    return [Cue(cues[b[0]].start, cues[b[-1]].end, " ".join(cues[i].text for i in b))
+            for b in blocks]
+
+
+_STRONG = (".", "?", "!", "…", ";", ":", "。", "？", "！")
+
+
+def split_translation(text, weights):
+    """Divide la traduzione di una frase fra le sue battute, in parti
+    proporzionali al peso di ognuna (la lunghezza del testo originale),
+    tagliando fra le parole e preferendo i segni di punteggiatura vicini.
+    Ogni battuta riceve almeno una parola, se ce ne sono abbastanza."""
+    n_parts = len(weights)
+    words = text.split()
+    if n_parts <= 1 or not words:
+        return [" ".join(words)] + [""] * (n_parts - 1)
+    if len(words) < n_parts:
+        return words + [""] * (n_parts - len(words))
+    pos = [0]                                   # caratteri prima della parola j
+    for w in words:
+        pos.append(pos[-1] + len(w) + 1)
+    total = pos[-1]
+    wsum = float(sum(weights)) or 1.0
+    cuts, prev, acc = [], 0, 0.0
+    for k in range(1, n_parts):
+        acc += weights[k - 1]
+        target = total * acc / wsum
+        part = total / n_parts
+        best, best_score = None, None
+        for j in range(prev + 1, len(words) - (n_parts - k) + 1):
+            score = abs(pos[j] - target)
+            end = words[j - 1]
+            if end.endswith(_STRONG):
+                score -= 0.45 * part
+            elif end.endswith(CLAUSE_END):
+                score -= 0.3 * part
+            if best_score is None or score < best_score:
+                best, best_score = j, score
+        cuts.append(best)
+        prev = best
+    bounds = [0] + cuts + [len(words)]
+    return [" ".join(words[a:b]) for a, b in zip(bounds, bounds[1:])]
+
+
+def translations_per_cue(cues, parts, blocks, block_texts):
+    """I sottotitoli tradotti, uno per battuta originale: ogni frase
+    tradotta si ridivide sui suoi pezzi in proporzione al testo originale,
+    e i pezzi di una stessa battuta si riuniscono."""
+    per_part = [""] * len(parts)
+    for block, text in zip(blocks, block_texts):
+        pieces = split_translation(text, [max(1, len(parts[k].text)) for k in block])
+        for k, piece in zip(block, pieces):
+            per_part[k] = piece
+    out = [[] for _ in cues]
+    for part, text in zip(parts, per_part):
+        if text:
+            out[part.cue].append(text)
+    return [" ".join(t) for t in out]
+
+
+_ELLIPSIS_END = re.compile(r"\s*(?:\.\.\.|…)+\s*$")
+_ELLIPSIS_START = re.compile(r"^\s*(?:\.\.\.|…)+\s*")
+
+
+def clean_translation(source, text):
+    """Toglie i puntini di sospensione che il modello aggiunge ai capi di
+    una frase e che nell'originale non ci sono: nei sottotitoli sono
+    brutti e la voce li legge come una frase sospesa."""
+    text = " ".join(text.split())
+    if not _ELLIPSIS_END.search(source):
+        stripped = _ELLIPSIS_END.sub("", text)
+        if stripped:
+            # «…» al posto di un punto: se l'originale finisce la frase, il
+            # punto resta.
+            text = stripped + ("." if source.rstrip().endswith((".", "。")) else "")
+    if not _ELLIPSIS_START.search(source):
+        text = _ELLIPSIS_START.sub("", text) or text
+    return text
+
+
 # ── traduzione ──────────────────────────────────────────────────────────────
 def build_prompt(src, tgt):
     s, g = english_name(src), english_name(tgt)
     return (
-        f"You are a professional dubbing adapter translating spoken dialogue from {s} to "
-        f"{g}. You receive numbered subtitle lines in the format `N|MAX|text`, where MAX is "
-        f"the maximum number of characters the {g} line may have, so that it can be spoken "
-        f"in the time of the original. Translate each line into natural, idiomatic spoken "
-        f"{g}, faithful to the meaning and tone. When a faithful translation would be "
-        f"longer than MAX, condense it as a professional adapter would, keeping the "
-        f"meaning. A sentence may continue across lines: translate it so that each line "
-        f"still corresponds to its own part. Answer with exactly one line per input line, "
-        f"in the format `N|translation`, same numbers, same order, nothing else: no notes, "
-        f"no explanations, no blank translations.")
+        f"You are a professional dubbing adapter translating a spoken talk from {s} to "
+        f"{g}. You receive numbered passages in the format `N|MAX|text`: each passage is "
+        f"what the speaker says in one stretch, usually one or more complete sentences, "
+        f"and MAX is the maximum number of characters the {g} passage may have, so that it "
+        f"can be spoken in the time of the original. Translate each passage into natural, "
+        f"fluent, idiomatic spoken {g}, faithful to the meaning and tone, as one coherent "
+        f"text. When a faithful translation would be longer than MAX, condense it as a "
+        f"professional adapter would, keeping the meaning. Translate every part of the "
+        f"passage, in its order. If a passage stops in the middle of a sentence, stop the "
+        f"translation at the corresponding point, without adding a period. Never add "
+        f"ellipses (... or …) that are not in the original. Answer with exactly one line per "
+        f"passage, in the format `N|translation`, same numbers, same order, nothing else: "
+        f"no notes, no explanations, no blank translations.")
 
 
 _LINE = re.compile(r"^\s*(?:\[(\d+)\]\s*[|:.)\-]?|(\d+)\s*[|:.)\-])\s*(.*?)\s*$")
@@ -555,8 +732,12 @@ class Dubbing:
     def _translate(self):
         o = self.o
         self.on_stage("translate", 0.0, "")
+        self.parts = cue_parts(self.cues)
+        self.blocks = group_blocks(self.parts)
+        self.stats["blocks"] = len(self.blocks)
         if self.src == o.tgt:
             # Stessa lingua: niente traduzione, il doppiaggio rilegge il testo.
+            self.block_texts = [c.text for c in block_cues(self.parts, self.blocks)]
             self.translated = [c.text for c in self.cues]
             self._after_translation()
             return
@@ -578,11 +759,15 @@ class Dubbing:
                 if self.stop_event.is_set():
                     raise _Stopped()
                 raise engine.EngineError("engine_not_ready")
-            self.translated, tstats = translate_cues(
-                self.engine.chat, self.cues, self.src, self.o.tgt, self.stop_event,
+            units = block_cues(self.parts, self.blocks)
+            texts, tstats = translate_cues(
+                self.engine.chat, units, self.src, self.o.tgt, self.stop_event,
                 lambda i, n: self._emit(self.on_stage, "translate", i / max(1, n), f"{i}/{n}"),
                 self.o.max_speed)
             self.stats.update(tstats)
+            self.block_texts = [clean_translation(u.text, t) for u, t in zip(units, texts)]
+            self.translated = translations_per_cue(self.cues, self.parts, self.blocks,
+                                                   self.block_texts)
         except _Stopped:
             error = "cancelled"
         except engine.EngineError as e:
@@ -629,7 +814,9 @@ class Dubbing:
     def _dub(self):
         o = self.o
         self.on_stage("dub", 0.0, "")
-        pieces = [tts.Piece(t, 0, c.start, c.end) for c, t in zip(self.cues, self.translated)
+        # La voce dice ogni frase intera, dall'inizio della prima battuta.
+        pieces = [tts.Piece(t, 0, c.start, c.end)
+                  for c, t in zip(block_cues(self.parts, self.blocks), self.block_texts)
                   if t.strip()]
         self.speaker = tts.Speaker(
             on_progress=lambda i, n: self.on_stage("dub", i / max(1, n), f"{i + 1}/{n}"),

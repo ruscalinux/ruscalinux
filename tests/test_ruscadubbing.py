@@ -127,6 +127,62 @@ class Cues(unittest.TestCase):
         self.assertGreater(rd.budget_chars(cues, 0, "it", 1.3), rd.budget_chars(cues, 1, "it", 1.3))
         self.assertGreater(rd.budget_chars(cues, 0, "it", 2.0), rd.budget_chars(cues, 0, "it", 1.0))
 
+    def test_sentences(self):
+        """Le battute si dividono alle fini di frase interne e si
+        raggruppano in frasi intere."""
+        C = rd.Cue
+        cues = [C(0, 4000, "Il corso non deve"), C(4000, 8000, "essere lungo. Il tempo conta."),
+                C(8000, 12000, "Ecco il secondo"), C(12000, 14000, "principio."),
+                C(20000, 21000, "Grazie!")]
+        parts = rd.cue_parts(cues)
+        self.assertEqual([(p.cue, p.text) for p in parts],
+                         [(0, "Il corso non deve"), (1, "essere lungo."), (1, "Il tempo conta."),
+                          (2, "Ecco il secondo"), (3, "principio."), (4, "Grazie!")])
+        self.assertEqual(parts[1].start, 4000)
+        self.assertEqual(parts[2].end, 8000)
+        self.assertLess(parts[1].end, parts[2].end)
+        blocks = rd.group_blocks(parts)
+        units = rd.block_cues(parts, blocks)
+        self.assertTrue(all(u.text.endswith(rd.SENTENCE_END) for u in units))
+        self.assertEqual([u.text for u in units],
+                         ["Il corso non deve essere lungo. Il tempo conta.",
+                          "Ecco il secondo principio.", "Grazie!"])
+        # Una frase troppo lunga si chiude a una virgola, o al limite.
+        long = [C(i * 5000, i * 5000 + 4900, f"parte {i},") for i in range(10)]
+        for u in rd.block_cues(long, rd.group_blocks(long)):
+            self.assertLessEqual(u.end - u.start, rd.BLOCK_MAX_MS)
+
+    def test_split(self):
+        split = rd.split_translation
+        self.assertEqual(split("uno due tre", [1]), ["uno due tre"])
+        self.assertEqual(split("uno", [1, 1, 1]), ["uno", "", ""])
+        parts = split("Grazie a tutti voi. Cercherò di farvi piacere con cose nuove. Grazie!",
+                      [30, 60])
+        self.assertEqual(parts, ["Grazie a tutti voi.",
+                                 "Cercherò di farvi piacere con cose nuove. Grazie!"])
+        words = "a b c d e f g h i l".split()
+        parts = split(" ".join(words), [1, 1, 1, 1, 1])
+        self.assertEqual(len(parts), 5)
+        self.assertTrue(all(parts))
+        self.assertEqual(" ".join(parts).split(), words)
+
+    def test_per_cue(self):
+        C = rd.Cue
+        cues = [C(0, 4000, "Il corso non deve"), C(4000, 8000, "essere lungo. Il tempo conta.")]
+        parts = rd.cue_parts(cues)
+        blocks = rd.group_blocks(parts)
+        per = rd.translations_per_cue(cues, parts, blocks,
+                                      ["The course must not be long. Time matters."])
+        self.assertEqual(" ".join(per), "The course must not be long. Time matters.")
+        self.assertTrue(all(per))
+
+    def test_clean(self):
+        clean = rd.clean_translation
+        self.assertEqual(clean("Нам требуется найти", "Dobbiamo trovare..."), "Dobbiamo trovare")
+        self.assertEqual(clean("Спасибо.", "Grazie…"), "Grazie.")
+        self.assertEqual(clean("Ну...", "Beh..."), "Beh...")
+        self.assertEqual(clean("и", "…e poi"), "e poi")
+
     def test_parse(self):
         got = rd.parse_translations("Ecco:\n1|Ciao.\n2| 40 |Addio.\n[3] Fine\n```\nniente\n4|\n")
         self.assertEqual(got, {1: "Ciao.", 2: "Addio.", 3: "Fine"})
