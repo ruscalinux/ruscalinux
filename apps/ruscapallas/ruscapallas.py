@@ -5,7 +5,7 @@ RuscaPallas 1.99.3 — la finestra di Pallasio.
 
 Pallasio, il manul cinico con giacca, cravatta e occhialini, vive in
 un'estensione di GNOME Shell (ruscapallas@ruscalinux.org) e parla grazie
-al servizio org.ruscalinux.RuscaPallas. Questa finestra lo richiama sul
+al servizio org.ruscalinux.RuscaPallas.Dialog. Questa finestra lo richiama sul
 desktop e lo configura: dimensione, salti, ascolto, risposte, modelli,
 voce, personalità e tema. Le scelte vanno in
 ~/.config/ruscapallas/settings.json, che leggono anche l'estensione (subito)
@@ -40,7 +40,8 @@ APP_NAME = "RuscaPallas"
 APP_VERSION = "1.99.3"
 UUID = "ruscapallas@ruscalinux.org"
 SHELL_NAME, SHELL_PATH = f"{APP_ID}.Shell", "/org/ruscalinux/RuscaPallas/Shell"
-SERVICE_PATH = "/org/ruscalinux/RuscaPallas"
+# il servizio di dialogo ha un nome suo: l'App ID è della finestra
+SERVICE_NAME, SERVICE_PATH = "org.ruscalinux.RuscaPallas.Dialog", "/org/ruscalinux/RuscaPallas/Dialog"
 EXT_ACTIVE = 1                 # ExtensionState.ACTIVE di GNOME Shell (48)
 STYLE_SRC = os.path.join(BASE_DIR, "style.css")
 ICON_SRC = os.path.join(BASE_DIR, "ruscapallas.svg")
@@ -210,7 +211,7 @@ def hide(bus):
 def quit_service(bus):
     """Spegne il servizio se è acceso: modelli e voce nuovi valgono al clic dopo."""
     try:
-        call(bus, APP_ID, SERVICE_PATH, APP_ID, "Quit", auto_start=False)
+        call(bus, SERVICE_NAME, SERVICE_PATH, SERVICE_NAME, "Quit", auto_start=False)
         return True
     except GLib.Error:
         return False
@@ -478,7 +479,7 @@ def build_app():
             if show(self.bus) in ("relogin", "no_shell"):
                 self.toast(_("relogin"), 8)
                 return
-            self.bus.call(APP_ID, SERVICE_PATH, APP_ID, "Talk", None, None,
+            self.bus.call(SERVICE_NAME, SERVICE_PATH, SERVICE_NAME, "Talk", None, None,
                           Gio.DBusCallFlags.NONE, 5000, None, None)
             self.refresh_visible()
 

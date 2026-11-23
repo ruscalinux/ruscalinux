@@ -15,7 +15,7 @@ Markdown sono copie identiche dei suoi (make-deb.sh lo controlla). Cambia
 solo il modo di ascoltare: Pallasio ascolta dopo un clic, resta in ascolto
 qualche secondo per il seguito, poi torna a passeggiare.
 
-Lo avvia D-Bus al primo clic (org.ruscalinux.RuscaPallas) ed esce da solo
+Lo avvia D-Bus al primo clic (org.ruscalinux.RuscaPallas.Dialog) ed esce da solo
 dopo un quarto d'ora senza conversare, per liberare la memoria del modello.
 
 Copyright (C) 2026 Nunzio Curcuruto — https://www.ruscalinux.org
@@ -44,11 +44,14 @@ import speech_text as st  # noqa: E402
 
 APP_ID = "org.ruscalinux.RuscaPallas"
 APP_VERSION = "1.99.3"
-BUS_NAME = APP_ID
-OBJECT_PATH = "/org/ruscalinux/RuscaPallas"
-INTERFACE = "org.ruscalinux.RuscaPallas"
+# Un nome suo, diverso dall'App ID: quello appartiene alla finestra
+# (GApplication lo prende sul bus), e due processi con lo stesso nome si
+# rubano i messaggi.
+BUS_NAME = "org.ruscalinux.RuscaPallas.Dialog"
+OBJECT_PATH = "/org/ruscalinux/RuscaPallas/Dialog"
+INTERFACE = "org.ruscalinux.RuscaPallas.Dialog"
 INTERFACE_XML = """<node>
-  <interface name="org.ruscalinux.RuscaPallas">
+  <interface name="org.ruscalinux.RuscaPallas.Dialog">
     <method name="Talk"/>
     <method name="Stop"/>
     <method name="Quit"/>

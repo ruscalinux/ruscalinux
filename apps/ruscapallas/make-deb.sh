@@ -11,7 +11,7 @@
 # Il pacchetto ha tre parti:
 #   * l'estensione di GNOME Shell ruscapallas@ruscalinux.org (Pallasio sul
 #     desktop: disegno, movimenti, fumetto);
-#   * il servizio di dialogo org.ruscalinux.RuscaPallas, avviato da D-Bus
+#   * il servizio di dialogo org.ruscalinux.RuscaPallas.Dialog, avviato da D-Bus
 #     al primo clic: è il ciclo di conversazione di RuscaLLisse, con i suoi
 #     moduli copiati identici (qui si controlla);
 #   * la finestra RuscaPallas (ruscapallas, GTK 4 e libadwaita), che lo
@@ -27,6 +27,7 @@ VER="1.99.3"
 PKG="ruscapallas"
 NAME="RuscaPallas"
 APP_ID="org.ruscalinux.RuscaPallas"
+DIALOG="org.ruscalinux.RuscaPallas.Dialog"          # il servizio di dialogo: un nome diverso dall'App ID
 UUID="ruscapallas@ruscalinux.org"
 ARCH="all"
 DEBVER="${VER}"
@@ -125,9 +126,9 @@ install -m 644 "$PKG-symbolic.svg" "$ROOT/usr/share/icons/hicolor/symbolic/apps/
 for f in docs/*.md; do gzip -9n -c "$f" > "$DOC/$(basename "$f").gz"; done
 
 # il servizio di dialogo parte da solo al primo clic su Pallasio
-cat > "$ROOT/usr/share/dbus-1/services/$APP_ID.service" <<SERVICE
+cat > "$ROOT/usr/share/dbus-1/services/$DIALOG.service" <<SERVICE
 [D-BUS Service]
-Name=$APP_ID
+Name=$DIALOG
 Exec=/usr/share/$PKG/ruscapallas-service.py
 SERVICE
 
@@ -167,7 +168,7 @@ $(cat "$TMP/description")
   <url type="bugtracker">https://github.com/ruscalinux/ruscalinux/issues</url>
   <provides>
     <binary>$PKG</binary>
-    <dbus type="user">$APP_ID</dbus>
+    <dbus type="user">$DIALOG</dbus>
   </provides>
   <requires>
     <id>org.gnome.Shell</id>

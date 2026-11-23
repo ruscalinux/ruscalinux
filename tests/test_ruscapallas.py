@@ -155,6 +155,19 @@ class TestFinestra(unittest.TestCase):
         keys |= {f"words_{v}" for v in self.mod.WORDS} | {f"theme_{v}" for v in self.mod.THEMES}
         self.assertEqual(sorted(k for k in keys if k not in it), [])
 
+    def test_nomi_dbus_separati(self):
+        """La finestra (GApplication) prende l'App ID sul bus: il servizio deve
+        avere un nome suo, o al clic sull'icona la finestra non si apre."""
+        svc = load_service()
+        self.assertNotEqual(svc.BUS_NAME, self.mod.APP_ID)
+        self.assertEqual(self.mod.SERVICE_NAME, svc.BUS_NAME)
+        self.assertEqual(self.mod.SERVICE_PATH, svc.OBJECT_PATH)
+        js = _read(os.path.join(APP, "extension", "pallasio.js"))
+        self.assertIn(f"const SERVICE_NAME = '{svc.BUS_NAME}';", js)
+        self.assertIn(f"const SERVICE_PATH = '{svc.OBJECT_PATH}';", js)
+        self.assertIn(f'<interface name="{svc.INTERFACE}">', js)
+        self.assertIn('DIALOG="org.ruscalinux.RuscaPallas.Dialog"', _read(os.path.join(APP, "make-deb.sh")))
+
     def test_version_senza_finestra(self):
         r = subprocess.run([sys.executable, os.path.join(APP, "ruscapallas.py"), "--version"],
                            capture_output=True, text=True, timeout=60)

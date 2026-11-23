@@ -7,7 +7,7 @@
 //   trascinamento    lo si sposta; lasciato andare, cade
 //   clic destro      menu: «Zitto», «Torna nello sgabuzzino»
 //
-// La conversazione la fa il servizio org.ruscalinux.RuscaPallas (Python,
+// La conversazione la fa il servizio org.ruscalinux.RuscaPallas.Dialog (Python,
 // avviato da D-Bus al primo clic): ascolta con Vosk, pensa con
 // ruscallama-engine, parla con Piper. Qui arrivano solo lo stato, le
 // emozioni e il volume della voce, per muovere la bocca.
@@ -36,10 +36,10 @@ const JUMPS = {never: null, sometimes: [25, 70], often: [8, 22]};
 const DRAG_THRESHOLD = 8;             // px prima che un clic diventi un trascinamento
 const ANSWER_TIMEOUT = 20;            // s: dopo un clic il servizio deve farsi vivo
 
-const SERVICE_NAME = 'org.ruscalinux.RuscaPallas';
-const SERVICE_PATH = '/org/ruscalinux/RuscaPallas';
+const SERVICE_NAME = 'org.ruscalinux.RuscaPallas.Dialog';
+const SERVICE_PATH = '/org/ruscalinux/RuscaPallas/Dialog';
 const SERVICE_XML = `<node>
-  <interface name="org.ruscalinux.RuscaPallas">
+  <interface name="org.ruscalinux.RuscaPallas.Dialog">
     <method name="Talk"/>
     <method name="Stop"/>
     <method name="Quit"/>
