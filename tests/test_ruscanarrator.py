@@ -48,6 +48,8 @@ if "rotto" in opt("-m"):
     sys.stderr.write("failed to load model\n"); sys.exit(1)
 if "lento" in opt("-m"):
     time.sleep(60)
+if "crash-prima" in opt("-m"):              # cade prima di scrivere l'audio
+    os.abort()
 m = re.search(r"\[durata (\d+)\]", text)
 ms = int(m.group(1)) if m else 60 * len(text)
 rate = 24000
@@ -59,6 +61,10 @@ w.writeframes(b"".join(struct.pack("<h", int(12000 * math.sin(2 * math.pi * 220 
 w.writeframes(b"\0\0" * (rate * 3 // 10))
 w.close()
 sys.stderr.write("generated frames, wrote %s\n" % out)
+sys.stderr.flush()
+if "crash-dopo" in opt("-m"):               # driver NVIDIA: cade alla chiusura
+    sys.stderr.write("double free or corruption (!prev)\n"); sys.stderr.flush()
+    os.abort()
 '''
 
 DOC = """# Capitolo uno
@@ -211,7 +217,7 @@ class Narrator(unittest.TestCase):
         tts.WORK_DIR = os.path.join(t, "lavoro")
         self.args = os.environ["FAKE_ARGS"] = os.path.join(t, "args.jsonl")
         self.voices = {}
-        for name in ("buono", "rotto", "lento"):
+        for name in ("buono", "rotto", "lento", "crash-dopo", "crash-prima"):
             model = os.path.join(t, f"{name}.gguf")
             mmproj = os.path.join(t, f"mmproj-{name}.gguf")
             for f in (model, mmproj):
@@ -268,6 +274,7 @@ class Narrator(unittest.TestCase):
         self.assertEqual(args[args.index("-s") + 1], "7")
         self.assertEqual(args[args.index("-t") + 1], "3")
         self.assertEqual(args[args.index("-ngl") + 1], "99")
+        self.assertEqual(args[args.index("-c") + 1], str(tts.TTS_CONTEXT))
         self.assertNotIn("--device", args)
         self.assertNotIn("--tts-speaker-file", args)
         self.assertEqual(args[-1], "")                     # driver Vulkan visibili
@@ -344,6 +351,20 @@ class Narrator(unittest.TestCase):
         self.assertIn("failed to load model", error.detail)
         self.assertIsNone(path)
         self.assertEqual(os.listdir(tts.WORK_DIR), [])
+
+    def test_crash_after_writing(self):
+        """llama-tts scrive l'audio e cade alla chiusura (driver Vulkan
+        NVIDIA, «double free or corruption»): l'audio si tiene."""
+        error, path, _ = self.speak([tts.Piece("Uno."), tts.Piece("Due.")],
+                                    voice="crash-dopo")["done"]
+        self.assertIsNone(error)
+        self.assertTrue(os.path.isfile(path))
+
+    def test_crash_before_writing(self):
+        error, path, _ = self.speak([tts.Piece("Uno.")], voice="crash-prima")["done"]
+        self.assertEqual(error.key, "err_engine")
+        self.assertIn("SIGABRT", error.detail)
+        self.assertIsNone(path)
 
     def test_cancel(self):
         seen = self.speak([tts.Piece("Uno."), tts.Piece("Due.")], voice="lento", cancel_after=1500)

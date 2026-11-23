@@ -545,11 +545,15 @@ class Speaker:
         with self._lock:
             self._proc = proc
         tail = collections.deque(maxlen=12)
+        self._wrote = []                      # file che llama-tts dice di aver scritto
         try:
             for raw in iter(proc.stdout.readline, b""):
                 line = raw.decode("utf-8", "replace").rstrip("\r\n")
                 tail.append(line)
                 self._emit(self.on_log, line)
+                m = _WROTE.search(line)
+                if m:
+                    self._wrote.append(m.group(1).strip())
             code = proc.wait()
         finally:
             if proc.poll() is None:
@@ -578,7 +582,8 @@ class Speaker:
 
     def _tts_command(self, text, out, voice, o, device):
         cmd = [find_binary(), "-m", voice.model, "-mm", voice.mmproj, "-p", text,
-               "-o", out, "-s", str(o["seed"]), "-t", str(max(1, o["threads"]))]
+               "-o", out, "-s", str(o["seed"]), "-t", str(max(1, o["threads"])),
+               "-c", str(TTS_CONTEXT)]
         if o["language"]:
             cmd += ["--tts-lang", o["language"]]
         if o["speaker_file"]:
@@ -616,8 +621,18 @@ class Speaker:
                 raw = os.path.join(self.run_dir, f"{i:05d}-tts.wav")
                 cmd, env = self._tts_command(piece.text, raw, voice, o, device)
                 code, tail = self._run(cmd, env)
-                if code != 0 or not os.path.isfile(raw) or os.path.getsize(raw) <= 44:
-                    raise TTSError("err_engine", tail)
+                written = (raw in self._wrote and os.path.isfile(raw)
+                           and os.path.getsize(raw) > 44)
+                if code != 0 and written:
+                    # L'audio è scritto e completo: l'errore è venuto dopo,
+                    # alla chiusura (driver Vulkan NVIDIA: «double free or
+                    # corruption» mentre il programma libera la scheda).
+                    self._emit(self.on_log, "ruscanarrator: llama-tts ha scritto l'audio e poi "
+                                            f"si è chiuso con un errore ({exit_description(code)}): "
+                                            "l'audio è completo e si tiene")
+                elif code != 0 or not os.path.isfile(raw) or os.path.getsize(raw) <= 44:
+                    raise TTSError("err_engine", f"{exit_description(code)}\n{tail}".strip()
+                                   if code != 0 else tail)
                 if rate is None:
                     rate = wav_info(raw)[0]
                 clean = os.path.join(self.run_dir, f"{i:05d}.wav")
@@ -689,6 +704,27 @@ class Speaker:
             line.append(clip)
         if cues and line.ms < cues[-1].end:
             line.silence(cues[-1].end - line.ms)
+
+
+# Contesto di llama-tts. Senza -c llama.cpp usa quello di addestramento del
+# modello (per Qwen3-TTS decine di migliaia di posizioni), e la cache occupa
+# gigabyte della scheda: su una RTX 3060 Laptop da 6 GB la voce non partiva
+# (ErrorOutOfDeviceMemory). Un pezzo (al massimo MAX_CHARS caratteri, circa
+# mezzo minuto) sta in meno di mille posizioni fra testo e audio.
+TTS_CONTEXT = 4096
+
+_WROTE = re.compile(r"\bwrote (/.+?)\s*$")
+
+
+def exit_description(code):
+    """Il codice di uscita di un programma, a parole: "codice 1", o il
+    segnale che l'ha fermato ("segnale 6, SIGABRT")."""
+    if code is not None and code < 0:
+        try:
+            return f"segnale {-code}, {signal.Signals(-code).name}"
+        except ValueError:
+            return f"segnale {-code}"
+    return f"codice {code}"
 
 
 def _atempo(speed):

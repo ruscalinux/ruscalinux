@@ -88,7 +88,7 @@ PROFILE="usr.lib.ruscallama-engine.llama-server"
 
 # Opzioni di llama-tts usate da RuscaNarrator (rusca_tts.py): controllate
 # come quelle di llama-server.
-OPZIONI_TTS="-m -mm -p -o -s -t --tts-lang --tts-speaker-file --tts-voice -ngl
+OPZIONI_TTS="-m -mm -p -o -s -t -c --tts-lang --tts-speaker-file --tts-voice -ngl
   --device --no-mmproj-offload --list-devices"
 
 # Solo questi finiscono nel pacchetto: llama-server per i programmi,
