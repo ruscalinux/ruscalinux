@@ -401,5 +401,30 @@ class Chain(unittest.TestCase):
         return p
 
 
+@unittest.skipIf(rd is None, "PyGObject (GLib) non disponibile")
+class Siblings(unittest.TestCase):
+    """Alla prima apertura si usano le scelte di RuscaNarrator & co."""
+
+    def test_sibling_settings(self):
+        try:
+            import gi
+            gi.require_version("Gtk", "4.0")
+            gi.require_version("Adw", "1")
+            import ruscadubbing as ui
+        except (ImportError, ValueError):
+            self.skipTest("GTK non disponibile")
+        with tempfile.TemporaryDirectory() as t:
+            for app, data in (("ruscanarrator", {"model": "/m/1.7B.gguf", "seed": 7,
+                                                 "speaker_file": "/v/a.wav", "max_speed": 1}),
+                              ("ruscatranslator", {"model": "/m/gemma.gguf"}),
+                              ("ruscatranscriber", "non json")):
+                os.makedirs(os.path.join(t, app))
+                with open(os.path.join(t, app, "settings.json"), "w") as f:
+                    f.write(json.dumps(data) if isinstance(data, dict) else data)
+            got = ui.sibling_settings(t)
+        self.assertEqual(got, {"voice_model": "/m/1.7B.gguf", "seed": 7, "speaker_file": "/v/a.wav",
+                               "max_speed": 1.0, "llm_model": "/m/gemma.gguf"})
+
+
 if __name__ == "__main__":
     unittest.main()

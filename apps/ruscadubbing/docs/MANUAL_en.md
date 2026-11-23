@@ -31,7 +31,7 @@ RuscaDubbing **has no models of its own**: it uses those you already copied for 
 | Translation | GGUF language model | `~/.local/share/ruscallama/models/` | RuscaTranslator, RuscaLLama |
 | Voice | Qwen3-TTS GGUF + mmproj | `~/.local/share/ruscanarrator/models/` | RuscaNarrator |
 
-In **Preferences** you choose which one each step uses; the folder button opens the right folder. If one is missing, a bar at the top says so.
+On first start RuscaDubbing uses the models you chose in the other apps. In **Preferences** you choose which one each step uses; for the voice the **1.7B** model is better: the 0.6B gets Italian stress wrong more often; the folder button opens the right folder. If one is missing, a bar at the top says so.
 
 **The voice.** Without a reference voice the model invents a voice for every line. A dubbing needs **one voice**: make one with **Create a Voice** in RuscaNarrator and choose it in Preferences → **Reference Voice**. On first start RuscaDubbing picks the first voice it finds.
 

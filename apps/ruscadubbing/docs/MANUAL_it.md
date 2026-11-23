@@ -31,7 +31,7 @@ RuscaDubbing **non ha modelli propri**: usa quelli che hai già copiato per le a
 | Traduzione | modello linguistico GGUF | `~/.local/share/ruscallama/models/` | RuscaTranslator, RuscaLLama |
 | Voce | Qwen3-TTS GGUF + mmproj | `~/.local/share/ruscanarrator/models/` | RuscaNarrator |
 
-Nelle **Preferenze** scegli quale usare per ogni passo; il pulsante con la cartella apre la cartella giusta. Se ne manca uno, una striscia in alto lo dice.
+Alla prima apertura RuscaDubbing usa i modelli che hai scelto nelle altre app. Nelle **Preferenze** scegli quale usare per ogni passo; per la voce conviene il modello **1.7B**: lo 0.6B sbaglia più spesso gli accenti dell’italiano; il pulsante con la cartella apre la cartella giusta. Se ne manca uno, una striscia in alto lo dice.
 
 **La voce.** Senza voce di riferimento il modello inventa una voce per ogni battuta. Per un doppiaggio serve **una voce sola**: crea una voce con **Crea una voce** di RuscaNarrator e sceglila nelle Preferenze → **Voce di riferimento**. Alla prima apertura RuscaDubbing sceglie la prima voce che trova.
 

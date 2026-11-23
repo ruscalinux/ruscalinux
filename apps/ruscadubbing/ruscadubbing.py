@@ -133,8 +133,42 @@ def ensure_icon():
         pass
 
 
+# Le scelte già fatte nelle altre app: alla prima apertura RuscaDubbing usa
+# gli stessi modelli, la stessa voce di riferimento e lo stesso seme, invece
+# del primo file in ordine alfabetico (che può essere il modello piccolo).
+SIBLINGS = (
+    ("ruscatranscriber", {"model": "whisper_model"}),
+    ("ruscatranslator", {"model": "llm_model"}),
+    ("ruscanarrator", {"model": "voice_model", "speaker_file": "speaker_file",
+                       "voice_name": "voice_name", "seed": "seed", "max_speed": "max_speed"}),
+)
+
+
+def sibling_settings(config_dir=None):
+    """{chiave di RuscaDubbing: valore} dalle impostazioni delle altre app."""
+    config_dir = config_dir or GLib.get_user_config_dir()
+    out = {}
+    for app, keys in SIBLINGS:
+        try:
+            with open(os.path.join(config_dir, app, "settings.json"),
+                      encoding="utf-8") as f:
+                data = json.load(f)
+        except (OSError, ValueError):
+            continue
+        if not isinstance(data, dict):
+            continue
+        for theirs, ours in keys.items():
+            value = data.get(theirs)
+            if value not in (None, "") and (isinstance(value, type(DEFAULTS[ours])) or (
+                    isinstance(DEFAULTS[ours], float) and isinstance(value, int))):
+                out[ours] = type(DEFAULTS[ours])(value)
+    return out
+
+
 def load_settings():
     cfg = dict(DEFAULTS)
+    if not os.path.exists(CONFIG_FILE):
+        cfg.update(sibling_settings())
     try:
         with open(CONFIG_FILE, encoding="utf-8") as f:
             data = json.load(f)
@@ -565,17 +599,23 @@ class DubbingWindow(Adw.ApplicationWindow):
         self.whisper_models = whisper.find_models()
         self.llm_models = engine.find_models()
         self.voices = tts.find_voices()
+        siblings = sibling_settings()
         for key, paths in (("whisper_model", self.whisper_models),
                            ("llm_model", self.llm_models),
                            ("voice_model", [v.model for v in self.voices])):
-            chosen = pick(self.cfg[key], paths)
+            # Il file salvato; se non c'è più, quello scelto nell'altra app.
+            chosen = pick(self.cfg[key] if self.cfg[key] in paths else siblings.get(key, ""),
+                          paths)
             if chosen != self.cfg[key]:
                 self._set(key, chosen)
         if not self.cfg["speaker_file"]:
-            # Una voce uguale per tutte le battute: la prima voce creata con
-            # RuscaNarrator, se c'è.
+            # Una voce uguale per tutte le battute: quella scelta in
+            # RuscaNarrator, o la prima creata con RuscaNarrator.
+            theirs = siblings.get("speaker_file", "")
             saved = tts.find_voice_files()
-            if saved:
+            if theirs and os.path.isfile(theirs):
+                self._set("speaker_file", theirs)
+            elif saved:
                 self._set("speaker_file", saved[0][1])
         self._refresh_banner()
 
