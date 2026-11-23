@@ -89,5 +89,7 @@
  "theme_dark": "Scuro",
  "err_save": "Non riesco a salvare le impostazioni.",
  "applies_next": "Vale dalla prossima conversazione.",
- "lisse_uses": "RuscaLLisse usa {name}"
+ "lisse_uses": "RuscaLLisse usa {name}",
+ "menu_settings": "Impostazioni…",
+ "action_settings": "Impostazioni"
 }

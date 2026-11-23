@@ -12,7 +12,9 @@ voce, personalità e tema. Le scelte vanno in
 e il servizio (alla domanda dopo, o alla conversazione dopo per modelli e
 voce).
 
-    ruscapallas            apre la finestra e richiama Pallasio
+    ruscapallas            lo richiama dallo sgabuzzino; se è già sul
+                           desktop, apre le impostazioni
+    ruscapallas --settings apre le impostazioni
     ruscapallas --show     lo richiama, senza finestra
     ruscapallas --hide     lo rimanda nello sgabuzzino
     ruscapallas --quit     spegne il servizio di dialogo e libera la memoria
@@ -215,6 +217,18 @@ def quit_service(bus):
         return True
     except GLib.Error:
         return False
+
+
+def launch_action(state, visible):
+    """Che cosa fa un clic sull'icona: 'show' (Pallasio compare dal nulla,
+    nessuna finestra) o 'window' (le impostazioni). Le impostazioni si aprono
+    solo se Pallasio è già sul desktop, o se GNOME non conosce ancora
+    l'estensione (la finestra spiega che serve un nuovo accesso)."""
+    if state is None:
+        return "window"
+    if state != EXT_ACTIVE or visible is False:
+        return "show"
+    return "window"
 
 
 def notify(bus, body):
@@ -573,12 +587,7 @@ def build_app():
                 window.add_css_class("rusca-dark" if dark else "rusca-light")
 
         def do_activate(self):
-            win = self.props.active_window
-            if win is None:
-                bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
-                show(bus)                 # aprendo RuscaPallas, Pallasio compare
-                win = PallasWindow(self)
-            win.present()
+            (self.props.active_window or PallasWindow(self)).present()
 
     return PallasApp()
 
@@ -590,8 +599,19 @@ def main(argv):
     if "--help" in argv or "-h" in argv:
         print(__doc__.strip().split("\n\n")[2])
         return 0
+    bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+    if not argv:                        # clic sull'icona
+        try:
+            state = extension_state(bus)
+        except GLib.Error:
+            state = None
+        visible = pallasio_visible(bus) if state == EXT_ACTIVE else None
+        if launch_action(state, visible) == "show":
+            err = show(bus)
+            if err:
+                notify(bus, _(err))
+            return 0
     if any(a in argv for a in ("--show", "--hide", "--quit")):
-        bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
         if "--hide" in argv:
             hide(bus)
         elif "--quit" in argv:

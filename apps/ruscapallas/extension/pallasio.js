@@ -137,6 +137,7 @@ export class Pallasio {
 
         this._menu = new PopupMenu.PopupMenu(this.actor, 0.5, St.Side.BOTTOM);
         this._menu.addAction(this._('menu_stop'), () => this._call('Stop'));
+        this._menu.addAction(this._('menu_settings'), () => this._openSettings());
         this._menu.addAction(this._('menu_hide'), () => this.Hide());
         Main.uiGroup.add_child(this._menu.actor);
         this._menu.actor.hide();
@@ -296,6 +297,24 @@ export class Pallasio {
         });
         this._dbus.emit_property_changed('Visible', GLib.Variant.new_boolean(false));
         Main.notify(this._('name'), this._('hidden_hint'));
+    }
+
+    /** La finestra di RuscaPallas, aperta sulle impostazioni. */
+    _openSettings() {
+        try {
+            const app = Gio.DesktopAppInfo.new('org.ruscalinux.RuscaPallas.desktop');
+            if (app) {
+                app.launch_action('settings', global.create_app_launch_context(0, -1));
+                return;
+            }
+        } catch (e) {
+            console.warn(`ruscapallas: ${e.message}`);
+        }
+        try {
+            GLib.spawn_command_line_async('ruscapallas --settings');
+        } catch (e) {
+            console.warn(`ruscapallas: ${e.message}`);
+        }
     }
 
     // ── servizio di dialogo ───────────────────────────────────────────────

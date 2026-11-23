@@ -89,5 +89,7 @@
  "theme_dark": "Dark",
  "err_save": "Could not save the settings.",
  "applies_next": "Applies from the next conversation.",
- "lisse_uses": "RuscaLLisse uses {name}"
+ "lisse_uses": "RuscaLLisse uses {name}",
+ "menu_settings": "Settings…",
+ "action_settings": "Settings"
 }

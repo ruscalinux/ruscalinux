@@ -155,6 +155,21 @@ class TestFinestra(unittest.TestCase):
         keys |= {f"words_{v}" for v in self.mod.WORDS} | {f"theme_{v}" for v in self.mod.THEMES}
         self.assertEqual(sorted(k for k in keys if k not in it), [])
 
+    def test_clic_sull_icona(self):
+        """L'icona richiama Pallasio senza finestra; le impostazioni si aprono
+        solo se è già sul desktop, o se GNOME non conosce l'estensione."""
+        act, ACTIVE = self.mod.launch_action, self.mod.EXT_ACTIVE
+        self.assertEqual(act(ACTIVE, False), "show")      # nello sgabuzzino
+        self.assertEqual(act(ACTIVE, True), "window")     # già sul desktop
+        self.assertEqual(act(2, None), "show")            # estensione spenta: si accende
+        self.assertEqual(act(None, None), "window")       # serve un nuovo accesso
+
+    def test_azione_impostazioni(self):
+        sh = _read(os.path.join(APP, "make-deb.sh"))
+        self.assertIn("Actions=settings;", sh)
+        self.assertIn("Exec=$PKG --settings", sh)
+        self.assertIn("launch_action('settings'", _read(os.path.join(APP, "extension", "pallasio.js")))
+
     def test_nomi_dbus_separati(self):
         """La finestra (GApplication) prende l'App ID sul bus: il servizio deve
         avere un nome suo, o al clic sull'icona la finestra non si apre."""

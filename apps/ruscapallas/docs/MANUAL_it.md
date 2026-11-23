@@ -8,7 +8,7 @@ Ascolta, pensa e parla con gli stessi motori di RuscaLLisse: ruscavosk-engine (V
 
 1. Pallasio usa gli stessi file di RuscaLLisse: un modello Vosk per ascoltare, un modello GGUF per pensare e una voce Piper. Se RuscaLLisse funziona, funziona anche Pallasio; altrimenti apri RuscaLLisse e segui «Quali file scaricare?». Per una voce maschile scarica `it_IT-riccardo-x_low`.
 2. Dopo l'installazione del pacchetto esci dalla sessione e rientra: GNOME vede le estensioni nuove solo all'accesso.
-3. Apri **RuscaPallas** dalla cartella RuscaLinux Apps: Pallasio compare sul bordo basso dello schermo e si apre la sua finestra.
+3. Apri **RuscaPallas** dalla cartella RuscaLinux Apps: Pallasio compare dal nulla sul bordo basso dello schermo.
 
 ## Parlargli
 
@@ -23,13 +23,13 @@ Il fumetto non mostra mai parole: la conversazione non si scrive e non si salva.
 ## Muoverlo
 
 - **Trascinalo** con il mouse; lasciato andare cade a terra, o sulla finestra che ha sotto.
-- **Clic destro**: «Zitto» e «Torna nello sgabuzzino»: sparisce nel nulla in una nuvola di scintille. Richiamato, riappare dal nulla.
+- **Clic destro**: «Zitto», «Impostazioni…» e «Torna nello sgabuzzino»: sparisce nel nulla in una nuvola di scintille. Richiamato, riappare dal nulla.
 - Nella panoramica delle attività e con le finestre a schermo intero non c'è.
 - Con le animazioni disattivate (Impostazioni → Accessibilità) sta fermo, ma parla lo stesso.
 
 ## La finestra RuscaPallas
 
-Si apre dalla cartella RuscaLinux Apps. **Parlagli** (Ctrl+T) fa drizzare le orecchie a Pallasio senza cercarlo sul desktop. Sotto, le impostazioni:
+Un clic sull'icona di RuscaPallas richiama Pallasio dallo sgabuzzino; se è già sul desktop, apre le impostazioni. Le impostazioni si aprono anche con il clic destro su Pallasio («Impostazioni…») o sull'icona («Impostazioni»). **Parlagli** (Ctrl+T) fa drizzare le orecchie a Pallasio senza cercarlo sul desktop. Sotto, le impostazioni:
 
 - **Sul desktop:** mostrarlo o rimandarlo nello sgabuzzino; dimensione (piccolo, normale, grande); quanto spesso salta sulle finestre (mai, ogni tanto, spesso); se si siede a leggere per conto suo. Valgono subito.
 - **Conversazione:** quanto resta in ascolto dopo la risposta (4, 8 o 15 secondi); risposte brevi, normali o lunghe; emozioni nel muso. Valgono dalla domanda successiva.
@@ -41,7 +41,8 @@ Le scelte stanno in `~/.config/ruscapallas/settings.json`. Voce e velocità scel
 
 ## Da terminale
 
-    ruscapallas            apre la finestra e lo richiama
+    ruscapallas            lo richiama (se è già sul desktop, apre le impostazioni)
+    ruscapallas --settings apre le impostazioni
     ruscapallas --show     lo richiama, senza finestra
     ruscapallas --hide     lo rimanda nello sgabuzzino
     ruscapallas --quit     spegne il servizio di dialogo e libera la memoria

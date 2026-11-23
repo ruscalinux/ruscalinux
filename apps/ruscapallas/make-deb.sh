@@ -15,7 +15,8 @@
 #     al primo clic: è il ciclo di conversazione di RuscaLLisse, con i suoi
 #     moduli copiati identici (qui si controlla);
 #   * la finestra RuscaPallas (ruscapallas, GTK 4 e libadwaita), che lo
-#     richiama e lo configura; con --show, --hide, --quit lavora senza
+#     configura (l'icona lo richiama; se è già sul desktop, o con
+#     --settings, apre le impostazioni); con --show, --hide, --quit lavora senza
 #     finestra.
 # I motori sono i pacchetti ruscavosk-engine, ruscallama-engine e
 # ruscapiper-engine, compilati dal sorgente.
@@ -85,7 +86,7 @@ from xml.sax.saxutils import escape
 out, codes = sys.argv[1], sys.argv[2:]
 load = lambda c: json.load(open(f"lang/{c}.json", encoding="utf-8"))
 ref, problems = load("en"), []
-rows = {"desktop": [], "summary": [], "description": []}
+rows = {"desktop": [], "summary": [], "description": [], "action": []}
 fields = lambda v: sorted(re.findall(r"{(\w+)}", v))
 for code in codes:
     data = load(code)
@@ -97,6 +98,7 @@ for code in codes:
     sfx = "" if code == "en" else f"[{code}]"
     lang = "" if code == "en" else f' xml:lang="{code}"'
     rows["desktop"] += [f"Comment{sfx}={t('app_summary')}", f"Keywords{sfx}={t('desktop_keywords')}"]
+    rows["action"].append(f"Name{sfx}={t('action_settings')}")
     rows["summary"].append(f"  <summary{lang}>{escape(t('app_summary'))}</summary>")
     rows["description"].append(f"    <p{lang}>{escape(t('app_description'))}</p>")
 if problems:
@@ -143,7 +145,12 @@ Terminal=false
 Categories=GNOME;GTK;Utility;X-RuscaLinux-Apps;
 StartupNotify=true
 StartupWMClass=$APP_ID
+Actions=settings;
 $(cat "$TMP/desktop")
+
+[Desktop Action settings]
+Exec=$PKG --settings
+$(cat "$TMP/action")
 DESKTOP
 if command -v desktop-file-validate >/dev/null; then
     desktop-file-validate "$ROOT/usr/share/applications/$APP_ID.desktop" || die "file .desktop non valido"

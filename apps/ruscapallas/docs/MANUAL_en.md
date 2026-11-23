@@ -8,7 +8,7 @@ He listens, thinks and speaks with the same engines as RuscaLLisse: ruscavosk-en
 
 1. Pallasio uses the same files as RuscaLLisse: a Vosk model to listen, a GGUF model to think and a Piper voice. If RuscaLLisse works, Pallasio works too; otherwise open RuscaLLisse and follow “Which files to download?”. For a male Italian voice, download `it_IT-riccardo-x_low`.
 2. After installing the package, log out and back in: GNOME only sees new extensions at login.
-3. Open **RuscaPallas** from the RuscaLinux Apps folder: Pallasio appears at the bottom of the screen and his window opens.
+3. Open **RuscaPallas** from the RuscaLinux Apps folder: Pallasio appears out of nowhere at the bottom of the screen.
 
 ## Talking to him
 
@@ -23,13 +23,13 @@ The bubble never shows words: the conversation is not written and not saved.
 ## Moving him
 
 - **Drag** him with the mouse; when released he falls to the ground, or onto the window below.
-- **Right click**: “Quiet” and “Back to the closet”: he vanishes into thin air in a cloud of sparkles. Called back, he appears out of nowhere.
+- **Right click**: “Quiet”, “Settings…” and “Back to the closet”: he vanishes into thin air in a cloud of sparkles. Called back, he appears out of nowhere.
 - He is not shown in the Activities overview or over full-screen windows.
 - With animations turned off (Settings → Accessibility) he stands still, but still talks.
 
 ## The RuscaPallas window
 
-Open it from the RuscaLinux Apps folder. **Talk** (Ctrl+T) makes Pallasio prick up his ears without looking for him on the desktop. Below are the settings:
+A click on the RuscaPallas icon calls Pallasio back from his closet; if he is already on the desktop, it opens the settings. Settings also open with a right click on Pallasio (“Settings…”) or on the icon (“Settings”). **Talk** (Ctrl+T) makes Pallasio prick up his ears without looking for him on the desktop. Below are the settings:
 
 - **On the Desktop:** show him or send him back to the closet; size (small, normal, large); how often he jumps on windows (never, sometimes, often); whether he sits down to read on his own. They apply at once.
 - **Conversation:** how long he keeps listening after answering (4, 8 or 15 seconds); short, normal or long answers; emotions on his face. They apply from the next question.
@@ -41,7 +41,8 @@ Settings are kept in `~/.config/ruscapallas/settings.json`. A voice and speed ch
 
 ## From a terminal
 
-    ruscapallas            opens the window and calls him back
+    ruscapallas            calls him back (if he is already there, opens the settings)
+    ruscapallas --settings opens the settings
     ruscapallas --show     calls him back, without the window
     ruscapallas --hide     sends him back to the closet
     ruscapallas --quit     stops the dialogue service and frees memory
