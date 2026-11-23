@@ -39,6 +39,8 @@ import json, os, sys
 args = sys.argv[1:]
 opt = lambda name: args[args.index(name) + 1]
 assert os.path.isfile(opt("-f"))
+if os.environ.get("FAKE_WHISPER_LOG"):
+    open(os.environ["FAKE_WHISPER_LOG"], "a").write("whisper\n")
 segs = [(500, 1800, " Good morning"), (1900, 3000, " to everybody."),
         (3600, 5200, " Today we talk about RuscaLinux.")]
 json.dump({"result": {"language": "en"}, "transcription": [
@@ -247,11 +249,19 @@ class Cues(unittest.TestCase):
             return "\n".join(out)
         texts, stats = rd.translate_cues(chat, cues, "en", "it", batch=3)
         self.assertEqual(texts, ["Riga 0.", "Riga 1.", "Riga 2.", "Riga 3.", "Line 4."])
-        self.assertEqual(stats, {"retried": 2, "shortened": 0, "kept": 1})
+        self.assertEqual(stats, {"retried": 2, "shortened": 0, "kept": 1, "reused": 0})
         # Il secondo gruppo ha come contesto le battute già tradotte.
         self.assertIn("Line 2. => Riga 2.", calls[1])
         self.assertIn("4|", calls[1])
         self.assertTrue(rd.build_prompt("en", "it").count("Italian") >= 2)
+        # Con la memoria: solo le frasi che mancano.
+        calls.clear()
+        texts, stats = rd.translate_cues(chat, cues, "en", "it", batch=3,
+                                         known=["Riga 0.", "", "Riga 2.", "Riga 3.", "x"])
+        self.assertEqual(texts[:4], ["Riga 0.", "Riga 1.", "Riga 2.", "Riga 3."])
+        self.assertEqual(stats["reused"], 4)
+        self.assertEqual(len(calls), 1)
+        self.assertNotIn("3|", calls[0].split("Lines to translate:")[-1])
 
     def test_shorten(self):
         cues = [rd.Cue(0, 800, "Yes.")]
@@ -392,10 +402,13 @@ class Chain(unittest.TestCase):
         rd.whisper.ENGINE_DIRS = rd.engine.ENGINE_DIRS = rd.tts.ENGINE_DIRS = (bins,)
         rd.whisper.FFMPEG_PATHS = rd.tts.FFMPEG_PATHS = (FFMPEG,)
         rd.WORK_DIR = os.path.join(t, "lavoro")
+        self.saved_project_dir = rd.PROJECT_DIR
+        rd.PROJECT_DIR = os.path.join(t, "progetti")
         rd.whisper.WORK_DIR = os.path.join(rd.WORK_DIR, "whisper")
         rd.tts.WORK_DIR = os.path.join(rd.WORK_DIR, "voce")
         os.environ["FAKE_ARGS"] = os.path.join(t, "server.jsonl")
         os.environ["FAKE_TTS_ARGS"] = os.path.join(t, "tts.jsonl")
+        os.environ["FAKE_WHISPER_LOG"] = os.path.join(t, "whisper.log")
         self.out = os.path.join(t, "uscita")
         os.makedirs(self.out)
         self.models = {}
@@ -407,6 +420,7 @@ class Chain(unittest.TestCase):
         (rd.whisper.ENGINE_DIRS, rd.whisper.FFMPEG_PATHS, rd.engine.ENGINE_DIRS,
          rd.tts.ENGINE_DIRS, rd.tts.FFMPEG_PATHS, rd.WORK_DIR, rd.whisper.WORK_DIR,
          rd.tts.WORK_DIR) = self.saved
+        rd.PROJECT_DIR = self.saved_project_dir
         self.dir.cleanup()
 
     def options(self, **kw):
@@ -467,6 +481,45 @@ class Chain(unittest.TestCase):
         self.assertEqual(left, [])
         server = json.load(open(os.environ["FAKE_ARGS"]))
         self.assertIn("127.0.0.1", server)
+
+    def count(self, name):
+        path = os.environ[name]
+        return len(open(path).read().splitlines()) if os.path.exists(path) else 0
+
+    def test_saved_work(self):
+        """Il secondo doppiaggio dello stesso video non rifà trascrizione e
+        traduzione; «Rifai tutto» (reuse=False) sì."""
+        self.assertIsNone(self.run_chain(self.options(outputs={"srt"}, voice=None))["done"][0])
+        self.assertEqual((self.count("FAKE_WHISPER_LOG"), self.count("FAKE_ARGS")), (1, 1))
+        self.assertEqual(rd.project_summary(self.video), (True, ["it"]))
+        self.assertEqual(oct(os.stat(rd.project_path(self.video)).st_mode & 0o777), "0o600")
+        seen = self.run_chain(self.options())
+        error, files, stats = seen["done"]
+        self.assertIsNone(error, error)
+        self.assertEqual((self.count("FAKE_WHISPER_LOG"), self.count("FAKE_ARGS")), (1, 1))
+        self.assertTrue(stats.get("reused_transcript"))
+        self.assertTrue(stats.get("reused"))
+        self.assertIn("IT Good morning", open(files["srt_tgt"], encoding="utf-8").read())
+        self.run_chain(self.options(outputs={"srt"}, voice=None, reuse=False))
+        self.assertEqual((self.count("FAKE_WHISPER_LOG"), self.count("FAKE_ARGS")), (2, 2))
+        rd.forget_project(self.video)
+        self.assertEqual(rd.project_summary(self.video), (False, []))
+
+    def test_preview(self):
+        """La prova: solo il primo tratto, file «.prova», niente salvato
+        della trascrizione parziale."""
+        saved = rd.PREVIEW_MS
+        rd.PREVIEW_MS = 3000
+        try:
+            seen = self.run_chain(self.options(preview=True))
+        finally:
+            rd.PREVIEW_MS = saved
+        error, files, stats = seen["done"]
+        self.assertIsNone(error, error)
+        self.assertTrue(files["video"].endswith("prova.it.prova.mkv") or
+                        files["video"].endswith(".prova.it.mkv"), files["video"])
+        self.assertLess(rd.probe(files["video"])["duration_ms"], 4500)
+        self.assertEqual(rd.project_summary(self.video)[0], False)
 
     def test_mp4_and_mute_video(self):
         seen = self.run_chain(self.options(media=self.mute, fmt="mp4", outputs={"video"},

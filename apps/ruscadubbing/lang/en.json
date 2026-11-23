@@ -209,5 +209,17 @@
   "llm_device_sub": "The language model: the one with more memory, if the model is large",
   "tts_device": "Graphics Card for the Voice",
   "tts_device_sub": "Qwen3-TTS, also for “Find a Similar Voice”",
-  "done_fast": "{n} translated subtitles are faster than comfortable reading (17 characters per second): consider shortening them by hand."
+  "done_fast": "{n} translated subtitles are faster than comfortable reading (17 characters per second): consider shortening them by hand.",
+  "saved_work": "Saved Work",
+  "saved_transcript": "transcription ready",
+  "saved_translations": "translation into: {langs}",
+  "saved_forget": "Forget",
+  "saved_forget_tip": "Delete the saved transcription and translations: the next dubbing redoes them",
+  "saved_forgotten": "Saved work deleted",
+  "preview": "Try One Minute",
+  "preview_tip": "Dub only the first minute, to try voice and settings",
+  "working_preview": "Trying “{name}”",
+  "stage_preview": "Preparing the first minute…",
+  "done_reused_all": "Transcription and translation taken from the saved work: only voice and mixing were redone.",
+  "done_reused_some": "Part of the work was taken from the saved work."
 }

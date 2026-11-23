@@ -65,6 +65,12 @@ La finestra mostra i quattro passi:
 
 **Ferma** (Esc) interrompe in ogni momento. Alla fine RuscaDubbing elenca i file: un clic li apre, **Guarda** apre il video.
 
+### Prova su un minuto e lavoro salvato
+
+**Prova su un minuto** doppia solo l'inizio del video: in un paio di minuti senti voce, livello dell'audio originale e qualità della traduzione, prima di doppiare tutto. I file della prova hanno «.prova» nel nome.
+
+RuscaDubbing **ricorda** trascrizione e traduzione di ogni video. Se lo doppi di nuovo (con un'altra voce, un altro livello dell'audio originale, un altro formato) si rifanno solo voce e missaggio: pochi minuti invece del lavoro intero. Le frasi tradotte nella prova servono anche al doppiaggio completo. La riga **Lavoro salvato**, nella pagina del video, dice che cosa c'è; **Dimentica** lo cancella e fa rifare tutto (per esempio dopo aver cambiato il modello di traduzione con uno migliore, o dopo aver corretto i sottotitoli originali).
+
 ## 4. I file
 
 Accanto al video, o nella cartella scelta in **Cartella dei file**. Un video `film.mp4` doppiato dall'inglese all'italiano dà:
@@ -107,6 +113,7 @@ Per un doppiaggio curato: trascrivi con RuscaTranscriber, correggi il testo, poi
 - **Nessun dato lascia la macchina.** La sola connessione è quella con `llama-server`, sul computer stesso (`127.0.0.1`), con una chiave casuale che cambia a ogni avvio.
 - I programmi si avviano senza shell; FFmpeg legge solo file locali.
 - I file di lavoro (audio estratto, battute, voce) stanno in `~/.cache/ruscadubbing/` e **si cancellano** alla fine di ogni doppiaggio, all'avvio e alla chiusura.
+- Trascrizione e traduzioni di ogni video restano invece in `~/.local/share/ruscadubbing/progetti/`, leggibili solo da te, finché non premi **Dimentica**.
 
 ## 9. Diritti e voci
 

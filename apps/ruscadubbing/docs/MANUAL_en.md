@@ -65,6 +65,12 @@ The window shows the four steps:
 
 **Stop** (Esc) interrupts at any time. At the end RuscaDubbing lists the files: a click opens them, **Watch** opens the video.
 
+### Try one minute and saved work
+
+**Try One Minute** dubs only the beginning of the video: in a couple of minutes you hear the voice, the level of the original audio and the quality of the translation, before dubbing everything. The files of the trial have “.prova” in their name.
+
+RuscaDubbing **remembers** the transcription and translation of each video. If you dub it again (with another voice, another level of the original audio, another format) only voice and mixing are redone: a few minutes instead of the whole job. The sentences translated in the trial are used by the full dubbing too. The **Saved Work** row on the video page says what is there; **Forget** deletes it and makes everything be redone.
+
 ## 4. The files
 
 Next to the video, or in the folder chosen in **Output Folder**. A video `film.mp4` dubbed from English to Italian gives:
@@ -107,6 +113,7 @@ For a careful dubbing: transcribe with RuscaTranscriber, correct the text, then 
 - **No data leaves the machine.** The only connection is to `llama-server`, on the computer itself (`127.0.0.1`), with a random key that changes at every start.
 - Programs are started without a shell; FFmpeg reads only local files.
 - Working files (extracted audio, lines, voice) are kept in `~/.cache/ruscadubbing/` and **deleted** at the end of each dubbing, at start and at close.
+- The transcription and translations of each video stay in `~/.local/share/ruscadubbing/progetti/`, readable only by you, until you press **Forget**.
 
 ## 9. Rights and voices
 

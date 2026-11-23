@@ -209,5 +209,17 @@
   "llm_device_sub": "Il modello linguistico: quella con più memoria, se è grande",
   "tts_device": "Scheda per la voce",
   "tts_device_sub": "Qwen3-TTS, anche per «Trova una voce simile»",
-  "done_fast": "{n} sottotitoli tradotti sono più veloci di quanto si legge comodamente (17 caratteri al secondo): conviene accorciarli a mano."
+  "done_fast": "{n} sottotitoli tradotti sono più veloci di quanto si legge comodamente (17 caratteri al secondo): conviene accorciarli a mano.",
+  "saved_work": "Lavoro salvato",
+  "saved_transcript": "trascrizione pronta",
+  "saved_translations": "traduzione in: {langs}",
+  "saved_forget": "Dimentica",
+  "saved_forget_tip": "Cancella trascrizione e traduzioni salvate: il prossimo doppiaggio le rifà",
+  "saved_forgotten": "Lavoro salvato cancellato",
+  "preview": "Prova su un minuto",
+  "preview_tip": "Doppia solo il primo minuto, per provare voce e impostazioni",
+  "working_preview": "Prova di «{name}»",
+  "stage_preview": "Preparo il primo minuto…",
+  "done_reused_all": "Trascrizione e traduzione riprese dal lavoro salvato: rifatti solo voce e missaggio.",
+  "done_reused_some": "Una parte del lavoro è stata ripresa da quello salvato."
 }

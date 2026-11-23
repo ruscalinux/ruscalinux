@@ -29,6 +29,8 @@
 #   * i file di lavoro stanno in ~/.cache/ruscadubbing (permessi 0700) e si
 #     cancellano alla fine, all'avvio e alla chiusura.
 import collections
+import hashlib
+import json
 import os
 import re
 import shutil
@@ -47,6 +49,12 @@ WORK_DIR = os.path.join(GLib.get_user_cache_dir(), "ruscadubbing")
 # I moduli comuni lavorano in sottocartelle di quella di RuscaDubbing, non in
 # quelle di RuscaTranscriber e RuscaNarrator.
 whisper.WORK_DIR = os.path.join(WORK_DIR, "whisper")
+# Lavoro salvato: trascrizione e traduzioni di ogni video, per rifare solo
+# voce e missaggio. Testo dell'utente: cartella 0700, file 0600, si
+# cancella dalla finestra («Dimentica»).
+PROJECT_DIR = os.path.join(GLib.get_user_data_dir(), "ruscadubbing", "progetti")
+PREVIEW_MS = 60000          # «Prova su un minuto»
+PROMPT_VERSION = 2          # cambia quando cambia il modo di tradurre
 tts.WORK_DIR = os.path.join(WORK_DIR, "voce")
 
 # Lingue del doppiaggio: quelle che il modello della voce sa dire (Qwen3-TTS).
@@ -574,20 +582,23 @@ def parse_translations(text):
 
 
 def translate_cues(chat, cues, src, tgt, stop_event=None, on_progress=None, max_speed=1.3,
-                   batch=BATCH):
-    """Traduce le battute a gruppi. chat(body) -> testo è la funzione del
-    motore (engine.Engine.chat). Restituisce (traduzioni, statistiche):
-    statistiche = {"retried": n, "shortened": n, "kept": n}.
-    Una battuta che non torna tradotta si chiede di nuovo da sola; se il
-    modello non la restituisce ancora, resta l'originale ("kept")."""
-    stats = {"retried": 0, "shortened": 0, "kept": 0}
+                   batch=BATCH, known=None):
+    """Traduce le frasi a gruppi. chat(body) -> testo è la funzione del
+    motore (engine.Engine.chat). known: traduzioni già pronte (memoria del
+    lavoro salvato), None o "" per quelle da fare. Restituisce
+    (traduzioni, statistiche): statistiche = {"retried", "shortened",
+    "kept", "reused"}. Una frase che non torna tradotta si chiede di nuovo
+    da sola; se il modello non la restituisce ancora, resta l'originale
+    ("kept")."""
+    result = [t or None for t in (known or [None] * len(cues))]
+    todo = [i for i in range(len(cues)) if not result[i]]
+    stats = {"retried": 0, "shortened": 0, "kept": 0, "reused": len(cues) - len(todo)}
     system = build_prompt(src, tgt)
-    result = [None] * len(cues)
 
     def ask(lines, context):
         user = ""
         if context:
-            user += ("Previous lines, already translated (context only, do not output):\n"
+            user += ("Previous passages, already translated (context only, do not output):\n"
                      + "\n".join(context) + "\n\n")
         user += "Lines to translate:\n" + "\n".join(lines)
         body = dict(SAMPLING, messages=[{"role": "system", "content": system},
@@ -595,46 +606,46 @@ def translate_cues(chat, cues, src, tgt, stop_event=None, on_progress=None, max_
                     max_tokens=MAX_TOKENS, reasoning_effort="none")
         return parse_translations(chat(body))
 
-    for first in range(0, len(cues), batch):
+    def line(i):
+        return f"{i + 1}|{budget_chars(cues, i, tgt, max_speed)}|{cues[i].text}"
+
+    for start in range(0, len(todo), batch):
         if stop_event is not None and stop_event.is_set():
             raise _Stopped()
         if on_progress:
-            on_progress(first, len(cues))
-        idx = list(range(first, min(first + batch, len(cues))))
-        lines = [f"{i + 1}|{budget_chars(cues, i, tgt, max_speed)}|{cues[i].text}" for i in idx]
+            on_progress(start, len(todo))
+        idx = todo[start:start + batch]
         context = [f"{cues[j].text} => {result[j]}"
-                   for j in range(max(0, first - CONTEXT_LINES), first) if result[j]]
-        got = ask(lines, context)
+                   for j in range(max(0, idx[0] - CONTEXT_LINES), idx[0]) if result[j]]
+        got = ask([line(i) for i in idx], context)
         for i in idx:
             if got.get(i + 1):
                 result[i] = got[i + 1]
-        missing = [i for i in idx if not result[i]]
-        for i in missing:                       # una per volta
+        for i in [i for i in idx if not result[i]]:            # una per volta
             if stop_event is not None and stop_event.is_set():
                 raise _Stopped()
             stats["retried"] += 1
-            got = ask([f"{i + 1}|{budget_chars(cues, i, tgt, max_speed)}|{cues[i].text}"], context)
+            got = ask([line(i)], context)
             if got.get(i + 1):
                 result[i] = got[i + 1]
             else:
                 result[i] = cues[i].text
                 stats["kept"] += 1
-        # Battute molto più lunghe del loro tempo: si chiede una versione breve.
+        # Frasi molto più lunghe del loro tempo: si chiede una versione breve.
         long_ones = [i for i in idx
                      if len(result[i]) > budget_chars(cues, i, tgt, max_speed) * 1.25]
         if long_ones:
             if stop_event is not None and stop_event.is_set():
                 raise _Stopped()
-            lines = [f"{i + 1}|{budget_chars(cues, i, tgt, max_speed)}|{cues[i].text}"
-                     for i in long_ones]
-            got = ask(lines, [f"(too long, shorten to MAX) {result[i]}" for i in long_ones])
+            got = ask([line(i) for i in long_ones],
+                      [f"(too long, shorten to MAX) {result[i]}" for i in long_ones])
             for i in long_ones:
                 short = got.get(i + 1)
                 if short and len(short) < len(result[i]):
                     result[i] = short
                     stats["shortened"] += 1
     if on_progress:
-        on_progress(len(cues), len(cues))
+        on_progress(len(todo), len(todo))
     return result, stats
 
 
@@ -688,7 +699,7 @@ def mix_command(ffmpeg, media, dub_wav, out_wav, has_audio, ducking="medium"):
 
 
 def mux_command(ffmpeg, media, mix_wav, srt_src, srt_tgt, out, fmt, src, tgt, has_audio,
-                titles=("", "")):
+                titles=("", ""), max_ms=0):
     """Il video doppiato: immagine copiata (niente ricodifica), audio
     originale (se c'è), audio doppiato come traccia predefinita, sottotitoli
     nelle due lingue. titles: (nome della traccia originale, del doppiaggio)."""
@@ -715,8 +726,11 @@ def mux_command(ffmpeg, media, mix_wav, srt_src, srt_tgt, out, fmt, src, tgt, ha
             f"title={titles[1]}", f"-disposition:a:{dub}", "default",
             "-metadata:s:s:0", f"language={iso3(src)}", "-metadata:s:s:1",
             f"language={iso3(tgt)}", "-disposition:s:0", "0", "-disposition:s:1", "0",
-            "-f", "mp4" if fmt == "mp4" else "matroska", "-y", out]
-    return cmd
+            "-f", "mp4" if fmt == "mp4" else "matroska"]
+    if max_ms:
+        # La prova finisce con lo spezzone, anche se la voce va oltre.
+        cmd += ["-t", f"{max_ms / 1000:.3f}"]
+    return cmd + ["-y", out]
 
 
 def unique_path(path):
@@ -732,9 +746,10 @@ def unique_path(path):
     return f"{root} ({n}){ext}"
 
 
-def output_paths(media, folder, src, tgt, fmt):
-    """Nomi dei file in uscita, accanto al video o nella cartella scelta."""
-    stem = os.path.splitext(os.path.basename(media))[0]
+def output_paths(media, folder, src, tgt, fmt, suffix=""):
+    """Nomi dei file in uscita, accanto al video o nella cartella scelta.
+    suffix: ".prova" per la prova su un minuto."""
+    stem = os.path.splitext(os.path.basename(media))[0] + suffix
     base = os.path.join(folder or os.path.dirname(os.path.abspath(media)), stem)
     return {
         "srt_src": unique_path(f"{base}.{src}.srt"),
@@ -745,16 +760,95 @@ def output_paths(media, folder, src, tgt, fmt):
     }
 
 
+# ── lavoro salvato ──────────────────────────────────────────────────────────
+def _file_id(path):
+    st = os.stat(path)
+    return f"{os.path.realpath(path)}|{st.st_size}|{st.st_mtime_ns}"
+
+
+def model_id(path):
+    """Un modello si riconosce da nome e dimensione (non dal percorso: lo
+    stesso file copiato altrove è lo stesso modello)."""
+    try:
+        return f"{os.path.basename(path)}|{os.path.getsize(path)}"
+    except OSError:
+        return os.path.basename(path or "")
+
+
+def project_path(media):
+    key = hashlib.sha256(_file_id(media).encode("utf-8")).hexdigest()[:24]
+    return os.path.join(PROJECT_DIR, key + ".json")
+
+
+def load_project(media):
+    """Il lavoro salvato per questo video (lo stesso file: percorso,
+    dimensione e data di modifica), o {}."""
+    try:
+        with open(project_path(media), encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) and data.get("version") == 1 else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def save_project(media, data):
+    try:
+        os.makedirs(PROJECT_DIR, mode=0o700, exist_ok=True)
+        os.chmod(PROJECT_DIR, 0o700)
+        path = project_path(media)
+        data = dict(data, version=1, media=os.path.basename(media))
+        fd = os.open(path + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False)
+        os.replace(path + ".tmp", path)
+    except OSError:
+        pass
+
+
+def forget_project(media):
+    try:
+        os.unlink(project_path(media))
+    except OSError:
+        pass
+
+
+def project_summary(media):
+    """(c'è una trascrizione salvata, lingue in cui ci sono traduzioni)."""
+    data = load_project(media) if media and os.path.isfile(media) else {}
+    langs = set()
+    for key, memory in (data.get("memory") or {}).items():
+        if memory:
+            langs.add(key.split("|")[1])
+    return bool(data.get("transcripts")), sorted(langs)
+
+
+def _transcript_key(o):
+    return f"{model_id(o.whisper_model)}|{o.src}"
+
+
+def _memory_key(src, tgt, llm_model):
+    return f"{src}|{tgt}|{model_id(llm_model)}|v{PROMPT_VERSION}"
+
+
+def trim_cues(cues, limit_ms):
+    """Le battute che cominciano prima di limit_ms, tagliate a limit_ms."""
+    return [Cue(c.start, min(c.end, limit_ms), c.text) for c in cues
+            if c.start < limit_ms - 300]
+
+
 # ── la catena ───────────────────────────────────────────────────────────────
 STAGES = ("transcribe", "translate", "dub", "mix")
 Options = collections.namedtuple("Options", [
     "media", "folder", "src", "tgt", "whisper_model", "llm_model", "voice", "speaker_file",
     "voice_name", "gpu", "whisper_device", "llm_device", "tts_device", "threads", "context", "max_speed", "seed", "ducking",
-    "outputs", "fmt", "titles", "source_srt"])
+    "outputs", "fmt", "titles", "source_srt", "reuse", "preview"],
+    defaults=(True, False))
 # whisper_device, llm_device, tts_device: la scheda grafica di ogni passo
 # (descrizione di list_devices(), "" = scelta del motore).
 # outputs: insieme di "srt", "audio", "video". source_srt: file SRT della
 # lingua originale da usare al posto della trascrizione ("" = trascrivere).
+# reuse: usare la trascrizione e le traduzioni salvate per questo video.
+# preview: doppiare solo il primo minuto (file «.prova»).
 
 
 class Dubbing:
@@ -817,15 +911,59 @@ class Dubbing:
         os.makedirs(WORK_DIR, mode=0o700, exist_ok=True)
         os.chmod(WORK_DIR, 0o700)
         self.run_dir = tempfile.mkdtemp(prefix="run-", dir=WORK_DIR)
+        self.media_work = o.media
+        # Il lavoro salvato si carica sempre (per aggiungervi), ma si usa
+        # solo con reuse: «Rifai tutto» rifà e sovrascrive.
+        self.project = load_project(o.media)
+        threading.Thread(target=self._prepare_work, daemon=True).start()
+
+    def _prepare_work(self):
+        """Fuori dall'interfaccia: lo spezzone della prova e la lettura del
+        video."""
+        o = self.o
+        error = None
         try:
-            self.info = probe(o.media)
+            if o.preview:
+                self.on_stage_safe("transcribe", 0.0, "preview")
+                clip = os.path.join(self.run_dir, "prova.mkv")
+                code, tail = self._run([
+                    tts.find_ffmpeg(), "-nostdin", "-hide_banner", "-loglevel", "error",
+                    "-protocol_whitelist", "file", "-i", o.media, "-map", "0", "-t",
+                    f"{PREVIEW_MS / 1000:.3f}", "-c", "copy", "-y", clip])
+                if code != 0 or not os.path.isfile(clip):
+                    raise DubbingError("err_mux", tail)
+                self.media_work = clip
+            self.info = probe(self.media_work)
+        except _Stopped:
+            error = "cancelled"
         except DubbingError as e:
-            self._finish(e)
-            return
+            error = e
+        except OSError as e:
+            error = DubbingError("open_error", str(e))
+        if error:
+            self._emit(self._finish, error)
+        else:
+            self._emit(self._after_prepare)
+
+    def on_stage_safe(self, *args):
+        self._emit(self.on_stage, *args)
+
+    def _after_prepare(self):
+        o = self.o
         if o.source_srt:
             self._use_source_srt()
-        else:
-            self._transcribe()
+            return
+        saved = (self.project.get("transcripts") or {}).get(_transcript_key(o))
+        if o.reuse and saved and saved.get("cues"):
+            # Trascrizione già fatta per questo video, con questo modello.
+            cues = [Cue(int(a), int(b), str(t)) for a, b, t in saved["cues"]]
+            if o.preview:
+                cues = trim_cues(cues, PREVIEW_MS)
+            self.stats["reused_transcript"] = True
+            self.on_log("ruscadubbing: trascrizione salvata, non si rifà")
+            self._transcribed(None, saved.get("language", ""), None, cues=cues)
+            return
+        self._transcribe()
 
     def cancel(self):
         if not self.running:
@@ -865,6 +1003,8 @@ class Dubbing:
         except OSError as e:
             self._finish(DubbingError("open_error", str(e)))
             return
+        if self.o.preview:
+            self.cues = trim_cues(self.cues, PREVIEW_MS)
         if not self.cues:
             self._finish(DubbingError("err_no_speech"))
             return
@@ -879,17 +1019,25 @@ class Dubbing:
                 "transcribe", (percent / 100) if stage == "speech" else 0.0, stage),
             on_log=self.on_log, on_done=self._transcribed)
         try:
-            self.transcriber.start(self.o.media, self.o.whisper_model, self.o.src,
+            self.transcriber.start(self.media_work, self.o.whisper_model, self.o.src,
                                    self.o.threads, self.o.gpu, self.o.whisper_device)
         except whisper.WhisperError as e:
             self._finish(DubbingError(e.key, e.detail))
 
-    def _transcribed(self, error, language, segments):
+    def _transcribed(self, error, language, segments, cues=None):
         self.transcriber = None
         if error:
             self._finish(error if error == "cancelled" else DubbingError(error.key, error.detail))
             return
-        self.cues = cues_from_segments(segments)
+        self.cues = cues if cues is not None else cues_from_segments(segments)
+        if self.o.preview:
+            self.cues = trim_cues(self.cues, PREVIEW_MS)
+        if cues is None and not self.o.preview and self.cues:
+            # Si salva solo la trascrizione del video intero.
+            self.project.setdefault("transcripts", {})[_transcript_key(self.o)] = {
+                "language": language or "",
+                "cues": [[c.start, c.end, c.text] for c in self.cues]}
+            save_project(self.o.media, self.project)
         if not self.cues:
             self._finish(DubbingError("err_no_speech"))
             return
@@ -909,7 +1057,24 @@ class Dubbing:
             self.translated = [c.text for c in self.cues]
             self._after_translation()
             return
+        # Memoria delle traduzioni di questo video: una frase già tradotta
+        # (stessa lingua, stesso modello) non si ritraduce.
+        self.units = block_cues(self.parts, self.blocks)
+        self.memory_key = _memory_key(self.src, o.tgt, o.llm_model)
+        memory = (self.project.get("memory") or {}).get(self.memory_key) or {}
+        self.known = [memory.get(u.text, "") if o.reuse else "" for u in self.units]
+        if all(self.known):
+            self.on_log("ruscadubbing: traduzione salvata, non si rifà")
+            self.stats["reused"] = len(self.units)
+            self._set_translations(self.known)
+            self._after_translation()
+            return
         threading.Thread(target=self._translate_work, daemon=True).start()
+
+    def _set_translations(self, texts):
+        self.block_texts = [clean_translation(u.text, t) for u, t in zip(self.units, texts)]
+        self.translated = translations_per_cue(self.cues, self.parts, self.blocks,
+                                               self.block_texts)
 
     def _translate_work(self):
         o = self.o
@@ -927,15 +1092,18 @@ class Dubbing:
                 if self.stop_event.is_set():
                     raise _Stopped()
                 raise engine.EngineError("engine_not_ready")
-            units = block_cues(self.parts, self.blocks)
             texts, tstats = translate_cues(
-                self.engine.chat, units, self.src, self.o.tgt, self.stop_event,
+                self.engine.chat, self.units, self.src, self.o.tgt, self.stop_event,
                 lambda i, n: self._emit(self.on_stage, "translate", i / max(1, n), f"{i}/{n}"),
-                self.o.max_speed)
+                self.o.max_speed, known=self.known)
             self.stats.update(tstats)
-            self.block_texts = [clean_translation(u.text, t) for u, t in zip(units, texts)]
-            self.translated = translations_per_cue(self.cues, self.parts, self.blocks,
-                                                   self.block_texts)
+            self._set_translations(texts)
+            memory = self.project.setdefault("memory", {}).setdefault(self.memory_key, {})
+            for u, t, k in zip(self.units, self.block_texts, self.known):
+                # Le frasi lasciate nell'originale non si ricordano.
+                if t and not k and t != u.text:
+                    memory[u.text] = t
+            save_project(self.o.media, self.project)
         except _Stopped:
             error = "cancelled"
         except engine.EngineError as e:
@@ -964,7 +1132,8 @@ class Dubbing:
 
     def _write_subtitles(self):
         o = self.o
-        self.paths = output_paths(o.media, o.folder, self.src, o.tgt, o.fmt)
+        self.paths = output_paths(o.media, o.folder, self.src, o.tgt, o.fmt,
+                                  ".prova" if o.preview else "")
         self.work_srt_src = os.path.join(self.run_dir, "originale.srt")
         self.work_srt_tgt = os.path.join(self.run_dir, "tradotto.srt")
         # Sottotitoli divisi con le regole professionali: gli originali
@@ -976,6 +1145,11 @@ class Dubbing:
             tgt_subs, fast = segment_subtitles(units, self.block_texts, o.tgt)
         else:
             tgt_subs, fast = segment_subtitles(self.cues, self.translated, o.tgt)
+        if o.preview:
+            # Nella prova nessun sottotitolo va oltre lo spezzone.
+            limit = self.info["duration_ms"] or PREVIEW_MS
+            src_subs = [Cue(c.start, min(c.end, limit), c.text) for c in src_subs if c.start < limit]
+            tgt_subs = [Cue(c.start, min(c.end, limit), c.text) for c in tgt_subs if c.start < limit]
         self.stats["fast_subtitles"] = fast
         self.stats["subtitles"] = len(tgt_subs)
         for path, text in ((self.work_srt_src, to_srt(src_subs)),
@@ -1043,7 +1217,8 @@ class Dubbing:
         try:
             has_audio = self.info["audio"] > 0
             mix = os.path.join(self.run_dir, "doppiaggio.wav")
-            code, tail = self._run(mix_command(ffmpeg, o.media, voice_wav, mix, has_audio, o.ducking))
+            code, tail = self._run(mix_command(ffmpeg, self.media_work, voice_wav, mix, has_audio,
+                                               o.ducking))
             if code != 0 or not os.path.isfile(mix):
                 raise DubbingError("err_mix", tail)
             self._emit(self.on_stage, "mix", 0.4, "")
@@ -1060,8 +1235,9 @@ class Dubbing:
             if "video" in o.outputs:
                 tmp = self.paths["video"] + ".part"
                 code, tail = self._run(mux_command(
-                    ffmpeg, o.media, mix, self.work_srt_src, self.work_srt_tgt, tmp, o.fmt,
-                    self.src, o.tgt, has_audio, o.titles))
+                    ffmpeg, self.media_work, mix, self.work_srt_src, self.work_srt_tgt, tmp, o.fmt,
+                    self.src, o.tgt, has_audio, o.titles,
+                    self.info["duration_ms"] if o.preview else 0))
                 if code != 0 or not os.path.isfile(tmp):
                     try:
                         os.unlink(tmp)

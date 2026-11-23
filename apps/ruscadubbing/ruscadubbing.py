@@ -337,6 +337,7 @@ class DubbingWindow(Adw.ApplicationWindow):
     # ── azioni ────────────────────────────────────────────────────────────
     def _build_actions(self):
         for name, cb in (("open", self.open_file), ("dub", self.start),
+                         ("preview", lambda: self.start(preview=True)),
                          ("stop", self.stop), ("new", self.new_dubbing),
                          ("open-result", self.open_result), ("open-folder", self.open_folder),
                          ("preferences", self.show_preferences), ("show-log", self.show_log),
@@ -414,6 +415,16 @@ class DubbingWindow(Adw.ApplicationWindow):
         change.update_property([Gtk.AccessibleProperty.LABEL], [_("change_video")])
         self.video_row.add_suffix(change)
         video.add(self.video_row)
+        # Lavoro già fatto per questo video: trascrizione e traduzioni
+        # salvate, che si riusano (si rifanno solo voce e missaggio).
+        self.saved_row = Adw.ActionRow(title=_("saved_work"), visible=False)
+        self.saved_row.add_prefix(Gtk.Image(icon_name="document-save-symbolic"))
+        forget = Gtk.Button(label=_("saved_forget"), valign=Gtk.Align.CENTER,
+                            tooltip_text=_("saved_forget_tip"))
+        forget.add_css_class("flat")
+        forget.connect("clicked", lambda _b: self._forget())
+        self.saved_row.add_suffix(forget)
+        video.add(self.saved_row)
         box.append(video)
 
         langs = Adw.PreferencesGroup(title=_("group_languages"))
@@ -498,11 +509,19 @@ class DubbingWindow(Adw.ApplicationWindow):
         out.add(self.folder_row)
         box.append(out)
 
-        self.dub_btn = Gtk.Button(label=_("dub"), action_name="win.dub",
-                                  halign=Gtk.Align.CENTER)
+        buttons = Gtk.Box(spacing=12, halign=Gtk.Align.CENTER)
+        preview = Gtk.Button(label=_("preview"), action_name="win.preview",
+                             tooltip_text=_("preview_tip"))
+        preview.add_css_class("pill")
+        self.dub_btn = Gtk.Button(label=_("dub"), action_name="win.dub")
         self.dub_btn.add_css_class("suggested-action")
         self.dub_btn.add_css_class("pill")
-        box.append(self.dub_btn)
+        buttons.append(preview)
+        buttons.append(self.dub_btn)
+        box.append(buttons)
+        narrow = Adw.Breakpoint.new(Adw.BreakpointCondition.parse("max-width: 420sp"))
+        narrow.add_setter(buttons, "orientation", Gtk.Orientation.VERTICAL)
+        self.add_breakpoint(narrow)
         return self._scrolled(box)
 
     def _work_page(self):
@@ -607,6 +626,25 @@ class DubbingWindow(Adw.ApplicationWindow):
             b.set_revealed(False)
         self._refresh_actions()
 
+    def _refresh_saved_row(self):
+        transcript, langs = dub.project_summary(self.media) if self.media else (False, [])
+        if not transcript and not langs:
+            self.saved_row.set_visible(False)
+            return
+        parts = []
+        if transcript:
+            parts.append(_("saved_transcript"))
+        if langs:
+            parts.append(_("saved_translations", langs=", ".join(language_name(c) for c in langs)))
+        self.saved_row.set_subtitle(GLib.markup_escape_text("; ".join(parts)))
+        self.saved_row.set_visible(True)
+
+    def _forget(self):
+        if self.media:
+            dub.forget_project(self.media)
+            self._refresh_saved_row()
+            self._toast(_("saved_forgotten"))
+
     def _refresh_voice_row(self):
         path = self.cfg["speaker_file"]
         if path and os.path.isfile(path):
@@ -624,6 +662,8 @@ class DubbingWindow(Adw.ApplicationWindow):
         running = self.dubbing.running or busy
         ready = self.media is not None and self._missing() is None and bool(self._outputs())
         self.lookup_action("dub").set_enabled(ready and not running)
+        self.lookup_action("preview").set_enabled(ready and not running
+                                                  and bool(self._outputs() - {"srt"}))
         self.lookup_action("stop").set_enabled(self.dubbing.running)
         self.lookup_action("open").set_enabled(not running)
         self.lookup_action("new").set_enabled(not running)
@@ -715,6 +755,7 @@ class DubbingWindow(Adw.ApplicationWindow):
             parts.append(_("subtitle_tracks", n=info["subtitle"]))
         self.video_row.set_subtitle(" · ".join(parts))
         self._refresh_folder()
+        self._refresh_saved_row()
         self.stack.set_visible_child_name("setup")
         self._refresh_banner()
 
@@ -769,7 +810,7 @@ class DubbingWindow(Adw.ApplicationWindow):
         dialog.select_folder(self, None, done)
 
     # ── doppiaggio ────────────────────────────────────────────────────────
-    def start(self):
+    def start(self, preview=False):
         if self.media is None or self.dubbing.running:
             return
         cfg = self.cfg
@@ -793,7 +834,7 @@ class DubbingWindow(Adw.ApplicationWindow):
             threads=cfg["threads"], context=cfg["context"], max_speed=cfg["max_speed"],
             seed=cfg["seed"], ducking=cfg["ducking"], outputs=self._outputs(), fmt=cfg["fmt"],
             titles=(language_name(src) if src != "auto" else "", dub.NATIVE[cfg["tgt"]]),
-            source_srt=self.source_srt)
+            source_srt=self.source_srt, reuse=True, preview=preview)
         self.log_lines.clear()
         self.files = {}
         for stage in dub.STAGES:
@@ -801,7 +842,8 @@ class DubbingWindow(Adw.ApplicationWindow):
         if not (self._outputs() - {"srt"}):
             for stage in ("dub", "mix"):
                 self._stage_state(stage, "skip")
-        self.work_title.set_label(_("working_title", name=os.path.basename(self.media)))
+        self.work_title.set_label(_("working_preview" if preview else "working_title",
+                                    name=os.path.basename(self.media)))
         self.progress.set_fraction(0)
         self.progress.set_text("")
         try:
@@ -853,6 +895,8 @@ class DubbingWindow(Adw.ApplicationWindow):
         text = ""
         if stage == "transcribe" and fraction >= 1.0 and detail:
             text = _("detected_language", language=language_name(detail))
+        elif stage == "transcribe" and detail == "preview":
+            text = _("stage_preview")
         elif stage == "transcribe" and detail == "audio":
             text = _("stage_audio")
         elif stage == "transcribe" and detail == "model":
@@ -906,6 +950,7 @@ class DubbingWindow(Adw.ApplicationWindow):
         self._show_result(files, stats)
 
     def _show_result(self, files, stats):
+        self._refresh_saved_row()
         elapsed = duration_text((time.monotonic() - self._started) * 1000)
         lines = [_("done_desc", n=stats.get("cues", 0), time=elapsed)]
         if stats.get("faster") or stats.get("late"):
@@ -913,6 +958,10 @@ class DubbingWindow(Adw.ApplicationWindow):
                            late=stats.get("late", 0)))
         if stats.get("kept"):
             lines.append(_("done_kept", n=stats["kept"]))
+        if stats.get("reused_transcript") and stats.get("reused") == stats.get("blocks"):
+            lines.append(_("done_reused_all"))
+        elif stats.get("reused_transcript") or stats.get("reused"):
+            lines.append(_("done_reused_some"))
         if stats.get("fast_subtitles"):
             lines.append(_("done_fast", n=stats["fast_subtitles"]))
         self.done_status.set_description("\n".join(lines))
