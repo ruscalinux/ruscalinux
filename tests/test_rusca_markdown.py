@@ -18,7 +18,8 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TOOLS = os.path.join(REPO, "apps")
 COPIES = ["ruscallama/rusca_markdown.py", "ruscamark/rusca_markdown.py",
           "ruscawriter/src/ruscawriter/rusca_markdown.py",
-          "ruscatranslator/rusca_markdown.py", "ruscanarrator/rusca_markdown.py"]
+          "ruscatranslator/rusca_markdown.py", "ruscanarrator/rusca_markdown.py",
+          "ruscallisse/rusca_markdown.py", "ruscadubbing/rusca_markdown.py"]
 sys.path.insert(0, os.path.join(TOOLS, "ruscallama"))
 import rusca_markdown as md  # noqa: E402
 

@@ -1,0 +1,405 @@
+"""RuscaLinux OS Apps — test di RuscaDubbing — 1.99.3 — GPL-3.0
+
+rusca_dubbing.py porta un video dalla lingua originale a quella doppiata:
+whisper-cli trascrive, llama-server traduce, llama-tts doppia, FFmpeg
+missa e scrive il video. Qui si controllano le battute, il prompt e la
+lettura delle traduzioni, e l'intera catena con tre programmi finti al posto
+dei motori (non servono né i motori né i modelli). FFmpeg invece è quello
+vero, e crea anche il video di prova: senza, quei test si saltano.
+Dalla radice del repository:
+    python3 -m unittest tests/test_ruscadubbing.py
+"""
+
+import ast
+import json
+import os
+import re
+import shutil
+import stat
+import subprocess
+import sys
+import tempfile
+import unittest
+
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+APP = os.path.join(REPO, "apps", "ruscadubbing")
+sys.path.insert(0, APP)
+
+try:
+    from gi.repository import GLib
+    import rusca_dubbing as rd
+except (ImportError, ValueError):
+    rd = None
+
+FFMPEG = shutil.which("ffmpeg")
+
+# whisper-cli finto: tre segmenti, i primi due sono una frase sola.
+FAKE_WHISPER = r'''#!/usr/bin/env python3
+import json, os, sys
+args = sys.argv[1:]
+opt = lambda name: args[args.index(name) + 1]
+assert os.path.isfile(opt("-f"))
+segs = [(500, 1800, " Good morning"), (1900, 3000, " to everybody."),
+        (3600, 5200, " Today we talk about RuscaLinux.")]
+json.dump({"result": {"language": "en"}, "transcription": [
+    {"offsets": {"from": a, "to": b}, "text": t} for a, b, t in segs]},
+    open(opt("-of") + ".json", "w"))
+'''
+
+# llama-server finto: /health, e /v1/chat/completions che risponde
+# `N|IT <testo>` per ogni riga `N|MAX|testo`; controlla la chiave.
+FAKE_SERVER = r'''#!/usr/bin/env python3
+import http.server, json, os, re, sys
+args = sys.argv[1:]
+opt = lambda name: args[args.index(name) + 1]
+key = open(opt("--api-key-file")).read().strip()
+with open(os.environ["FAKE_ARGS"], "a") as f:
+    f.write(json.dumps(args) + "\n")
+class H(http.server.BaseHTTPRequestHandler):
+    def log_message(self, *a): pass
+    def send(self, code, body):
+        data = json.dumps(body).encode()
+        self.send_response(code); self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(data))); self.end_headers()
+        self.wfile.write(data)
+    def do_GET(self):
+        self.send(200, {"status": "ok"})
+    def do_POST(self):
+        if self.headers.get("Authorization") != "Bearer " + key:
+            return self.send(401, {"error": "key"})
+        body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+        user = body["messages"][-1]["content"].split("Lines to translate:\n")[-1]
+        out = []
+        for line in user.splitlines():
+            m = re.match(r"(\d+)\|(\d+)\|(.*)", line)
+            if m:
+                out.append(f"{m.group(1)}|IT {m.group(3)}")
+        self.send(200, {"choices": [{"message": {"content": "\n".join(out)}}]})
+http.server.HTTPServer(("127.0.0.1", int(opt("--port"))), H).serve_forever()
+'''
+
+# llama-tts finto: 24 kHz; 40 ms di tono per carattere fra due silenzi brevi.
+FAKE_TTS = r'''#!/usr/bin/env python3
+import json, math, os, struct, sys, wave
+args = sys.argv[1:]
+if args == ["--list-devices"]:
+    print("Available devices:"); sys.exit(0)
+opt = lambda name: args[args.index(name) + 1]
+text, out = opt("-p"), opt("-o")
+with open(os.environ["FAKE_TTS_ARGS"], "a") as f:
+    f.write(json.dumps(args) + "\n")
+rate = 24000
+w = wave.open(out, "wb"); w.setnchannels(1); w.setsampwidth(2); w.setframerate(rate)
+w.writeframes(b"\0\0" * (rate // 10))
+n = rate * 40 * len(text) // 1000
+w.writeframes(b"".join(struct.pack("<h", int(9000 * math.sin(2 * math.pi * 300 * i / rate)))
+                       for i in range(n)))
+w.writeframes(b"\0\0" * (rate // 10))
+w.close()
+'''
+
+
+@unittest.skipIf(rd is None, "PyGObject (GLib) non disponibile")
+class Cues(unittest.TestCase):
+    def seg(self, a, b, t):
+        return rd.whisper.Segment(a, b, t)
+
+    def test_join(self):
+        cues = rd.cues_from_segments([self.seg(0, 1000, " Ciao"), self.seg(1200, 2000, "a tutti."),
+                                      self.seg(2100, 3000, "Oggi"), self.seg(5000, 6000, "piove.")])
+        self.assertEqual(cues, [rd.Cue(0, 2000, "Ciao a tutti."), rd.Cue(2100, 3000, "Oggi"),
+                                rd.Cue(5000, 6000, "piove.")])
+
+    def test_srt(self):
+        cues = [rd.Cue(0, 1000, "Hello."), rd.Cue(1500, 2500, "Bye.")]
+        self.assertEqual(rd.to_srt(cues, ["Ciao.", "Addio."]),
+                         "1\n00:00:00,000 --> 00:00:01,000\nCiao.\n\n"
+                         "2\n00:00:01,500 --> 00:00:02,500\nAddio.\n")
+        both = rd.bilingual_srt(cues, ["Ciao.", "Addio."])
+        self.assertIn("Hello.\nCiao.", both)
+        again = rd.cues_from_srt(rd.to_srt(cues))
+        self.assertEqual([c.text for c in again], ["Hello.", "Bye."])
+
+    def test_budget(self):
+        cues = [rd.Cue(0, 1000, "a"), rd.Cue(2000, 2600, "b")]
+        self.assertEqual(rd.slot_ms(cues, 0), 2000)          # fino alla battuta dopo
+        self.assertEqual(rd.slot_ms(cues, 1), 600)           # l'ultima: la sua durata
+        self.assertGreater(rd.budget_chars(cues, 0, "it", 1.3), rd.budget_chars(cues, 1, "it", 1.3))
+        self.assertGreater(rd.budget_chars(cues, 0, "it", 2.0), rd.budget_chars(cues, 0, "it", 1.0))
+
+    def test_parse(self):
+        got = rd.parse_translations("Ecco:\n1|Ciao.\n2| 40 |Addio.\n[3] Fine\n```\nniente\n4|\n")
+        self.assertEqual(got, {1: "Ciao.", 2: "Addio.", 3: "Fine"})
+
+    def test_translate(self):
+        cues = [rd.Cue(i * 2000, i * 2000 + 1500, f"Line {i}.") for i in range(5)]
+        calls = []
+
+        def chat(body):
+            user = body["messages"][-1]["content"]
+            calls.append(user)
+            lines = [line for line in user.split("Lines to translate:\n")[-1].splitlines() if line]
+            out = []
+            for line in lines:
+                n, _max, text = line.split("|", 2)
+                if text == "Line 3." and len(lines) > 1:
+                    continue                        # nel gruppo il modello la salta
+                if text == "Line 4.":
+                    continue                        # questa non torna mai
+                out.append(f"{n}|Riga {text[5]}.")
+            return "\n".join(out)
+        texts, stats = rd.translate_cues(chat, cues, "en", "it", batch=3)
+        self.assertEqual(texts, ["Riga 0.", "Riga 1.", "Riga 2.", "Riga 3.", "Line 4."])
+        self.assertEqual(stats, {"retried": 2, "shortened": 0, "kept": 1})
+        # Il secondo gruppo ha come contesto le battute già tradotte.
+        self.assertIn("Line 2. => Riga 2.", calls[1])
+        self.assertIn("4|", calls[1])
+        self.assertTrue(rd.build_prompt("en", "it").count("Italian") >= 2)
+
+    def test_shorten(self):
+        cues = [rd.Cue(0, 800, "Yes.")]
+
+        def chat(body):
+            user = body["messages"][-1]["content"]
+            if "too long" in user:
+                return "1|Sì."
+            return "1|" + "Certamente, sono assolutamente d'accordo con te." * 2
+        texts, stats = rd.translate_cues(chat, cues, "en", "it")
+        self.assertEqual(texts, ["Sì."])
+        self.assertEqual(stats["shortened"], 1)
+
+    def test_stop(self):
+        import threading
+        ev = threading.Event()
+        ev.set()
+        with self.assertRaises(rd._Stopped):
+            rd.translate_cues(lambda b: "", [rd.Cue(0, 1, "a")], "en", "it", ev)
+
+    def test_paths(self):
+        with tempfile.TemporaryDirectory() as t:
+            media = os.path.join(t, "film.mp4")
+            open(media, "w").close()
+            p = rd.output_paths(media, "", "en", "it", "mkv")
+            self.assertEqual(p["video"], os.path.join(t, "film.it.mkv"))
+            open(p["video"], "w").close()
+            self.assertEqual(rd.output_paths(media, "", "en", "it", "mkv")["video"],
+                             os.path.join(t, "film.it (2).mkv"))
+
+    def test_mux_command(self):
+        cmd = rd.mux_command("/usr/bin/ffmpeg", "in.mp4", "mix.wav", "a.srt", "b.srt", "o.mkv",
+                             "mkv", "en", "it", True, ("Original", "Italiano"))
+        self.assertEqual(cmd[cmd.index("-protocol_whitelist") + 1], "file")
+        self.assertIn("language=eng", cmd)
+        self.assertIn("language=ita", cmd)
+        self.assertEqual(cmd[cmd.index("-c:v") + 1], "copy")
+        self.assertEqual(cmd[cmd.index("-disposition:a:1") + 1], "default")
+
+
+@unittest.skipIf(rd is None, "PyGObject (GLib) non disponibile")
+class Source(unittest.TestCase):
+    def test_no_network(self):
+        """Solo rusca_engine.py parla (con llama-server, su 127.0.0.1)."""
+        net = {"socket", "urllib", "requests", "http", "ftplib", "smtplib", "ssl"}
+        for name in ("rusca_dubbing.py", "ruscadubbing.py", "rusca_whisper.py", "rusca_tts.py"):
+            path = os.path.join(APP, name)
+            if not os.path.isfile(path):
+                continue
+            tree = ast.parse(open(path, encoding="utf-8").read())
+            for node in ast.walk(tree):
+                mods = []
+                if isinstance(node, ast.Import):
+                    mods = [a.name for a in node.names]
+                elif isinstance(node, ast.ImportFrom) and node.module:
+                    mods = [node.module]
+                for m in mods:
+                    self.assertNotIn(m.split(".")[0], net, f"{name}: {m}")
+
+    def test_shared_copies(self):
+        """I moduli comuni sono copie identiche di quelli delle altre app."""
+        for f, other in (("rusca_whisper.py", "ruscatranscriber"), ("rusca_tts.py", "ruscanarrator"),
+                         ("rusca_engine.py", "ruscatranslator"),
+                         ("rusca_markdown.py", "ruscanarrator"),
+                         ("markdown_it_mark.py", "ruscanarrator"), ("style.css", "ruscanarrator")):
+            a = open(os.path.join(APP, f), "rb").read()
+            b = open(os.path.join(APP, "..", other, f), "rb").read()
+            self.assertEqual(a, b, f)
+
+    def test_work_dirs(self):
+        self.assertTrue(rd.whisper.WORK_DIR.startswith(rd.WORK_DIR))
+        self.assertTrue(rd.tts.WORK_DIR.startswith(rd.WORK_DIR))
+
+    def test_lang_keys(self):
+        """Le due lingue hanno le stesse chiavi, e ci sono tutte quelle usate."""
+        it = json.load(open(os.path.join(APP, "lang", "it.json"), encoding="utf-8"))
+        en = json.load(open(os.path.join(APP, "lang", "en.json"), encoding="utf-8"))
+        self.assertEqual(set(it), set(en))
+        used = set()
+        for name in ("rusca_dubbing.py", "ruscadubbing.py", "rusca_whisper.py", "rusca_tts.py",
+                     "rusca_engine.py"):
+            src = open(os.path.join(APP, name), encoding="utf-8").read()
+            if name.startswith("rusca_"):           # nei moduli comuni, solo gli errori
+                pattern = r'(?:DubbingError|WhisperError|TTSError|EngineError)\("([a-z][a-z0-9_]+)"'
+            else:
+                pattern = r'\b_\("([a-z][a-z0-9_]+)"'
+            used |= set(re.findall(pattern, src))
+        used |= {"err_no_llm_engine", "err_mux", "app_summary", "desktop_keywords"}
+        for stage in rd.STAGES:
+            used |= {f"stage_{stage}", f"stage_{stage}_sub"}
+        used |= {f"ducking_{d}" for d in rd.DUCKING} | {f"fmt_{f}" for f in rd.VIDEO_FORMATS}
+        used |= {f"file_{k}" for k in ("video", "audio", "srt_tgt", "srt_src", "srt_both")}
+        used |= {f"{k}_sub" for k in ("out_srt", "out_audio", "out_video")}
+        used |= {f"theme_{t}" for t in ("system", "light", "dark")}
+        self.assertEqual(sorted(used - set(en)), [])
+
+
+@unittest.skipIf(rd is None or FFMPEG is None, "PyGObject o FFmpeg non disponibili")
+class Chain(unittest.TestCase):
+    """Tutta la catena: video vero, motori finti, FFmpeg vero."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        t = cls.tmp.name
+        cls.video = os.path.join(t, "prova.mp4")
+        subprocess.run([FFMPEG, "-nostdin", "-loglevel", "error", "-f", "lavfi", "-i",
+                        "testsrc=size=160x120:rate=10:duration=6", "-f", "lavfi", "-i",
+                        "sine=frequency=500:duration=6", "-c:v", "libx264", "-preset",
+                        "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest",
+                        "-y", cls.video], check=True)
+        cls.mute = os.path.join(t, "muto.mp4")
+        subprocess.run([FFMPEG, "-nostdin", "-loglevel", "error", "-i", cls.video, "-an",
+                        "-c:v", "copy", "-y", cls.mute], check=True)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        t = self.dir.name
+        bins = os.path.join(t, "bin")
+        os.makedirs(bins)
+        for name, code in (("whisper-cli", FAKE_WHISPER), ("llama-server", FAKE_SERVER),
+                           ("llama-tts", FAKE_TTS)):
+            p = os.path.join(bins, name)
+            with open(p, "w", encoding="utf-8") as f:
+                f.write(code)
+            os.chmod(p, os.stat(p).st_mode | stat.S_IXUSR)
+        self.saved = (rd.whisper.ENGINE_DIRS, rd.whisper.FFMPEG_PATHS, rd.engine.ENGINE_DIRS,
+                      rd.tts.ENGINE_DIRS, rd.tts.FFMPEG_PATHS, rd.WORK_DIR, rd.whisper.WORK_DIR,
+                      rd.tts.WORK_DIR)
+        rd.whisper.ENGINE_DIRS = rd.engine.ENGINE_DIRS = rd.tts.ENGINE_DIRS = (bins,)
+        rd.whisper.FFMPEG_PATHS = rd.tts.FFMPEG_PATHS = (FFMPEG,)
+        rd.WORK_DIR = os.path.join(t, "lavoro")
+        rd.whisper.WORK_DIR = os.path.join(rd.WORK_DIR, "whisper")
+        rd.tts.WORK_DIR = os.path.join(rd.WORK_DIR, "voce")
+        os.environ["FAKE_ARGS"] = os.path.join(t, "server.jsonl")
+        os.environ["FAKE_TTS_ARGS"] = os.path.join(t, "tts.jsonl")
+        self.out = os.path.join(t, "uscita")
+        os.makedirs(self.out)
+        self.models = {}
+        for name in ("whisper.bin", "llm.gguf", "voce.gguf", "mmproj-voce.gguf"):
+            self.models[name] = os.path.join(t, name)
+            open(self.models[name], "w").close()
+
+    def tearDown(self):
+        (rd.whisper.ENGINE_DIRS, rd.whisper.FFMPEG_PATHS, rd.engine.ENGINE_DIRS,
+         rd.tts.ENGINE_DIRS, rd.tts.FFMPEG_PATHS, rd.WORK_DIR, rd.whisper.WORK_DIR,
+         rd.tts.WORK_DIR) = self.saved
+        self.dir.cleanup()
+
+    def options(self, **kw):
+        o = dict(media=self.video, folder=self.out, src="auto", tgt="it",
+                 whisper_model=self.models["whisper.bin"], llm_model=self.models["llm.gguf"],
+                 voice=rd.tts.Voice(self.models["voce.gguf"], self.models["mmproj-voce.gguf"]),
+                 speaker_file="", voice_name="", gpu=False, gpu_device="", threads=2,
+                 context=4096, max_speed=1.3, seed=42, ducking="medium",
+                 outputs={"srt", "audio", "video"}, fmt="mkv", titles=("English", "Italiano"),
+                 source_srt="")
+        o.update(kw)
+        return rd.Options(**o)
+
+    def run_chain(self, options, cancel_after=None):
+        loop = GLib.MainLoop()
+        seen = {"stages": [], "done": None}
+
+        def done(error, files, stats):
+            seen["done"] = (error, files, stats)
+            loop.quit()
+        d = rd.Dubbing(lambda s, f=0.0, x="": seen["stages"].append(s), lambda line: None, done)
+        d.start(options)
+        if cancel_after:
+            GLib.timeout_add(cancel_after, lambda: d.cancel() and False)
+        GLib.timeout_add_seconds(90, loop.quit)
+        loop.run()
+        self.assertIsNotNone(seen["done"], "il doppiaggio non è finito")
+        d.engine.stop(wait=True)
+        return seen
+
+    def streams(self, path):
+        r = subprocess.run([FFMPEG, "-hide_banner", "-i", path], capture_output=True, text=True)
+        return [line.strip() for line in r.stderr.splitlines() if "Stream #" in line]
+
+    def test_mkv(self):
+        seen = self.run_chain(self.options())
+        error, files, stats = seen["done"]
+        self.assertIsNone(error, error)
+        self.assertEqual(set(files), {"srt_src", "srt_tgt", "srt_both", "audio", "video"})
+        self.assertEqual(stats["cues"], 2)                   # due segmenti uniti
+        for stage in rd.STAGES:
+            self.assertIn(stage, seen["stages"])
+        tgt = open(files["srt_tgt"], encoding="utf-8").read()
+        self.assertIn("IT Good morning to everybody.", tgt)
+        self.assertTrue(files["srt_src"].endswith("prova.en.srt"))
+        streams = self.streams(files["video"])
+        kinds = [s.split(": ")[1] for s in streams]
+        self.assertEqual(kinds, ["Video", "Audio", "Audio", "Subtitle", "Subtitle"], streams)
+        self.assertIn("(eng)", streams[1])
+        self.assertIn("(ita)", streams[2])
+        self.assertIn("(default)", streams[2])
+        self.assertNotIn("(default)", streams[1])
+        self.assertIn("h264", streams[0])                    # immagine copiata
+        info = rd.probe(files["video"])
+        self.assertGreaterEqual(info["duration_ms"], 5500)
+        # Niente file di lavoro rimasti, niente server acceso.
+        left = [os.path.join(r, f) for r, _d, fs in os.walk(rd.WORK_DIR) for f in fs]
+        self.assertEqual(left, [])
+        server = json.load(open(os.environ["FAKE_ARGS"]))
+        self.assertIn("127.0.0.1", server)
+
+    def test_mp4_and_mute_video(self):
+        seen = self.run_chain(self.options(media=self.mute, fmt="mp4", outputs={"video"},
+                                           source_srt=self._srt(), src="en"))
+        error, files, _stats = seen["done"]
+        self.assertIsNone(error, error)
+        self.assertEqual(set(files), {"video"})
+        kinds = [s.split(": ")[1] for s in self.streams(files["video"])]
+        self.assertEqual(kinds, ["Video", "Audio", "Subtitle", "Subtitle"])
+
+    def test_subtitles_only(self):
+        seen = self.run_chain(self.options(outputs={"srt"}, voice=None))
+        error, files, _stats = seen["done"]
+        self.assertIsNone(error, error)
+        self.assertEqual(set(files), {"srt_src", "srt_tgt", "srt_both"})
+        self.assertFalse(os.path.exists(os.environ["FAKE_TTS_ARGS"]))
+
+    def test_cancel(self):
+        seen = self.run_chain(self.options(), cancel_after=300)
+        self.assertEqual(seen["done"][0], "cancelled")
+        self.assertFalse(os.path.exists(os.path.join(self.out, "prova.it.mkv")))
+
+    def test_missing_model(self):
+        with self.assertRaises(rd.DubbingError) as cm:
+            rd.Dubbing().start(self.options(llm_model=""))
+        self.assertEqual(cm.exception.key, "err_no_llm_model")
+
+    def _srt(self):
+        p = os.path.join(self.dir.name, "orig.srt")
+        with open(p, "w", encoding="utf-8") as f:
+            f.write("1\n00:00:00,500 --> 00:00:02,000\nHello there.\n\n"
+                    "2\n00:00:03,000 --> 00:00:05,000\nSee you.\n")
+        return p
+
+
+if __name__ == "__main__":
+    unittest.main()

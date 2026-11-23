@@ -107,6 +107,14 @@
   included: copy a Vosk model, a GGUF model and a Piper voice (for example
   `vosk-model-it-0.22`, a Ministral model and `it_IT-paola-medium`) and import
   them from the app.
+- **A dubbing room.** RuscaDubbing takes a video in its own language and
+  makes subtitles in both languages, the dubbed audio and a video with both
+  audio tracks and both subtitle tracks. Whisper transcribes the speech, a
+  language model translates each line so that it fits its time, and the
+  voice of RuscaNarrator says it at the right moment over the lowered
+  original sound. The picture is copied, not re-encoded. It uses the models
+  of RuscaTranscriber, RuscaTranslator and RuscaNarrator: nothing new to
+  download, and nothing leaves the computer.
 - **A pinball game.** RuscaPinball brings the “Amethyst” table, seen in
   perspective like the 1980s home computer pinball games: mushroom
   bumpers, a centre target that lights double bumpers, a dome kicker, the

@@ -1,0 +1,122 @@
+# RuscaDubbing 1.99.3 — Manuale
+
+**Versione** 1.99.3 · **Autore** Nunzio Curcuruto · **Distribuzione** RuscaLinux ([ruscalinux.org](https://www.ruscalinux.org/)) · **Licenza** GNU GPL v3 o successiva
+
+RuscaDubbing è la **sala di doppiaggio** di RuscaLinux. Da un video nella sua lingua ottiene:
+
+- i **sottotitoli** nella lingua originale, in quella del doppiaggio e nelle due insieme (SRT);
+- l'**audio doppiato** (Opus);
+- il **video doppiato** (MKV o MP4): l'immagine originale, l'audio originale e quello doppiato, i sottotitoli nelle due lingue.
+
+Tutto succede **su questo computer**, con tre motori esterni con licenza MIT: **whisper.cpp** (`ruscawhisper-engine`) trascrive, **llama.cpp** (`ruscallama-engine`) traduce e dà la voce, **FFmpeg** missa e scrive il video.
+
+---
+
+## 1. Requisiti
+
+- RuscaLinux o Debian Stable, GNOME;
+- Python ≥ 3.10, GTK ≥ 4.18, libadwaita ≥ 1.7;
+- i pacchetti `ruscawhisper-engine`, `ruscallama-engine` (con `llama-tts`) e `ffmpeg`;
+- tre modelli, gli stessi delle altre app (punto seguente).
+
+Una scheda grafica con Vulkan rende tutto molto più veloce. Su un portatile senza scheda grafica un video di qualche minuto richiede comunque un po' di pazienza.
+
+## 2. I modelli
+
+RuscaDubbing **non ha modelli propri**: usa quelli che hai già copiato per le altre app.
+
+| Passo | Modello | Cartella | Lo usa anche |
+|---|---|---|---|
+| Trascrizione | Whisper (`ggml-….bin`) | `~/.local/share/ruscawhisper/models/` | RuscaTranscriber |
+| Traduzione | modello linguistico GGUF | `~/.local/share/ruscallama/models/` | RuscaTranslator, RuscaLLama |
+| Voce | Qwen3-TTS GGUF + mmproj | `~/.local/share/ruscanarrator/models/` | RuscaNarrator |
+
+Nelle **Preferenze** scegli quale usare per ogni passo; il pulsante con la cartella apre la cartella giusta. Se ne manca uno, una striscia in alto lo dice.
+
+**La voce.** Senza voce di riferimento il modello inventa una voce per ogni battuta. Per un doppiaggio serve **una voce sola**: crea una voce con **Crea una voce** di RuscaNarrator e sceglila nelle Preferenze → **Voce di riferimento**. Alla prima apertura RuscaDubbing sceglie la prima voce che trova.
+
+## 3. Doppiare un video
+
+1. **Apri** il video (Ctrl+O), trascinalo sulla finestra, oppure dal gestore dei file: **Apri con → RuscaDubbing**.
+2. Scegli la **lingua originale** («Automatica» la riconosce) e la **lingua del doppiaggio**.
+3. Scegli **che cosa ottenere**: sottotitoli, audio doppiato, video doppiato.
+4. Premi **Doppia** (Ctrl+Invio).
+
+La finestra mostra i quattro passi:
+
+| Passo | Che cosa succede |
+|---|---|
+| **Trascrizione** | Whisper scrive i sottotitoli originali. I pezzi di una stessa frase separati da una pausa breve diventano una battuta sola, perché la voce li dica di seguito. |
+| **Traduzione** | Il modello linguistico traduce le battute a gruppi, con le battute precedenti come contesto. Per ogni battuta sa **quanti caratteri** può usare per stare nel suo tempo; se una traduzione è molto più lunga, gli si chiede una versione breve, come fa un adattatore. Poi il modello si chiude, per lasciare la scheda grafica alla voce. |
+| **Doppiaggio** | La voce dice ogni battuta **al suo tempo**. Se è troppo lunga si accelera senza cambiare il tono, fino alla velocità massima; se non basta slitta in avanti: due battute non si sovrappongono mai. |
+| **Missaggio** | FFmpeg abbassa l'audio originale mentre parla la voce (musica ed effetti restano, più bassi) e scrive i file. L'immagine **si copia** senza ricodifica: nessuna perdita di qualità e pochi secondi anche per un film. |
+
+**Ferma** (Esc) interrompe in ogni momento. Alla fine RuscaDubbing elenca i file: un clic li apre, **Guarda** apre il video.
+
+## 4. I file
+
+Accanto al video, o nella cartella scelta in **Cartella dei file**. Un video `film.mp4` doppiato dall'inglese all'italiano dà:
+
+| File | Contenuto |
+|---|---|
+| `film.en.srt` | sottotitoli originali |
+| `film.it.srt` | sottotitoli tradotti |
+| `film.en-it.srt` | le due lingue insieme: sopra l'originale, sotto la traduzione |
+| `film.it.opus` | l'audio doppiato da solo |
+| `film.it.mkv` | il video doppiato |
+
+Se un file esiste già non si sovrascrive: il nuovo si chiama `film.it (2).mkv`.
+
+Nel video doppiato la traccia **doppiata è quella predefinita**; l'audio originale e i sottotitoli sono tracce in più, con la loro lingua, da scegliere nel lettore (in Totem/Video: menu → **Lingue** e **Sottotitoli**; in VLC: **Audio** → **Traccia audio**). **MKV** accetta qualsiasi video e copia l'audio originale così com'è; **MP4** è più diffuso su telefoni e televisori, ma non accetta ogni tipo di immagine: se non riesce, scegli MKV.
+
+## 5. Sottotitoli originali da un file
+
+Se hai già i sottotitoli originali (quelli del film, o quelli di RuscaTranscriber corretti a mano), nella riga **Sottotitoli originali** premi il pulsante con la cartella e scegli il file `.srt`: la trascrizione si salta e si usano quelli. Indica la **lingua originale**: dal testo non si riconosce. È anche il modo per doppiare un video **senza audio**.
+
+Per un doppiaggio curato: trascrivi con RuscaTranscriber, correggi il testo, poi dallo a RuscaDubbing.
+
+## 6. Audio originale sotto la voce
+
+**Poco**, **Abbastanza** o **Molto**: quanto si abbassa l'audio originale mentre parla la voce doppiata. È il doppiaggio «a voce sopra» dei documentari: la voce originale si sente appena, sotto. Togliere del tutto la voce originale lasciando musica ed effetti richiede di separare le voci dal resto: arriverà in una versione futura.
+
+## 7. Preferenze
+
+| Gruppo | Che cosa |
+|---|---|
+| Aspetto | Tema chiaro, scuro o del sistema |
+| Modelli | Il modello per trascrivere, tradurre e dare la voce |
+| Voce | Voce di riferimento; voce del modello (per i modelli con voci con nome); **velocità massima** (quanto può accelerare una battuta, 1,3 volte se non la cambi); **seme** (lo stesso seme dà la stessa interpretazione) |
+| Motore | Scheda grafica sì/no e quale; thread della CPU; contesto della traduzione |
+
+## 8. Privacy
+
+- **Nessun dato lascia la macchina.** La sola connessione è quella con `llama-server`, sul computer stesso (`127.0.0.1`), con una chiave casuale che cambia a ogni avvio.
+- I programmi si avviano senza shell; FFmpeg legge solo file locali.
+- I file di lavoro (audio estratto, battute, voce) stanno in `~/.cache/ruscadubbing/` e **si cancellano** alla fine di ogni doppiaggio, all'avvio e alla chiusura.
+
+## 9. Diritti e voci
+
+Doppia solo video che hai il diritto di usare. Ogni modello ha la propria licenza, da controllare prima di pubblicare. Usa come voce di riferimento solo la tua voce o quella di chi ti ha dato il permesso.
+
+## 10. Scorciatoie
+
+| Tasti | Azione |
+|---|---|
+| Ctrl+O | Apri un video |
+| Ctrl+Invio | Doppia |
+| Esc | Ferma |
+| Ctrl+, | Preferenze |
+| Ctrl+? | Scorciatoie |
+| F10 | Menu principale |
+| Ctrl+W / Ctrl+Q | Chiudi / Esci |
+
+## 11. Problemi
+
+| Problema | Soluzione |
+|---|---|
+| La striscia in alto dice che manca un modello | Copia il modello nella sua cartella (punto 2) e riapri le Preferenze |
+| La voce cambia da una battuta all'altra | Scegli una **voce di riferimento** (punto 2) |
+| Molte battute accelerate o spostate | Alza un po' la velocità massima, o usa sottotitoli meno fitti |
+| Alcune battute restano nella lingua originale | Il modello linguistico non le ha tradotte: provane uno più grande |
+| Il video MP4 non si scrive | Scegli **MKV** |
+| Qualcosa non va | Menu principale → **Registro dei motori** mostra che cosa hanno scritto i programmi |

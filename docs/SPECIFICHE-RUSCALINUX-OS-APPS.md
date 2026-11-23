@@ -66,6 +66,7 @@ Si trova nel repository in `docs/SPECIFICHE-RUSCALINUX-OS-APPS.md`. Durante lo s
 | RuscaLLisse | Conversazione a voce con un’entità digitale animata, con la personalità decisa dall’utente (la prima è Ellittica) | Assistente vocale | `org.ruscalinux.RuscaLLisse` | `ruscallisse` | No |
 | ruscavosk-engine | Motore di riconoscimento vocale in tempo reale di RuscaLLisse: **Vosk, software esterno** | Componente di sistema, senza interfaccia | — | `ruscavosk-engine` | — |
 | ruscapiper-engine | Motore di sintesi vocale di RuscaLLisse: **Piper (piper1-gpl), software esterno** | Componente di sistema, senza interfaccia | — | `ruscapiper-engine` | — |
+| RuscaDubbing | Doppiaggio di un video in un’altra lingua: sottotitoli nelle due lingue, audio doppiato, video con due tracce audio e due di sottotitoli | Doppiaggio video | `org.ruscalinux.RuscaDubbing` | `ruscadubbing` | No |
 
 ### 1.1 Gli strumenti di intelligenza artificiale
 
@@ -534,6 +535,38 @@ python3 -m unittest tests/test_ruscallisse.py
 4. **Voci italiane.** La licenza di `it_IT-riccardo-x_low` (dal suo MODEL_CARD) e l’origine del dataset sintetico di `it_IT-serena`, prima di consigliarle nel manuale.
 5. **Cancellazione dell’eco.** Che `libpipewire-module-echo-cancel` (con WebRTC) sia nel PipeWire di trixie, che il file di configurazione della ISO crei sorgente e uscita senza disturbare le altre applicazioni, e che con gli altoparlanti l’interruzione a voce funzioni davvero.
 6. **Latenza.** I tempi veri sui due computer di prova (checklist, punto 19): se il primo campione arriva oltre circa un secondo e mezzo, si guarda prima la soglia di silenzio, poi la dimensione del modello linguistico.
+
+### 1.9 Il doppiaggio
+
+**Stato: fase 1 nella 1.99.3.** RuscaDubbing (`apps/ruscadubbing/`, versione 1.99.3) è la sala di doppiaggio di RuscaLinux: da un video nella sua lingua ottiene i sottotitoli nelle due lingue, l’audio doppiato e il video doppiato. Non ha motori né modelli propri: usa quelli delle altre app.
+
+| Passo | Motore | Modulo (copia identica di) | Modelli |
+|---|---|---|---|
+| Trascrizione | `whisper-cli` di ruscawhisper-engine | `rusca_whisper.py` (RuscaTranscriber) | `~/.local/share/ruscawhisper/models/` |
+| Traduzione | `llama-server` di ruscallama-engine | `rusca_engine.py` (RuscaTranslator) | `~/.local/share/ruscallama/models/` |
+| Doppiaggio | `llama-tts` di ruscallama-engine | `rusca_tts.py` (RuscaNarrator) | `~/.local/share/ruscanarrator/models/`, voci in `…/voices/` |
+| Missaggio e video | `ffmpeg` di Debian | `rusca_dubbing.py` | — |
+
+`rusca_dubbing.py` è la catena, senza interfaccia; `ruscadubbing.py` è la finestra. I moduli comuni sono **copie identiche** (anche `rusca_markdown.py` e `markdown_it_mark.py`, che `rusca_tts.py` importa, e `style.css`): `rusca_dubbing.py` cambia solo la loro cartella di lavoro dopo l’import (`whisper.WORK_DIR`, `tts.WORK_DIR`), che diventa una sottocartella di `~/.cache/ruscadubbing/`.
+
+- **Un passo per volta.** I modelli non stanno insieme nella memoria della scheda grafica: il modello di traduzione si chiude prima che parta quello della voce. I passi si concatenano nel thread dell’interfaccia, ognuno dalla fine del precedente (`on_done`).
+- **Battute.** I segmenti di Whisper diventano battute (`cues_from_segments()`): due segmenti si uniscono se il primo non finisce con un segno di fine frase, la pausa è di al massimo 600 ms, la battuta resta entro 7 s e 140 caratteri. Al posto della trascrizione si può dare un file SRT della lingua originale (per esempio corretto a mano): allora la lingua originale va scelta, e un video senza audio si può doppiare solo così.
+- **Traduzione con il tempo.** Le battute si traducono a gruppi di 12, con le ultime 4 già tradotte come contesto, nel formato `N|MAX|testo`, dove MAX è il numero massimo di caratteri (`budget_chars()`): il tempo della battuta (fino alla successiva) per i caratteri al secondo della lingua (`CHARS_PER_SECOND`, per esempio 14 per l’italiano), con metà dell’accelerazione permessa. Il prompt chiede un adattamento da doppiatore: fedele, parlato, condensato quando serve. La risposta si legge riga per riga (`N|traduzione`); una battuta che manca si richiede da sola, e se non torna resta l’originale (lo si dice alla fine). Una traduzione più lunga di 1,25 volte MAX si richiede in versione breve. Campionamento a temperatura 0,2, ragionamento spento. Se lingua originale e del doppiaggio coincidono, non si traduce.
+- **Doppiaggio.** Le battute tradotte vanno a `rusca_tts.Speaker` in modo SRT: ognuna all’ora della battuta originale, accelerata con `atempo` fino alla velocità massima (1,3 se non cambiata), poi spostata in avanti; due battute non si sovrappongono mai. Per una voce sola in tutto il video serve una **voce di riferimento**: alla prima apertura si prende la prima voce creata con RuscaNarrator.
+- **Missaggio.** La voce sta sopra l’audio originale abbassato (doppiaggio «a voce sopra»): `sidechaincompress` con la voce come segnale di controllo, poi `amix` e `alimiter`, stereo a 48 kHz. Tre livelli: poco (ratio 4), abbastanza (8, predefinito), molto (16).
+- **Video.** Immagine **copiata** (`-c:v copy`), capitoli copiati; traccia audio 1 l’originale (copiata in MKV), traccia 2 il doppiaggio (Opus 160 kbit/s in MKV, AAC 192 kbit/s in MP4) **predefinita**; due tracce di sottotitoli (SRT in MKV, `mov_text` in MP4), non predefinite. Ogni traccia ha la lingua ISO 639-2 e un titolo con il nome della lingua. Senza audio originale c’è solo il doppiaggio. MKV è il formato predefinito: MP4 non accetta ogni codec video, e se fallisce l’errore lo dice (`err_mux_mp4`).
+- **File in uscita**, accanto al video o in una cartella scelta: `nome.<src>.srt`, `nome.<tgt>.srt`, `nome.<src>-<tgt>.srt` (le due lingue in ogni sottotitolo, sopra l’originale), `nome.<tgt>.opus`, `nome.<tgt>.mkv`. Non si sovrascrive mai niente (`nome.it (2).mkv`); audio e video si scrivono in un file `.part` e si rinominano alla fine. Dopo un errore i file già scritti restano, e la finestra lo dice.
+- **Finestra.** Pagina vuota (scegli o trascina un video) → impostazioni (video con durata e tracce; lingue; sottotitoli originali trascritti o da file; che cosa ottenere: sottotitoli, audio, video; formato; audio originale sotto la voce; cartella) → lavoro (i quattro passi con stato, avanzamento complessivo, tempo trascorso, **Ferma**) → risultato (battute, accelerazioni, battute non tradotte; elenco dei file da aprire; Guarda, Apri la cartella, Nuovo doppiaggio). Un `Adw.Banner` dice che cosa manca (motore o modello) e apre le Preferenze: Aspetto, Modelli (uno per passo, con il pulsante della cartella), Voce (voce di riferimento, voce del modello, velocità massima, seme), Motore (scheda grafica e quale, thread, contesto). Chiudere durante un doppiaggio chiede conferma.
+- **Privacy.** La sola connessione è quella di `rusca_engine.py` con `llama-server` su 127.0.0.1, con chiave casuale (sezione 11). `rusca_dubbing.py` non importa moduli di rete; i programmi partono senza shell; FFmpeg con `-protocol_whitelist file`. Cartella di lavoro `~/.cache/ruscadubbing/` (0700), cancellata alla fine di ogni doppiaggio, all’avvio e alla chiusura.
+- **Lingue dell’interfaccia.** Italiano e inglese; le altre 24 seguiranno (sezione 9.1: finché manca il file vale l’inglese).
+
+**Fasi successive** (piano sulla Whiteboard «RuscaDubbing — piano»): (2) un editor delle battute, con tabella, indicatore di durata, anteprima e rigenerazione di una sola battuta; (3) **ruscademucs-engine** (demucs.cpp, MIT) per separare la voce originale da musica ed effetti e toglierla del tutto; (4) più voci, una per parlante; la voce dell’attore originale solo per contenuti propri o con il suo consenso.
+
+**Test.** `tests/test_ruscadubbing.py` controlla le battute (unione dei segmenti, SRT, SRT nelle due lingue, tempo e caratteri per battuta), la lettura delle traduzioni, la traduzione a gruppi (contesto, battute saltate richieste da sole, battuta mai tradotta, versione breve, interruzione), i nomi dei file, il comando del video; che i moduli comuni siano identici, che le cartelle di lavoro stiano sotto quella di RuscaDubbing, che it e en abbiano le stesse chiavi e tutte quelle usate, che non ci siano moduli di rete; e l’intera catena con `whisper-cli`, `llama-server` e `llama-tts` finti e FFmpeg vero su un video generato: MKV con cinque tracce, lingue e traccia predefinita, MP4 da un video muto con un SRT, solo sottotitoli, interruzione, modello mancante, nessun file di lavoro rimasto. Senza FFmpeg o PyGObject si saltano.
+
+```bash
+python3 -m unittest tests/test_ruscadubbing.py
+```
 
 Gli identificatori di ogni tool devono coincidere tra loro (vedi sezione 5.2).
 

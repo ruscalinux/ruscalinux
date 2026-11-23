@@ -76,6 +76,21 @@ GLYPHS = {
   <path d="M92 34H42a9 9 0 0 0-9 9v30a9 9 0 0 0 9 9h26l16 14V82h8a9 9 0 0 0 9-9V43a9 9 0 0 0-9-9z" fill="{P_MID}"/>
   <g stroke="{CREAM}" stroke-width="6" stroke-linecap="round"><path d="M46 50h36M46 64h22"/></g>''',
 
+"ruscadubbing": f'''
+  <!-- ciak (il video) e onde della voce (il doppiaggio) -->
+  <rect x="4" y="40" width="66" height="54" rx="7" fill="{P_MID}"/>
+  <rect x="4" y="40" width="66" height="12" fill="{P600}"/>
+  <g transform="rotate(-16 6 36)">
+    <rect x="4" y="24" width="66" height="13" rx="3" fill="{P600}"/>
+    <g fill="{CREAM}"><path d="M14 24h9l-7 13H7zM32 24h9l-7 13h-9zM50 24h9l-7 13h-9z"/></g>
+  </g>
+  <circle cx="8" cy="40" r="4.5" fill="{R300}"/>
+  <g stroke="{CREAM}" stroke-width="5" stroke-linecap="round"><path d="M16 66h30M16 79h20"/></g>
+  <g fill="none" stroke="{P500}" stroke-width="6" stroke-linecap="round">
+    <path d="M80 54a14 14 0 0 1 0 24"/>
+    <path d="M90 44a28 28 0 0 1 0 44" stroke="{R300}"/>
+  </g>''',
+
 "ruscallisse": f'''
   <!-- Ellittica: caschetto, frangia di lato, occhiali ovali, matita, orbita -->
   <defs>
@@ -150,7 +165,8 @@ GLYPHS = {
 
 TITLES = {"ruscacleaner": "RuscaCleaner", "ruscahub": "RuscaHub", "ruscamark": "RuscaMark",
           "ruscawriter": "RuscaWriter", "ruscallama": "RuscaLLama", "ruscatranslator": "RuscaTranslator",
-          "ruscallisse": "RuscaLLisse", "ruscapinball": "RuscaPinball"}
+          "ruscallisse": "RuscaLLisse", "ruscapinball": "RuscaPinball",
+          "ruscadubbing": "RuscaDubbing"}
 
 
 def full_icon(tool):
