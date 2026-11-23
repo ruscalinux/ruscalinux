@@ -29,6 +29,7 @@ import signal
 import subprocess
 import tempfile
 import threading
+import unicodedata
 import wave
 
 from gi.repository import GLib
@@ -161,6 +162,56 @@ def _stem(name):
 def _rank(name):
     m = _PRECISION.search(name[:-5] if name.lower().endswith(".gguf") else name)
     return _RANK.get(m.group(1).lower(), 1) if m else 0
+
+
+# Chatterbox (Resemble AI) in llama.cpp: llama-tts passa il testo al modello
+# così com'è, mentre il programma originale lo prepara prima. Senza questa
+# preparazione le lettere accentate non sono quelle viste in addestramento
+# (scomposte in NFKD: «à» = «a» + accento) e la voce sbaglia l'accento
+# delle parole («quantìta» per «quantità»), e certi segni («...», «:»)
+# finiscono letti o detti male.
+_CHATTERBOX_PUNCT = (("...", ", "), ("…", ", "), (":", ","), (" - ", ", "), (";", ", "),
+                     ("—", "-"), ("–", "-"), (" ,", ","), ("“", '"'), ("”", '"'),
+                     ("‘", "'"), ("’", "'"), ("«", '"'), ("»", '"'))
+_CHATTERBOX_ENDS = (".", "!", "?", "-", ",", "、", "，", "。", "？", "！")
+_kind_cache = {}
+
+
+def is_chatterbox(model):
+    """Vero se il file GGUF è un modello Chatterbox (dal nome o
+    dall'architettura scritta all'inizio del file)."""
+    if not model:
+        return False
+    if "chatterbox" in os.path.basename(model).lower():
+        return True
+    if model not in _kind_cache:
+        try:
+            with open(model, "rb") as f:
+                _kind_cache[model] = b"chatterbox" in f.read(1 << 18).lower()
+        except OSError:
+            _kind_cache[model] = False
+    return _kind_cache[model]
+
+
+def prepare_text(text, model):
+    """Il testo come lo prepara il programma originale del modello: per
+    Chatterbox punteggiatura semplificata, prima lettera maiuscola, segno
+    finale, e (modello multilingue) lettere scomposte in NFKD. Per gli
+    altri modelli il testo resta com'è."""
+    if not is_chatterbox(model):
+        return text
+    text = " ".join(text.split())
+    if not text:
+        return text
+    text = text[0].upper() + text[1:]
+    for old, new in _CHATTERBOX_PUNCT:
+        text = text.replace(old, new)
+    text = " ".join(text.split())
+    if not text.endswith(_CHATTERBOX_ENDS):
+        text += "."
+    if "turbo" not in os.path.basename(model).lower():
+        text = unicodedata.normalize("NFKD", text)
+    return text
 
 
 def find_voices(dirs=None):
@@ -586,7 +637,8 @@ class Speaker:
             raise TTSError("err_audio", tail)
 
     def _tts_command(self, text, out, voice, o, device):
-        cmd = [find_binary(), "-m", voice.model, "-mm", voice.mmproj, "-p", text,
+        cmd = [find_binary(), "-m", voice.model, "-mm", voice.mmproj,
+               "-p", prepare_text(text, voice.model),
                "-o", out, "-s", str(o["seed"]), "-t", str(max(1, o["threads"])),
                "-c", str(TTS_CONTEXT)]
         if o["language"]:

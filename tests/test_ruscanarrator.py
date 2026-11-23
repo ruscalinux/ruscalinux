@@ -15,6 +15,7 @@ import shutil
 import stat
 import sys
 import tempfile
+import unicodedata
 import unittest
 import wave
 
@@ -194,6 +195,17 @@ class Text(unittest.TestCase):
             text = tts.sample_text(code)
             self.assertTrue(40 <= len(text) <= tts.MAX_CHARS, code)    # un pezzo solo
         self.assertEqual(tts.sample_text("xx"), tts.sample_text("en"))
+
+    def test_prepare_text(self):
+        """Chatterbox: il testo preparato come nel programma originale
+        (accenti scomposti, punteggiatura semplice); gli altri modelli no."""
+        cb = "/m/chatterbox-multilingual-Q8_0.gguf"
+        said = tts.prepare_text("la quantità... così: sùbito; ecco", cb)
+        self.assertEqual(said, unicodedata.normalize("NFKD", "La quantità, così, sùbito, ecco."))
+        self.assertIn("a\u0300", said)
+        self.assertEqual(tts.prepare_text("Grazie!", cb), "Grazie!")
+        self.assertEqual(tts.prepare_text("così...", "/m/chatterbox-turbo.gguf"), "Così,")
+        self.assertEqual(tts.prepare_text("così...", "/m/Qwen3-TTS-1.7B.gguf"), "così...")
 
     def test_atempo(self):
         self.assertEqual(tts._atempo(1.25), "atempo=1.2500")
