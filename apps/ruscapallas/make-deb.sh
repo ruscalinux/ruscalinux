@@ -14,8 +14,9 @@
 #   * il servizio di dialogo org.ruscalinux.RuscaPallas, avviato da D-Bus
 #     al primo clic: è il ciclo di conversazione di RuscaLLisse, con i suoi
 #     moduli copiati identici (qui si controlla);
-#   * il comando ruscapallas, che richiama Pallasio dalla griglia delle
-#     applicazioni.
+#   * la finestra RuscaPallas (ruscapallas, GTK 4 e libadwaita), che lo
+#     richiama e lo configura; con --show, --hide, --quit lavora senza
+#     finestra.
 # I motori sono i pacchetti ruscavosk-engine, ruscallama-engine e
 # ruscapiper-engine, compilati dal sorgente.
 # ---------------------------------------------------------------------------
@@ -38,7 +39,7 @@ EXT_FILES="metadata.json extension.js pallasio.js figure.js motion.js world.js"
 
 die() { echo "ERRORE: $*" >&2; exit 1; }
 for l in en it; do [ -f "lang/$l.json" ] || die "manca lang/$l.json"; done
-for f in $FILES pronunce.tsv "$PKG.svg" "$PKG-symbolic.svg" entities/pallasio.md \
+for f in $FILES pronunce.tsv style.css "$PKG.svg" "$PKG-symbolic.svg" entities/pallasio.md \
          docs/MANUAL_it.md docs/MANUAL_en.md; do
     [ -e "$f" ] || die "manca $f"
 done
@@ -53,7 +54,7 @@ if [ -f ../../release.conf ]; then
 fi
 # Il cervello di Pallasio è quello di Ellittica: una correzione fatta in
 # RuscaLLisse non deve restare indietro qui.
-for f in $SHARED pronunce.tsv; do
+for f in $SHARED pronunce.tsv style.css; do
     cmp -s "$f" "../ruscallisse/$f" || die "$f non è identico a quello di RuscaLLisse (copialo da ../ruscallisse/)"
 done
 command -v dpkg-deb >/dev/null || die "serve dpkg-deb (pacchetto dpkg)"
@@ -111,7 +112,7 @@ mkdir -p "$ROOT/DEBIAN" "$ROOT/usr/bin" "$SHARE/lang" "$SHARE/entities" "$EXT/la
          "$ROOT/usr/share/icons/hicolor/symbolic/apps"
 for f in $FILES; do install -m 644 "$f" "$SHARE/$f"; done
 chmod 755 "$SHARE/ruscapallas.py" "$SHARE/ruscapallas-service.py"
-install -m 644 pronunce.tsv "$PKG.svg" "$SHARE/"
+install -m 644 pronunce.tsv style.css "$PKG.svg" "$SHARE/"
 install -m 644 entities/*.md "$SHARE/entities/"
 for c in $LANGS; do
     install -m 644 "lang/$c.json" "$SHARE/lang/"
@@ -130,7 +131,6 @@ Name=$APP_ID
 Exec=/usr/share/$PKG/ruscapallas-service.py
 SERVICE
 
-# Nessuna finestra: il comando richiama Pallasio e avvisa con una notifica.
 cat > "$ROOT/usr/share/applications/$APP_ID.desktop" <<DESKTOP
 [Desktop Entry]
 Type=Application
@@ -139,8 +139,8 @@ GenericName=Desktop Companion
 Exec=$PKG
 Icon=$APP_ID
 Terminal=false
-Categories=GNOME;Utility;X-RuscaLinux-Apps;
-StartupNotify=false
+Categories=GNOME;GTK;Utility;X-RuscaLinux-Apps;
+StartupNotify=true
 StartupWMClass=$APP_ID
 $(cat "$TMP/desktop")
 DESKTOP
@@ -208,7 +208,7 @@ Section: gnome
 Priority: optional
 Architecture: $ARCH
 Installed-Size: $SIZE
-Depends: gnome-shell (>= 48), python3 (>= 3.10), python3-gi, gir1.2-glib-2.0, python3-markdown-it (>= 3.0), python3-mdit-py-plugins (>= 0.4), python3-linkify-it (>= 2.0), pipewire-bin, ruscallama-engine, ruscavosk-engine, ruscapiper-engine
+Depends: gnome-shell (>= 48), python3 (>= 3.10), python3-gi, gir1.2-glib-2.0, gir1.2-gtk-4.0 (>= 4.18), gir1.2-adw-1 (>= 1.7), python3-markdown-it (>= 3.0), python3-mdit-py-plugins (>= 0.4), python3-linkify-it (>= 2.0), pipewire-bin, ruscallama-engine, ruscavosk-engine, ruscapiper-engine
 Recommends: ruscallisse
 Maintainer: $MAINT
 Homepage: $HOMEPAGE

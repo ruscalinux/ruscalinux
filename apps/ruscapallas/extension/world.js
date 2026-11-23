@@ -30,9 +30,20 @@ export class World {
         this.platform = null;       // id della finestra sotto i piedi, o null
         this.target = null;         // {id, x}: finestra su cui vuole saltare
         this.aim = null;            // id della finestra su cui sta saltando
+        this.jumpEvery = [25, 70];  // s fra un salto e l'altro; null: mai
         this.nextJump = 12 + this.random() * 20;
         this.peek = 0;              // secondi ancora affacciato
         this.events = [];           // 'landed', 'peek', 'fell'
+    }
+
+    /** Nuove dimensioni (Pallasio più piccolo o più grande): i piedi restano
+     *  dove sono. */
+    resize(w, h, feet) {
+        if (this.x !== null)
+            this.x += (this.w - w) / 2;
+        this.w = w;
+        this.h = h;
+        this.feet = feet;
     }
 
     get airborne() {
@@ -209,10 +220,11 @@ export class World {
         }
 
         // ogni tanto sceglie una finestra
-        if (!win) {
+        if (!win && this.jumpEvery) {
             this.nextJump -= dt;
             if (this.nextJump <= 0) {
-                this.nextJump = 25 + this.random() * 45;
+                const [a, b] = this.jumpEvery;
+                this.nextJump = a + this.random() * (b - a);
                 const c = this.candidates(area, windows);
                 if (c.length) {
                     const t = c[Math.floor(this.random() * c.length)];

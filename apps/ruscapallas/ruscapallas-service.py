@@ -75,7 +75,7 @@ VOICE_LEVEL = 0.18           # livello del microfono che conta come voce
 IDLE_EXIT = 15 * 60          # s senza conversare, poi il servizio esce
 MOUTH_EVERY = 40             # ms fra un volume della voce e il successivo
 DEFAULTS = {"vosk_model": "", "model": "", "voice": "", "speed": 0.0, "max_words": 60,
-            "emotions": True, "gpu": True, "gpu_device": ""}
+            "emotions": True, "gpu": True, "gpu_device": "", "listen_window": LISTEN_WINDOW}
 GREETING = {"it": "Ancora tu. Che c'è?", "en": "You again. What is it?"}
 
 
@@ -85,16 +85,30 @@ def _log(*args):
 
 def load_settings():
     """Le scelte di RuscaLLisse (modello, voce, scheda grafica) valgono anche
-    per Pallasio; quelle di RuscaPallas, se ci sono, vincono."""
+    per Pallasio; quelle di RuscaPallas, se ci sono, vincono. `own_voice` e
+    `own_speed` dicono se voce e velocità le ha scelte qui l'utente: allora
+    vincono anche su quelle scritte nella personalità."""
     cfg = dict(DEFAULTS)
+    cfg["own_voice"], cfg["own_speed"] = "", 0.0
     for path in (LISSE_CONFIG, CONFIG_FILE):
         try:
             with open(path, encoding="utf-8") as f:
                 data = json.load(f)
         except (OSError, ValueError):
             continue
-        if isinstance(data, dict):
-            cfg.update({k: data[k] for k in DEFAULTS if k in data and data[k] not in ("", None)})
+        if not isinstance(data, dict):
+            continue
+        cfg.update({k: data[k] for k in DEFAULTS if k in data and data[k] not in ("", None)})
+        if path == CONFIG_FILE:
+            cfg["own_voice"] = data.get("voice") or ""
+            try:
+                cfg["own_speed"] = float(data.get("speed") or 0.0)
+            except (TypeError, ValueError):
+                cfg["own_speed"] = 0.0
+    try:
+        cfg["listen_window"] = max(2.0, min(60.0, float(cfg["listen_window"])))
+    except (TypeError, ValueError):
+        cfg["listen_window"] = LISTEN_WINDOW
     return cfg
 
 
@@ -119,7 +133,9 @@ def choose_pieces(cfg, ent):
     gm = cfg["model"] if cfg["model"] in ggufs else (ggufs[0] if ggufs else None)
     voices = piper.find_voices()
     wanted = (ent or {}).get("voice_name") or ""
-    vc = next((v for v in voices if os.path.basename(v)[:-5] == wanted), None)
+    vc = cfg.get("own_voice") if cfg.get("own_voice") in voices else None
+    if vc is None:
+        vc = next((v for v in voices if os.path.basename(v)[:-5] == wanted), None)
     if vc is None:
         vc = cfg["voice"] if cfg["voice"] in voices else None
     if vc is None and voices:
@@ -167,8 +183,10 @@ class Service:
 
     # ── comandi (da D-Bus) ───────────────────────────────────────────────
     def talk(self):
-        """Clic su Pallasio: drizza le orecchie."""
+        """Clic su Pallasio: drizza le orecchie. Le impostazioni si rileggono:
+        lunghezza delle risposte, emozioni e ascolto valgono subito."""
         self.last_activity = time.monotonic()
+        self.cfg = load_settings()
         if self.conv is None:
             self.want_listen = True
             if not self.loading:
@@ -257,7 +275,7 @@ class Service:
         if conv is None or conv.paused:
             self._window_id = 0
             return False
-        if conv.state == "listening" and time.monotonic() - self.last_voice > LISTEN_WINDOW:
+        if conv.state == "listening" and time.monotonic() - self.last_voice > self.cfg["listen_window"]:
             conv.set_paused(True)
             self._set_state("idle")
             self._window_id = 0
@@ -299,7 +317,7 @@ class Service:
         self.lang = vosk.model_language(vm) or "it"
         if self.lang not in st.REGOLE:
             self.lang = "en"
-        speed = self.ent.get("speed") or self.cfg["speed"] or 1.0
+        speed = self.cfg["own_speed"] or self.ent.get("speed") or self.cfg["speed"] or 1.0
         args = ["-c", "8192", "-t", str(eng.physical_cores()), "--reasoning-format", "deepseek"]
         if self.cfg["gpu"]:
             device = eng.device_name(self.cfg["gpu_device"], eng.list_devices()) if self.cfg["gpu_device"] else ""

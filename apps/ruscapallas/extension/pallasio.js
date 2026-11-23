@@ -28,9 +28,11 @@ import {draw, drawBubble, BOX_W, BOX_H, FEET_Y, BUBBLE_W, BUBBLE_H} from './figu
 import {Animator} from './motion.js';
 import {World} from './world.js';
 
-const SCALE = 1.3;                    // unità del disegno → pixel logici
-const WIDTH = Math.ceil(BOX_W * SCALE);
-const HEIGHT = Math.ceil(BOX_H * SCALE);
+// Impostazioni scritte dalla finestra di RuscaPallas: si rileggono quando
+// cambiano, senza riavviare niente.
+const SETTINGS_FILE = GLib.build_filenamev([GLib.get_user_config_dir(), 'ruscapallas', 'settings.json']);
+const SIZES = {small: 1.0, normal: 1.3, large: 1.6};      // unità del disegno → pixel logici
+const JUMPS = {never: null, sometimes: [25, 70], often: [8, 22]};
 const DRAG_THRESHOLD = 8;             // px prima che un clic diventi un trascinamento
 const ANSWER_TIMEOUT = 20;            // s: dopo un clic il servizio deve farsi vivo
 
@@ -95,7 +97,9 @@ export class Pallasio {
         // St, che le spegne anche con il disegno via software (macchine virtuali)
         this._settings = new Gio.Settings({schema_id: 'org.gnome.desktop.interface'});
         this._anim = new Animator({reduceMotion: !this._settings.get_boolean('enable-animations')});
-        this._world = new World(WIDTH, HEIGHT, FEET_Y * SCALE);
+        this._scale = SIZES.normal;
+        this._idleReading = true;
+        this._world = new World(this._w, this._h, FEET_Y * this._scale);
         this._model = this._anim.step(0);
         this._visible = true;
         this._busy = false;           // sta conversando (non passeggia)
@@ -107,7 +111,7 @@ export class Pallasio {
 
         // ── attori ──
         this.actor = new St.DrawingArea({
-            reactive: true, track_hover: true, width: WIDTH, height: HEIGHT,
+            reactive: true, track_hover: true, width: this._w, height: this._h,
             name: 'ruscapallas',
             accessible_name: 'Pallasio',
         });
@@ -171,6 +175,17 @@ export class Pallasio {
         this._nameId = Gio.bus_own_name(Gio.BusType.SESSION, SHELL_NAME,
             Gio.BusNameOwnerFlags.NONE, null, null, null);
 
+        // ── impostazioni della finestra di RuscaPallas ──
+        this._loadOptions();
+        try {
+            // la cartella deve esistere, o il controllo non vede il file nascere
+            GLib.mkdir_with_parents(GLib.path_get_dirname(SETTINGS_FILE), 0o700);
+            this._optMonitor = Gio.File.new_for_path(SETTINGS_FILE).monitor_file(Gio.FileMonitorFlags.NONE, null);
+            this._optMonitor.connect('changed', () => this._loadOptions());
+        } catch (e) {
+            console.warn(`ruscapallas: ${e.message}`);
+        }
+
         // ── animazione, legata al ritmo dei fotogrammi dello schermo ──
         this._timeline = new Clutter.Timeline({actor: this.actor, duration: 1000, repeat_count: -1});
         this._timeline.connect('new-frame', () => this._tick());
@@ -207,6 +222,34 @@ export class Pallasio {
     _showBubble(on) {
         this._bubbleOn = on;
         this.bubble.opacity = on ? 255 : 0;
+    }
+
+    get _w() {
+        return Math.ceil(BOX_W * this._scale);
+    }
+
+    get _h() {
+        return Math.ceil(BOX_H * this._scale);
+    }
+
+    /** Dimensione, salti, letture per conto suo. Un file mancante o rotto
+     *  vale come le scelte predefinite. */
+    _loadOptions() {
+        let opt = {};
+        try {
+            const [, bytes] = GLib.file_get_contents(SETTINGS_FILE);
+            opt = JSON.parse(new TextDecoder().decode(bytes)) || {};
+        } catch {
+            opt = {};
+        }
+        const scale = SIZES[opt.size] ?? SIZES.normal;
+        if (scale !== this._scale) {
+            this._scale = scale;
+            this.actor?.set_size(this._w, this._h);
+            this._world.resize(this._w, this._h, FEET_Y * scale);
+        }
+        this._world.jumpEvery = opt.jumps in JUMPS ? JUMPS[opt.jumps] : JUMPS.sometimes;
+        this._idleReading = opt.idle_reading !== false;
     }
 
     _(key) {
@@ -331,7 +374,7 @@ export class Pallasio {
         if (!p.dragging && Math.hypot(x - p.x, y - p.y) < DRAG_THRESHOLD)
             return Clutter.EVENT_STOP;
         p.dragging = true;
-        this._world.drag(x - p.dx, y - p.dy + FEET_Y * SCALE);
+        this._world.drag(x - p.dx, y - p.dy + FEET_Y * this._scale);
         return Clutter.EVENT_STOP;
     }
 
@@ -378,7 +421,8 @@ export class Pallasio {
 
         // per conto suo: ogni tanto si siede a leggere, ogni tanto sbuffa
         if (!this._busy && !this._press) {
-            if (anim.mode === 'walk' && now > this._nextRest && !world.airborne && world.platform === null) {
+            if (anim.mode === 'walk' && this._idleReading && now > this._nextRest &&
+                !world.airborne && world.platform === null) {
                 this._restUntil = now + 8 + Math.random() * 10;
                 this._nextRest = this._restUntil + 40 + Math.random() * 80;
                 anim.setMode('sit');
@@ -404,7 +448,7 @@ export class Pallasio {
         const x = Math.round(world.x), y = world.top;
         this.actor.set_position(x, y);
         if (this._bubbleOn) {
-            const bx = world.dir > 0 ? x + WIDTH * 0.74 : x + WIDTH * 0.26 - BUBBLE_W;
+            const bx = world.dir > 0 ? x + this._w * 0.74 : x + this._w * 0.26 - BUBBLE_W;
             this.bubble.set_position(Math.round(bx), Math.max(0, y - BUBBLE_H * 0.55));
             this.bubble.queue_repaint();
         }
@@ -432,6 +476,8 @@ export class Pallasio {
             GLib.source_remove(this._answerId);
             this._answerId = 0;
         }
+        this._optMonitor?.cancel();
+        this._optMonitor = null;
         for (const id of this._overviewIds ?? [])
             Main.overview.disconnect(id);
         this._overviewIds = [];

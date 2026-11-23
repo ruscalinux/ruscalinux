@@ -8,7 +8,7 @@ He listens, thinks and speaks with the same engines as RuscaLLisse: ruscavosk-en
 
 1. Pallasio uses the same files as RuscaLLisse: a Vosk model to listen, a GGUF model to think and a Piper voice. If RuscaLLisse works, Pallasio works too; otherwise open RuscaLLisse and follow “Which files to download?”. For a male Italian voice, download `it_IT-riccardo-x_low`.
 2. After installing the package, log out and back in: GNOME only sees new extensions at login.
-3. Open **RuscaPallas** from the RuscaLinux Apps folder: Pallasio appears at the bottom of the screen.
+3. Open **RuscaPallas** from the RuscaLinux Apps folder: Pallasio appears at the bottom of the screen and his window opens.
 
 ## Talking to him
 
@@ -27,13 +27,22 @@ The bubble never shows words: the conversation is not written and not saved.
 - He is not shown in the Activities overview or over full-screen windows.
 - With animations turned off (Settings → Accessibility) he stands still, but still talks.
 
-## The personality
+## The RuscaPallas window
 
-Pallasio's character is in `~/.local/share/ruscapallas/pallasio.md`, with the same sections as RuscaLLisse entities (Quid, Character, Way of speaking, Never does, Voice). Changes apply from the next question.
+Open it from the RuscaLinux Apps folder. **Talk** (Ctrl+T) makes Pallasio prick up his ears without looking for him on the desktop. Below are the settings:
+
+- **On the Desktop:** show him or send him back to the closet; size (small, normal, large); how often he jumps on windows (never, sometimes, often); whether he sits down to read on his own. They apply at once.
+- **Conversation:** how long he keeps listening after answering (4, 8 or 15 seconds); short, normal or long answers; emotions on his face. They apply from the next question.
+- **Models and Voice:** to listen, to think, the voice and its speed, the graphics card. “Same as RuscaLLisse” uses the same files as RuscaLLisse. They apply from the next conversation.
+- **Personality:** “Edit Personality…” opens his character file, `~/.local/share/ruscapallas/pallasio.md`, with the same sections as RuscaLLisse entities (Quid, Character, Way of speaking, Never does, Voice); changes apply from the next question. “Restore the Original Pallasio…” puts back the one in the package.
+- **Appearance:** the window theme.
+
+Settings are kept in `~/.config/ruscapallas/settings.json`. A voice and speed chosen in the window win over those written in the personality.
 
 ## From a terminal
 
-    ruscapallas            calls him back
+    ruscapallas            opens the window and calls him back
+    ruscapallas --show     calls him back, without the window
     ruscapallas --hide     sends him back to the closet
     ruscapallas --quit     stops the dialogue service and frees memory
 

@@ -8,7 +8,7 @@ Ascolta, pensa e parla con gli stessi motori di RuscaLLisse: ruscavosk-engine (V
 
 1. Pallasio usa gli stessi file di RuscaLLisse: un modello Vosk per ascoltare, un modello GGUF per pensare e una voce Piper. Se RuscaLLisse funziona, funziona anche Pallasio; altrimenti apri RuscaLLisse e segui «Quali file scaricare?». Per una voce maschile scarica `it_IT-riccardo-x_low`.
 2. Dopo l'installazione del pacchetto esci dalla sessione e rientra: GNOME vede le estensioni nuove solo all'accesso.
-3. Apri **RuscaPallas** dalla cartella RuscaLinux Apps: Pallasio compare sul bordo basso dello schermo.
+3. Apri **RuscaPallas** dalla cartella RuscaLinux Apps: Pallasio compare sul bordo basso dello schermo e si apre la sua finestra.
 
 ## Parlargli
 
@@ -27,13 +27,22 @@ Il fumetto non mostra mai parole: la conversazione non si scrive e non si salva.
 - Nella panoramica delle attività e con le finestre a schermo intero non c'è.
 - Con le animazioni disattivate (Impostazioni → Accessibilità) sta fermo, ma parla lo stesso.
 
-## La personalità
+## La finestra RuscaPallas
 
-Il carattere di Pallasio è nel file `~/.local/share/ruscapallas/pallasio.md`, con le stesse sezioni delle entità di RuscaLLisse (Quid, Carattere, Modo di parlare, Non fa mai, Voce). Le modifiche valgono dalla domanda successiva.
+Si apre dalla cartella RuscaLinux Apps. **Parlagli** (Ctrl+T) fa drizzare le orecchie a Pallasio senza cercarlo sul desktop. Sotto, le impostazioni:
+
+- **Sul desktop:** mostrarlo o rimandarlo nello sgabuzzino; dimensione (piccolo, normale, grande); quanto spesso salta sulle finestre (mai, ogni tanto, spesso); se si siede a leggere per conto suo. Valgono subito.
+- **Conversazione:** quanto resta in ascolto dopo la risposta (4, 8 o 15 secondi); risposte brevi, normali o lunghe; emozioni nel muso. Valgono dalla domanda successiva.
+- **Modelli e voce:** per ascoltare, per pensare, la voce e la sua velocità, la scheda grafica. «Come RuscaLLisse» usa gli stessi file di RuscaLLisse. Valgono dalla conversazione successiva.
+- **Personalità:** «Modifica la personalità…» apre il file del suo carattere, `~/.local/share/ruscapallas/pallasio.md`, con le stesse sezioni delle entità di RuscaLLisse (Quid, Carattere, Modo di parlare, Non fa mai, Voce); le modifiche valgono dalla domanda successiva. «Ripristina il Pallasio originale…» rimette quello del pacchetto.
+- **Aspetto:** il tema della finestra.
+
+Le scelte stanno in `~/.config/ruscapallas/settings.json`. Voce e velocità scelte nella finestra vincono su quelle scritte nella personalità.
 
 ## Da terminale
 
-    ruscapallas            lo richiama
+    ruscapallas            apre la finestra e lo richiama
+    ruscapallas --show     lo richiama, senza finestra
     ruscapallas --hide     lo rimanda nello sgabuzzino
     ruscapallas --quit     spegne il servizio di dialogo e libera la memoria
 

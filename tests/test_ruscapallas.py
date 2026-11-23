@@ -106,6 +106,61 @@ class TestPersonalita(unittest.TestCase):
         self.assertIn("Regole del parlato", p)
 
 
+def load_window():
+    spec = importlib.util.spec_from_file_location("ruscapallas_window", os.path.join(APP, "ruscapallas.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+@unittest.skipUnless(HAVE_GI, "serve PyGObject")
+class TestFinestra(unittest.TestCase):
+    def setUp(self):
+        self.mod = load_window()
+        self.tmp = tempfile.mkdtemp()
+        self.mod.CONFIG_DIR = self.tmp
+        self.mod.CONFIG_FILE = os.path.join(self.tmp, "settings.json")
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_conserva_le_chiavi_altrui(self):
+        _json(self.mod.CONFIG_FILE, {"gpu_device": "NVIDIA", "size": "small"})
+        cfg = self.mod.load_settings()
+        self.assertEqual(cfg["size"], "small")
+        self.assertEqual(cfg["jumps"], "sometimes")          # predefinito
+        cfg["jumps"] = "often"
+        self.assertTrue(self.mod.save_settings(cfg))
+        saved = _json(self.mod.CONFIG_FILE)
+        self.assertEqual(saved["gpu_device"], "NVIDIA")
+        self.assertEqual(saved["jumps"], "often")
+
+    def test_valori_che_capisce_l_estensione(self):
+        js = _read(os.path.join(APP, "extension", "pallasio.js"))
+        for v in self.mod.SIZES + self.mod.JUMPS:
+            self.assertIn(f"{v}:", js)
+        self.assertIn("idle_reading", js)
+
+    def test_valori_che_capisce_il_servizio(self):
+        svc = _read(os.path.join(APP, "ruscapallas-service.py"))
+        for key in ("listen_window", "max_words", "emotions", "vosk_model", "model", "voice", "speed", "gpu"):
+            self.assertIn(f'"{key}"', svc)
+
+    def test_stringhe_della_finestra(self):
+        src = _read(os.path.join(APP, "ruscapallas.py"))
+        it = _json(os.path.join(APP, "lang", "it.json"))
+        import re
+        keys = set(re.findall(r'_\("([a-z_0-9]+)"', src))
+        keys |= {f"size_{v}" for v in self.mod.SIZES} | {f"jumps_{v}" for v in self.mod.JUMPS}
+        keys |= {f"words_{v}" for v in self.mod.WORDS} | {f"theme_{v}" for v in self.mod.THEMES}
+        self.assertEqual(sorted(k for k in keys if k not in it), [])
+
+    def test_version_senza_finestra(self):
+        r = subprocess.run([sys.executable, os.path.join(APP, "ruscapallas.py"), "--version"],
+                           capture_output=True, text=True, timeout=60)
+        self.assertEqual(r.stdout.strip(), "RuscaPallas 1.99.3")
+
+
 class FakeConv:
     def __init__(self):
         self.state = "listening"
@@ -146,6 +201,7 @@ class TestServizio(unittest.TestCase):
         self.mod.DATA_DIR = os.path.join(self.tmp, "data")
         self.mod.ENTITY_USER = os.path.join(self.tmp, "data", "pallasio.md")
         self.mod.eng.Engine = FakeEngine
+        self.mod._log = lambda *a: None                       # niente messaggi durante i test
         self.sent = []
         self.svc = self.mod.Service(emit=lambda name, sig, *args: self.sent.append((name, args)))
 
@@ -163,6 +219,28 @@ class TestServizio(unittest.TestCase):
         self.assertEqual(cfg["voice"], "/v/riccardo.onnx")   # le sue vincono
         self.assertEqual(cfg["max_words"], 80)
         self.assertTrue(cfg["emotions"])
+
+    def test_voce_scelta_qui_vince_sulla_personalita(self):
+        mod = self.mod
+        mod.vosk.find_models = lambda: ["/vosk/it"]
+        mod.vosk.model_language = lambda p: "it"
+        mod.eng.find_models = lambda extra_dirs=(): ["/m/a.gguf"]
+        mod.piper.find_voices = lambda: ["/v/it_IT-paola-medium.onnx", "/v/it_IT-riccardo-x_low.onnx"]
+        ent = {"voice_name": "it_IT-riccardo-x_low"}
+        _json(mod.LISSE_CONFIG, {"voice": "/v/it_IT-paola-medium.onnx"})
+        self.assertEqual(mod.choose_pieces(mod.load_settings(), ent)[2], "/v/it_IT-riccardo-x_low.onnx")
+        _json(mod.CONFIG_FILE, {"voice": "/v/it_IT-paola-medium.onnx", "speed": 1.1})
+        cfg = mod.load_settings()
+        self.assertEqual(mod.choose_pieces(cfg, ent)[2], "/v/it_IT-paola-medium.onnx")
+        self.assertEqual(cfg["own_speed"], 1.1)
+
+    def test_ascolto_dalla_finestra(self):
+        _json(self.mod.CONFIG_FILE, {"listen_window": 15})
+        self.assertEqual(self.mod.load_settings()["listen_window"], 15)
+        _json(self.mod.CONFIG_FILE, {"listen_window": "boh"})
+        self.assertEqual(self.mod.load_settings()["listen_window"], self.mod.LISTEN_WINDOW)
+        _json(self.mod.CONFIG_FILE, {"listen_window": 999})
+        self.assertEqual(self.mod.load_settings()["listen_window"], 60)
 
     def test_personalita_copiata_una_volta(self):
         path = self.mod.ensure_entity()
@@ -302,6 +380,14 @@ if (w.platform !== null || w.feetY !== 1080) fail('non cade a terra');
 // una finestra troppo in alto non è un posto dove salire
 if (new World(169, 195, 190).candidates(area, [{id: 1, x: 0, y: 60, width: 800, height: 300}]).length)
     fail('sale dove non c\'è spazio sopra');
+// «mai»: non sceglie finestre
+const nv = new World(169, 195, 190, {random: rnd}); nv.jumpEvery = null;
+const lw = [{id: 4, x: 600, y: 420, width: 700, height: 400}];
+for (let t = 0; t < 200; t += 1 / 30) nv.step(1 / 30, area, lw);
+if (nv.platform !== null || nv.target !== null || nv.airborne) fail('salta anche con «mai»');
+// più grande o più piccolo: il centro resta dov'è
+const rz = new World(169, 195, 190); rz.step(0.1, area, []); const c0 = rz.center;
+rz.resize(208, 240, 234); if (Math.abs(rz.center - c0) > 0.01) fail('ridimensionato si sposta');
 // fermo se non può camminare
 const s = new World(169, 195, 190); s.step(0.1, area, []); const x0 = s.x;
 for (let i = 0; i < 30; i++) s.step(0.1, area, [], false);
