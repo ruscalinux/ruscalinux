@@ -223,5 +223,14 @@
   "done_reused_all": "Trascrizione e traduzione riprese dal lavoro salvato: rifatti solo voce e missaggio.",
   "done_reused_some": "Una parte del lavoro è stata ripresa da quello salvato.",
   "stage_refit": "Accorcio le frasi troppo lunghe da dire…",
-  "done_refit": "{n} frasi troppo lunghe da dire sono state accorciate e ridette."
+  "done_refit": "{n} frasi troppo lunghe da dire sono state accorciate e ridette.",
+  "speaker_gender": "Chi parla",
+  "speaker_gender_sub": "Per l’accordo di ciò che dice di sé («sono stato», «sono stata»)",
+  "gender_auto": "Automatico",
+  "gender_male": "Un uomo",
+  "gender_female": "Una donna",
+  "glossary": "Glossario (facoltativo)",
+  "glossary_tip": "Nomi e termini di questo video, separati da punto e virgola: «Polyglot = Poliglotta; RuscaLinux». Un termine senza «=» non si traduce.",
+  "glossary_saved": "Glossario salvato per questo video",
+  "stage_brief": "Leggo tutto il discorso…"
 }

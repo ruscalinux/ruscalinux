@@ -59,6 +59,7 @@ VIDEO_PATTERNS = ("mp4", "mkv", "webm", "mov", "avi", "m4v", "mpg", "mpeg", "ts"
 SOURCE_CODES = ["auto"] + dub.CODES + sorted(dub.EXTRA_SOURCE)
 DUCKING = ("light", "medium", "strong")
 THEMES = ("system", "light", "dark")
+GENDERS = ("auto", "male", "female")
 # Una scheda grafica per passo: la trascrizione, la traduzione, la voce.
 DEVICE_KEYS = ("whisper_device", "llm_device", "tts_device")
 DEFAULTS = {
@@ -68,7 +69,7 @@ DEFAULTS = {
     "seed": 42, "context": 8192, "gpu": True,
     "whisper_device": "", "llm_device": "", "tts_device": "",
     "threads": tts.physical_cores(), "width": 760, "height": 720, "maximized": False,
-    "theme": "system",
+    "theme": "system", "speaker_gender": "auto",
 }
 
 
@@ -196,6 +197,8 @@ def load_settings():
         cfg["src"] = "auto"
     if cfg["fmt"] not in dub.VIDEO_FORMATS:
         cfg["fmt"] = "mkv"
+    if cfg["speaker_gender"] not in GENDERS:
+        cfg["speaker_gender"] = "auto"
     if cfg["ducking"] not in DUCKING:
         cfg["ducking"] = "medium"
     cfg["threads"] = max(1, min(cfg["threads"], os.cpu_count() or 1))
@@ -456,6 +459,20 @@ class DubbingWindow(Adw.ApplicationWindow):
         srt_choose.connect("clicked", lambda _b: self._choose_srt())
         self.srt_row.add_suffix(srt_choose)
         langs.add(self.srt_row)
+        # Chi parla: serve all'accordo in prima persona («sono stato/a»).
+        self.gender_row = Adw.ComboRow(title=_("speaker_gender"), subtitle=_("speaker_gender_sub"),
+                                       model=Gtk.StringList.new([_(f"gender_{g}") for g in GENDERS]))
+        self.gender_row.set_selected(GENDERS.index(self.cfg["speaker_gender"]))
+        self.gender_row.connect("notify::selected", lambda r, _p: self._set(
+            "speaker_gender", GENDERS[r.get_selected()]))
+        langs.add(self.gender_row)
+        # Glossario di questo video: nomi e termini da tradurre sempre allo
+        # stesso modo, o da non tradurre.
+        self.glossary_row = Adw.EntryRow(title=_("glossary"), show_apply_button=True)
+        self.glossary_row.set_tooltip_text(_("glossary_tip"))
+        self.glossary_row.connect("apply", lambda r: self._save_glossary(r.get_text()))
+        self.glossary_row.connect("changed", lambda r: self._save_glossary(r.get_text(), quiet=True))
+        langs.add(self.glossary_row)
         box.append(langs)
 
         # La voce del doppiaggio: quella di riferimento, e la ricerca di una
@@ -639,9 +656,24 @@ class DubbingWindow(Adw.ApplicationWindow):
         self.saved_row.set_subtitle(GLib.markup_escape_text("; ".join(parts)))
         self.saved_row.set_visible(True)
 
+    def _save_glossary(self, text, quiet=False):
+        if self.media is None or self._updating:
+            return
+        project = dub.load_project(self.media)
+        if (project.get("glossary") or "") == text:
+            return
+        project["glossary"] = text
+        dub.save_project(self.media, project)
+        if not quiet:
+            self._toast(_("glossary_saved"))
+
     def _forget(self):
         if self.media:
+            glossary = self.glossary_row.get_text()
             dub.forget_project(self.media)
+            if glossary:
+                # Il glossario è una scelta dell'utente: resta.
+                dub.save_project(self.media, {"glossary": glossary})
             self._refresh_saved_row()
             self._toast(_("saved_forgotten"))
 
@@ -756,6 +788,9 @@ class DubbingWindow(Adw.ApplicationWindow):
         self.video_row.set_subtitle(" · ".join(parts))
         self._refresh_folder()
         self._refresh_saved_row()
+        self._updating = True
+        self.glossary_row.set_text(dub.load_project(path).get("glossary") or "")
+        self._updating = False
         self.stack.set_visible_child_name("setup")
         self._refresh_banner()
 
@@ -834,7 +869,8 @@ class DubbingWindow(Adw.ApplicationWindow):
             threads=cfg["threads"], context=cfg["context"], max_speed=cfg["max_speed"],
             seed=cfg["seed"], ducking=cfg["ducking"], outputs=self._outputs(), fmt=cfg["fmt"],
             titles=(language_name(src) if src != "auto" else "", dub.NATIVE[cfg["tgt"]]),
-            source_srt=self.source_srt, reuse=True, preview=preview)
+            source_srt=self.source_srt, reuse=True, preview=preview,
+            gender=cfg["speaker_gender"], glossary=self.glossary_row.get_text())
         self.log_lines.clear()
         self.files = {}
         for stage in dub.STAGES:
@@ -895,6 +931,8 @@ class DubbingWindow(Adw.ApplicationWindow):
         text = ""
         if stage == "transcribe" and fraction >= 1.0 and detail:
             text = _("detected_language", language=language_name(detail))
+        elif stage == "translate" and detail == "brief":
+            text = _("stage_brief")
         elif stage == "transcribe" and detail == "preview":
             text = _("stage_preview")
         elif stage == "transcribe" and detail == "audio":

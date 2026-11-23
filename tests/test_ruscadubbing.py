@@ -190,6 +190,26 @@ class Cues(unittest.TestCase):
         self.assertEqual(clean("Ну...", "Beh..."), "Beh...")
         self.assertEqual(clean("и", "…e poi"), "e poi")
 
+    def test_context(self):
+        self.assertEqual(rd.parse_glossary("Polyglot = Poliglotta; RuscaLinux\nDmitry=Dmitrij"),
+                         [("Polyglot", "Poliglotta"), ("RuscaLinux", "RuscaLinux"),
+                          ("Dmitry", "Dmitrij")])
+        self.assertEqual(rd.guess_gender(120), "male?")
+        self.assertEqual(rd.guess_gender(210), "female?")
+        self.assertEqual(rd.guess_gender(170), "")
+        self.assertIn("masculine", rd.speaker_note("male", "it"))
+        self.assertIn("feminine", rd.speaker_note("female?", "it"))
+        self.assertEqual(rd.speaker_note("", "it"), "")
+        notes = rd.make_notes("Topic: languages.", rd.speaker_note("male", "it"),
+                              [("Polyglot", "Poliglotta")])
+        prompt = rd.build_prompt("ru", "it", notes)
+        self.assertIn("Topic: languages.", prompt)
+        self.assertIn("Polyglot = Poliglotta", prompt)
+        self.assertNotIn("Notes about", rd.build_prompt("ru", "it"))
+        body = rd.brief_request([rd.Cue(0, 1, "a" * 20000)], "ru", "it")
+        self.assertLess(len(body["messages"][0]["content"]), rd.BRIEF_CHARS + 2000)
+        self.assertNotEqual(rd._memory_key("ru", "it", "", "male|"), rd._memory_key("ru", "it", ""))
+
     def test_wrap(self):
         wrap = rd.wrap_lines
         self.assertEqual(wrap("Breve."), "Breve.")
@@ -509,6 +529,23 @@ class Chain(unittest.TestCase):
         self.assertEqual((self.count("FAKE_WHISPER_LOG"), self.count("FAKE_ARGS")), (2, 2))
         rd.forget_project(self.video)
         self.assertEqual(rd.project_summary(self.video), (False, []))
+
+    def test_brief_and_gender(self):
+        """La scheda del discorso si fa una volta e si salva; scegliere chi
+        parla (o un glossario) rifà la traduzione."""
+        self.assertIsNone(self.run_chain(self.options(outputs={"srt"}, voice=None))["done"][0])
+        project = rd.load_project(self.video)
+        self.assertEqual(len(project["briefs"]), 1)
+        self.assertEqual(self.count("FAKE_ARGS"), 1)
+        self.run_chain(self.options(outputs={"srt"}, voice=None))
+        self.assertEqual(self.count("FAKE_ARGS"), 1)              # tutto dalla memoria
+        self.run_chain(self.options(outputs={"srt"}, voice=None, gender="female",
+                                    glossary="RuscaLinux"))
+        self.assertEqual(self.count("FAKE_ARGS"), 2)
+        briefs = rd.load_project(self.video)["briefs"]
+        self.assertEqual(len(briefs), 2)
+        self.assertTrue(any("feminine" in b and "RuscaLinux = RuscaLinux" in b
+                            for b in briefs.values()))
 
     def test_refit(self):
         """Una frase che, detta, non sta nel suo tempo si fa accorciare e

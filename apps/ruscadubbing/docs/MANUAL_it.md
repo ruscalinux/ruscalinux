@@ -72,6 +72,12 @@ La finestra mostra i quattro passi:
 
 RuscaDubbing **ricorda** trascrizione e traduzione di ogni video. Se lo doppi di nuovo (con un'altra voce, un altro livello dell'audio originale, un altro formato) si rifanno solo voce e missaggio: pochi minuti invece del lavoro intero. Le frasi tradotte nella prova servono anche al doppiaggio completo. La riga **Lavoro salvato**, nella pagina del video, dice che cosa c'è; **Dimentica** lo cancella e fa rifare tutto (per esempio dopo aver cambiato il modello di traduzione con uno migliore, o dopo aver corretto i sottotitoli originali).
 
+### Chi parla e glossario
+
+**Chi parla** serve all'italiano: chi parla di sé dice «sono stato» o «sono stata». Con **Automatico** RuscaDubbing ascolta l'altezza della voce originale e legge la grammatica della trascrizione; se sai chi parla, sceglilo.
+
+Il **Glossario** è facoltativo e vale per il video aperto: nomi e termini da tradurre sempre allo stesso modo, separati da punto e virgola, per esempio `Polyglot = Poliglotta; Dmitrij Petrov`. Un termine senza «=» resta com'è. Prima di tradurre, il modello legge comunque tutto il discorso e si prepara una scheda con argomento, registro e termini ricorrenti: il glossario serve quando vuoi decidere tu.
+
 ## 4. I file
 
 Accanto al video, o nella cartella scelta in **Cartella dei file**. Un video `film.mp4` doppiato dall'inglese all'italiano dà:

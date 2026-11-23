@@ -54,7 +54,8 @@ whisper.WORK_DIR = os.path.join(WORK_DIR, "whisper")
 # cancella dalla finestra («Dimentica»).
 PROJECT_DIR = os.path.join(GLib.get_user_data_dir(), "ruscadubbing", "progetti")
 PREVIEW_MS = 60000          # «Prova su un minuto»
-PROMPT_VERSION = 2          # cambia quando cambia il modo di tradurre
+PROMPT_VERSION = 3          # cambia quando cambia il modo di tradurre
+BRIEF_CHARS = 12000         # trascrizione data al modello per la scheda
 tts.WORK_DIR = os.path.join(WORK_DIR, "voce")
 
 # Lingue del doppiaggio: quelle che il modello della voce sa dire (Qwen3-TTS).
@@ -541,8 +542,9 @@ def clean_translation(source, text):
 
 
 # ── traduzione ──────────────────────────────────────────────────────────────
-def build_prompt(src, tgt):
+def build_prompt(src, tgt, notes=""):
     s, g = english_name(src), english_name(tgt)
+    extra = f"\n\nNotes about this talk, from the whole transcript:\n{notes.strip()}" if notes.strip() else ""
     return (
         f"You are a professional dubbing adapter translating a spoken talk from {s} to "
         f"{g}. You receive numbered passages in the format `N|MAX|text`: each passage is "
@@ -556,7 +558,90 @@ def build_prompt(src, tgt):
         f"translation at the corresponding point, without adding a period. Never add "
         f"ellipses (... or …) that are not in the original. Answer with exactly one line per "
         f"passage, in the format `N|translation`, same numbers, same order, nothing else: "
-        f"no notes, no explanations, no blank translations.")
+        f"no notes, no explanations, no blank translations.{extra}")
+
+
+# ── contesto del discorso ───────────────────────────────────────────────────
+def parse_glossary(text):
+    """[(termine, traduzione)] da «termine = traduzione», separati da «;»
+    o da a capo. Un termine senza «=» si lascia com'è (non si traduce)."""
+    out = []
+    for item in re.split(r"[;\n]+", text or ""):
+        item = item.strip()
+        if not item:
+            continue
+        if "=" in item:
+            a, b = item.split("=", 1)
+            if a.strip():
+                out.append((a.strip(), b.strip() or a.strip()))
+        else:
+            out.append((item, item))
+    return out
+
+
+def speaker_note(gender, tgt):
+    """Indicazione sul genere di chi parla, per l'accordo delle forme in
+    prima persona («sono stato» o «sono stata»)."""
+    g = english_name(tgt)
+    if gender == "male":
+        return (f"The speaker is a man: in {g}, use masculine agreement for everything the "
+                f"speaker says about himself.")
+    if gender == "female":
+        return (f"The speaker is a woman: in {g}, use feminine agreement for everything the "
+                f"speaker says about herself.")
+    if gender == "male?":
+        return ("The speaker's voice is low, probably a man's: use masculine agreement for "
+                "first-person forms, unless the transcript clearly shows otherwise.")
+    if gender == "female?":
+        return ("The speaker's voice is high, probably a woman's: use feminine agreement for "
+                "first-person forms, unless the transcript clearly shows otherwise.")
+    return ""
+
+
+def guess_gender(hz):
+    """Dall'altezza mediana della voce: "male?", "female?" o "" (incerto).
+    È solo un indizio, che il modello mette dopo la grammatica del testo."""
+    if not hz:
+        return ""
+    return "male?" if hz < 160 else "female?" if hz > 180 else ""
+
+
+def brief_request(units, src, tgt):
+    """La richiesta della scheda del discorso: argomento, registro, genere
+    di chi parla dalla grammatica, termini ricorrenti con la traduzione da
+    usare sempre. Al modello va la trascrizione (inizio e fine, se è
+    lunga)."""
+    text = " ".join(u.text for u in units)
+    if len(text) > BRIEF_CHARS:
+        head = text[:BRIEF_CHARS * 2 // 3]
+        tail = text[-BRIEF_CHARS // 3:]
+        text = head + " […] " + tail
+    s, g = english_name(src), english_name(tgt)
+    user = (f"Here is the transcript of a talk in {s}. Write short notes, in English, for the "
+            f"person who will translate it into {g} for dubbing. At most 150 words, in this "
+            f"form:\n"
+            f"Topic: one or two sentences.\n"
+            f"Register: formal or informal, and how the speaker addresses the audience (in "
+            f"{g}, which form of address to use).\n"
+            f"Speaker: man, woman or unknown, only if the grammar of the transcript shows it "
+            f"(for example past-tense endings); otherwise unknown.\n"
+            f"Terms: up to 10 recurring key terms, names or concepts, each as "
+            f"`term = {g} translation`, to be used consistently.\n\n"
+            f"Transcript:\n{text}")
+    return dict(SAMPLING, messages=[{"role": "user", "content": user}], max_tokens=600,
+                reasoning_effort="none")
+
+
+def make_notes(brief, gender_note, glossary):
+    parts = []
+    if brief.strip():
+        parts.append(brief.strip())
+    if gender_note:
+        parts.append(gender_note)
+    if glossary:
+        parts.append("Glossary (always use these translations; a term mapped to itself stays "
+                     "untranslated):\n" + "\n".join(f"{a} = {b}" for a, b in glossary))
+    return "\n".join(parts)
 
 
 _LINE = re.compile(r"^\s*(?:\[(\d+)\]\s*[|:.)\-]?|(\d+)\s*[|:.)\-])\s*(.*?)\s*$")
@@ -582,7 +667,7 @@ def parse_translations(text):
 
 
 def translate_cues(chat, cues, src, tgt, stop_event=None, on_progress=None, max_speed=1.3,
-                   batch=BATCH, known=None):
+                   batch=BATCH, known=None, notes=""):
     """Traduce le frasi a gruppi. chat(body) -> testo è la funzione del
     motore (engine.Engine.chat). known: traduzioni già pronte (memoria del
     lavoro salvato), None o "" per quelle da fare. Restituisce
@@ -593,7 +678,7 @@ def translate_cues(chat, cues, src, tgt, stop_event=None, on_progress=None, max_
     result = [t or None for t in (known or [None] * len(cues))]
     todo = [i for i in range(len(cues)) if not result[i]]
     stats = {"retried": 0, "shortened": 0, "kept": 0, "reused": len(cues) - len(todo)}
-    system = build_prompt(src, tgt)
+    system = build_prompt(src, tgt, notes)
 
     def ask(lines, context):
         user = ""
@@ -673,11 +758,11 @@ def too_long(pieces, durations, max_speed):
 
 
 def shorten_translations(chat, originals, texts, targets, src, tgt, stop_event=None,
-                         batch=BATCH):
+                         batch=BATCH, notes=""):
     """Versioni più corte delle traduzioni troppo lunghe da dire.
     targets: {indice: caratteri massimi}. Restituisce {indice: testo}
     solo per quelle davvero più corte."""
-    system = build_prompt(src, tgt)
+    system = build_prompt(src, tgt, notes)
     order = sorted(targets)
     out = {}
     for start in range(0, len(order), batch):
@@ -878,8 +963,12 @@ def _transcript_key(o):
     return f"{model_id(o.whisper_model)}|{o.src}"
 
 
-def _memory_key(src, tgt, llm_model):
-    return f"{src}|{tgt}|{model_id(llm_model)}|v{PROMPT_VERSION}"
+def _memory_key(src, tgt, llm_model, extra=""):
+    """Chiave della memoria: lingue, modello, versione del modo di
+    tradurre, e un'impronta di genere e glossario (se cambiano, le
+    traduzioni vecchie non valgono più)."""
+    tag = hashlib.sha256(extra.encode("utf-8")).hexdigest()[:8] if extra else "-"
+    return f"{src}|{tgt}|{model_id(llm_model)}|v{PROMPT_VERSION}|{tag}"
 
 
 def trim_cues(cues, limit_ms):
@@ -893,14 +982,16 @@ STAGES = ("transcribe", "translate", "dub", "mix")
 Options = collections.namedtuple("Options", [
     "media", "folder", "src", "tgt", "whisper_model", "llm_model", "voice", "speaker_file",
     "voice_name", "gpu", "whisper_device", "llm_device", "tts_device", "threads", "context", "max_speed", "seed", "ducking",
-    "outputs", "fmt", "titles", "source_srt", "reuse", "preview"],
-    defaults=(True, False))
+    "outputs", "fmt", "titles", "source_srt", "reuse", "preview", "gender", "glossary"],
+    defaults=(True, False, "auto", ""))
 # whisper_device, llm_device, tts_device: la scheda grafica di ogni passo
 # (descrizione di list_devices(), "" = scelta del motore).
 # outputs: insieme di "srt", "audio", "video". source_srt: file SRT della
 # lingua originale da usare al posto della trascrizione ("" = trascrivere).
 # reuse: usare la trascrizione e le traduzioni salvate per questo video.
 # preview: doppiare solo il primo minuto (file «.prova»).
+# gender: "auto" (dall'altezza della voce e dalla grammatica), "male",
+# "female". glossary: «termine = traduzione; …» (facoltativo).
 
 
 class Dubbing:
@@ -1115,7 +1206,11 @@ class Dubbing:
         # Memoria delle traduzioni di questo video: una frase già tradotta
         # (stessa lingua, stesso modello) non si ritraduce.
         self.units = block_cues(self.parts, self.blocks)
-        self.memory_key = _memory_key(self.src, o.tgt, o.llm_model)
+        self.glossary = parse_glossary(o.glossary)
+        extra = o.gender + "|" + "; ".join(f"{a}={b}" for a, b in self.glossary)
+        self.memory_key = _memory_key(self.src, o.tgt, o.llm_model,
+                                      "" if extra == "auto|" else extra)
+        self.notes = (self.project.get("briefs") or {}).get(self.memory_key, "")
         memory = (self.project.get("memory") or {}).get(self.memory_key) or {}
         self.known = [memory.get(u.text, "") if o.reuse else "" for u in self.units]
         if all(self.known):
@@ -1135,11 +1230,29 @@ class Dubbing:
         o = self.o
         error = None
         try:
-            self._start_llm()
+            if not self.notes:
+                gender = o.gender
+                if gender == "auto":
+                    gender = guess_gender(self._speaker_pitch())
+                self._start_llm()
+                self._emit(self.on_stage, "translate", 0.0, "brief")
+                try:
+                    brief = self.engine.chat(brief_request(self.units, self.src, o.tgt)) or ""
+                except engine.EngineError:
+                    raise
+                except Exception as e:      # noqa: BLE001 — la scheda è un aiuto
+                    if self.stop_event.is_set():
+                        raise _Stopped() from e
+                    brief = ""
+                self.notes = make_notes(brief, speaker_note(gender, o.tgt), self.glossary)
+                self.project.setdefault("briefs", {})[self.memory_key] = self.notes
+                self._emit(self.on_log, "ruscadubbing: scheda del discorso:\n" + self.notes)
+            else:
+                self._start_llm()
             texts, tstats = translate_cues(
                 self.engine.chat, self.units, self.src, self.o.tgt, self.stop_event,
                 lambda i, n: self._emit(self.on_stage, "translate", i / max(1, n), f"{i}/{n}"),
-                self.o.max_speed, known=self.known)
+                self.o.max_speed, known=self.known, notes=self.notes)
             self.stats.update(tstats)
             self._set_translations(texts)
             memory = self.project.setdefault("memory", {}).setdefault(self.memory_key, {})
@@ -1260,6 +1373,25 @@ class Dubbing:
         self.on_stage("mix", 0.0, "")
         threading.Thread(target=self._mix_work, args=(path, speaker), daemon=True).start()
 
+    def _speaker_pitch(self):
+        """Altezza mediana della voce originale in Hz (0 se non si misura):
+        un minuto delle battute più lunghe, come «Trova una voce simile»."""
+        if not self.info.get("audio"):
+            return 0
+        try:
+            import rusca_voicematch as match
+            ffmpeg = tts.find_ffmpeg()
+            wav = os.path.join(self.run_dir, "voce-originale.wav")
+            match.extract_reference(ffmpeg, self.media_work,
+                                    match.speech_windows(self.info["duration_ms"], self.cues), wav)
+            hz = match.semitones_to_hz(match.measure(ffmpeg, wav).pitch)
+            os.unlink(wav)
+            self._emit(self.on_log, f"ruscadubbing: voce originale a circa {hz:.0f} Hz")
+            return hz
+        except Exception as e:      # noqa: BLE001 — è solo un indizio
+            self._emit(self.on_log, f"ruscadubbing: altezza della voce non misurata ({e})")
+            return 0
+
     def _start_llm(self):
         """Avvia llama-server con il modello di traduzione (nel thread di
         lavoro) e aspetta che sia pronto."""
@@ -1284,7 +1416,7 @@ class Dubbing:
             self._start_llm()
             changed = shorten_translations(
                 self.engine.chat, [u.text for u in self.units], self.block_texts, targets,
-                self.src, self.o.tgt, self.stop_event)
+                self.src, self.o.tgt, self.stop_event, notes=getattr(self, "notes", ""))
         except _Stopped:
             error = "cancelled"
         except engine.EngineError as e:

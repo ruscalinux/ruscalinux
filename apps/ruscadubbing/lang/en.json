@@ -223,5 +223,14 @@
   "done_reused_all": "Transcription and translation taken from the saved work: only voice and mixing were redone.",
   "done_reused_some": "Part of the work was taken from the saved work.",
   "stage_refit": "Shortening the sentences too long to speak…",
-  "done_refit": "{n} sentences too long to speak were shortened and spoken again."
+  "done_refit": "{n} sentences too long to speak were shortened and spoken again.",
+  "speaker_gender": "Speaker",
+  "speaker_gender_sub": "For the agreement of what the speaker says about themselves",
+  "gender_auto": "Automatic",
+  "gender_male": "A man",
+  "gender_female": "A woman",
+  "glossary": "Glossary (Optional)",
+  "glossary_tip": "Names and terms of this video, separated by semicolons: “Polyglot = Polyglot; RuscaLinux”. A term without “=” is not translated.",
+  "glossary_saved": "Glossary saved for this video",
+  "stage_brief": "Reading the whole talk…"
 }

@@ -72,6 +72,12 @@ The window shows the four steps:
 
 RuscaDubbing **remembers** the transcription and translation of each video. If you dub it again (with another voice, another level of the original audio, another format) only voice and mixing are redone: a few minutes instead of the whole job. The sentences translated in the trial are used by the full dubbing too. The **Saved Work** row on the video page says what is there; **Forget** deletes it and makes everything be redone.
 
+### Speaker and glossary
+
+**Speaker** matters for languages where what speakers say about themselves changes with gender (in Italian, “sono stato” or “sono stata”). With **Automatic** RuscaDubbing listens to the pitch of the original voice and reads the grammar of the transcript; if you know who speaks, choose it.
+
+The **Glossary** is optional and applies to the open video: names and terms to translate always the same way, separated by semicolons, for example `Polyglot = Poliglotta; Dmitry Petrov`. A term without “=” stays as it is. Before translating, the model reads the whole talk anyway and prepares notes with topic, register and recurring terms: the glossary is for when you want to decide.
+
 ## 4. The files
 
 Next to the video, or in the folder chosen in **Output Folder**. A video `film.mp4` dubbed from English to Italian gives:
