@@ -136,20 +136,8 @@ def ensure_icon():
         pass
 
 
-# Durante lo sviluppo della 1.99.3 il programma si chiamava RuscaDubbing:
-# alla prima apertura le sue impostazioni passano al nome nuovo.
-OLD_CONFIG_FILE = os.path.join(GLib.get_user_config_dir(), "ruscadubbing", "settings.json")
-
-
 def load_settings():
     cfg = dict(DEFAULTS)
-    if not os.path.exists(CONFIG_FILE) and os.path.isfile(OLD_CONFIG_FILE):
-        try:
-            os.makedirs(CONFIG_DIR, exist_ok=True)
-            with open(OLD_CONFIG_FILE, "rb") as src, open(CONFIG_FILE, "wb") as dst:
-                dst.write(src.read())
-        except OSError:
-            pass
     try:
         with open(CONFIG_FILE, encoding="utf-8") as f:
             data = json.load(f)

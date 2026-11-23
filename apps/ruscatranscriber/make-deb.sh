@@ -135,9 +135,6 @@ $(cat "$TMP/summary")
 $(cat "$TMP/description")
   </description>
   <launchable type="desktop-id">$APP_ID.desktop</launchable>
-  <replaces>
-    <id>org.ruscalinux.RuscaDubbing</id>
-  </replaces>
   <url type="homepage">$HOMEPAGE</url>
   <url type="bugtracker">https://github.com/ruscalinux/ruscalinux/issues</url>
   <provides>
@@ -204,9 +201,8 @@ COPYRIGHT
 cat <<CHANGELOG | gzip -9n > "$DOC/changelog.gz"
 $PKG ($VER) unstable; urgency=medium
 
-  * Nuovo nome: RuscaTranscriber. Durante lo sviluppo si chiamava
-    RuscaDubbing: il pacchetto sostituisce ruscadubbing e le impostazioni
-    passano da ~/.config/ruscadubbing/ alla prima apertura.
+  * Il nome RuscaDubbing, usato durante lo sviluppo, ora è quello della
+    sala di doppiaggio: il pacchetto non sostituisce più ruscadubbing.
   * Scelta della scheda grafica (GGML_VK_VISIBLE_DEVICES).
   * Primo rilascio: trascrizione di video e audio con un modello Whisper
     locale, tramite ruscawhisper-engine (whisper.cpp).
@@ -225,8 +221,6 @@ Section: sound
 Priority: optional
 Architecture: $ARCH
 Depends: python3 (>= 3.10), python3-gi, gir1.2-gtk-4.0 (>= 4.18), gir1.2-adw-1 (>= 1.7), ruscawhisper-engine (>= $VER), ffmpeg
-Replaces: ruscadubbing
-Conflicts: ruscadubbing
 Maintainer: $MAINT
 Homepage: $HOMEPAGE
 Installed-Size: $(du -sk "$ROOT/usr" | cut -f1)
