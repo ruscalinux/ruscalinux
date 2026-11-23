@@ -913,6 +913,8 @@ class DubbingWindow(Adw.ApplicationWindow):
                            late=stats.get("late", 0)))
         if stats.get("kept"):
             lines.append(_("done_kept", n=stats["kept"]))
+        if stats.get("fast_subtitles"):
+            lines.append(_("done_fast", n=stats["fast_subtitles"]))
         self.done_status.set_description("\n".join(lines))
         for row in self._file_rows:
             self.files_group.remove(row)

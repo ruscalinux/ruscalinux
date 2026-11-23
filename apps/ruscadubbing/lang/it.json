@@ -208,5 +208,6 @@
   "llm_device": "Scheda per la traduzione",
   "llm_device_sub": "Il modello linguistico: quella con più memoria, se è grande",
   "tts_device": "Scheda per la voce",
-  "tts_device_sub": "Qwen3-TTS, anche per «Trova una voce simile»"
+  "tts_device_sub": "Qwen3-TTS, anche per «Trova una voce simile»",
+  "done_fast": "{n} sottotitoli tradotti sono più veloci di quanto si legge comodamente (17 caratteri al secondo): conviene accorciarli a mano."
 }

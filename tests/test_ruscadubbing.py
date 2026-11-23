@@ -183,6 +183,47 @@ class Cues(unittest.TestCase):
         self.assertEqual(clean("Ну...", "Beh..."), "Beh...")
         self.assertEqual(clean("и", "…e poi"), "e poi")
 
+    def test_wrap(self):
+        wrap = rd.wrap_lines
+        self.assertEqual(wrap("Breve."), "Breve.")
+        text = "Per la mia lunga esperienza con persone e pubblici molto diversi,"
+        top, bottom = wrap(text).split("\n")
+        self.assertLessEqual(len(top), 42)
+        self.assertLessEqual(len(bottom), 42)
+        self.assertLessEqual(len(top), len(bottom))          # piramide
+        self.assertFalse(top.split()[-1] in ("e", "la", "di", "con"))
+        self.assertEqual(wrap("Sì, ho capito. Ma adesso dobbiamo andare via di qui."),
+                         "Sì, ho capito.\nMa adesso dobbiamo andare via di qui.")
+
+    def test_segment(self):
+        C = rd.Cue
+        units = [C(0, 20000, "x"), C(21000, 22000, "y")]
+        texts = ["Per la mia lunga esperienza con persone e pubblici molto diversi, questo è "
+                 "il formato compatto ottimale: permette, senza stancarsi troppo, di acquisire "
+                 "una quantità davvero efficace di conoscenze.", "Grazie!"]
+        subs, fast = rd.segment_subtitles(units, texts, "it")
+        self.assertEqual(fast, 0)
+        self.assertEqual(subs[-1].text, "Grazie!")
+        self.assertEqual(" ".join(" ".join(s.text.split("\n")) for s in subs),
+                         texts[0] + " " + texts[1])
+        for s in subs:
+            lines = s.text.split("\n")
+            self.assertLessEqual(len(lines), 2)
+            self.assertTrue(all(len(line) <= 42 for line in lines), s.text)
+            self.assertGreaterEqual(s.end - s.start, rd.SUB_MIN_MS)
+            self.assertLessEqual(s.end - s.start, rd.SUB_MAX_MS + 500)
+        for a, b in zip(subs, subs[1:]):
+            self.assertGreaterEqual(b.start - a.end, rd.SUB_GAP_MS - 1)
+        # Un sottotitolo troppo veloce resta un po' dopo la voce, se c'è spazio.
+        subs, fast = rd.segment_subtitles([C(0, 1000, "x")],
+                                          ["Una frase decisamente troppo lunga per un secondo."], "it")
+        self.assertGreater(subs[0].end, 1000)
+        self.assertLessEqual(subs[0].end, 1000 + rd.SUB_MAX_EXTEND_MS)
+        self.assertEqual(fast, 1)
+        # Cinese: righe più corte.
+        subs, _ = rd.segment_subtitles([C(0, 8000, "x")], ["早上好。" * 10], "zh")
+        self.assertTrue(all(len(line) <= 16 for s in subs for line in s.text.split("\n")))
+
     def test_parse(self):
         got = rd.parse_translations("Ecco:\n1|Ciao.\n2| 40 |Addio.\n[3] Fine\n```\nniente\n4|\n")
         self.assertEqual(got, {1: "Ciao.", 2: "Addio.", 3: "Fine"})

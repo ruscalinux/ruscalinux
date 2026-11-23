@@ -72,8 +72,8 @@ Next to the video, or in the folder chosen in **Output Folder**. A video `film.m
 | File | Content |
 |---|---|
 | `film.en.srt` | original subtitles |
-| `film.it.srt` | translated subtitles |
-| `film.en-it.srt` | both languages together: original above, translation below |
+| `film.it.srt` | translated subtitles, split as professional ones: at most two lines of 42 characters, line breaks after punctuation, comfortable reading times |
+| `film.en-it.srt` | both languages together, line by line: original above, translation below (useful to study or check) |
 | `film.it.opus` | the dubbed audio alone |
 | `film.it.mkv` | the dubbed video |
 

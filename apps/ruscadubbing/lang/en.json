@@ -208,5 +208,6 @@
   "llm_device": "Graphics Card for Translation",
   "llm_device_sub": "The language model: the one with more memory, if the model is large",
   "tts_device": "Graphics Card for the Voice",
-  "tts_device_sub": "Qwen3-TTS, also for “Find a Similar Voice”"
+  "tts_device_sub": "Qwen3-TTS, also for “Find a Similar Voice”",
+  "done_fast": "{n} translated subtitles are faster than comfortable reading (17 characters per second): consider shortening them by hand."
 }

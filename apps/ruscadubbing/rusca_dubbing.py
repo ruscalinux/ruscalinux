@@ -87,7 +87,7 @@ BLOCK_MAX_CHARS = 420
 BLOCK_GAP_MS = 1500
 BLOCK_MIN_MS = 8000         # sotto, una frase finita si unisce alla successiva
 BLOCK_JOIN_GAP_MS = 700     # … se fra le due la pausa è breve
-CLAUSE_END = (",", ";", ":", "—", "–")
+CLAUSE_END = (",", ";", ":", "—", "–", "，", "、", "；", "：")
 MAX_TOKENS = 2048
 SAMPLING = dict(temperature=0.2, top_p=0.92, top_k=40, min_p=0.08, repeat_penalty=1.05)
 # Battute che Whisper spezza: si uniscono se la pausa è breve e la frase non
@@ -178,6 +178,174 @@ def to_srt(cues, texts=None):
         blocks.append(f"{len(blocks) + 1}\n{whisper.srt_time(cue.start)} --> "
                       f"{whisper.srt_time(max(cue.end, cue.start + 1))}\n{text}\n")
     return "\n".join(blocks)
+
+
+# ── sottotitoli professionali ───────────────────────────────────────────────
+# Le regole comuni dei sottotitoli (per esempio le guide Netflix per molte
+# lingue europee): al massimo 2 righe da 42 caratteri, di solito una riga
+# sola; a capo dopo la punteggiatura, a piramide (riga in alto più corta),
+# mai una o due parole sole in alto; fino a 17 caratteri al secondo per un
+# pubblico adulto; almeno 5/6 di secondo per sottotitolo; 2 fotogrammi fra
+# un sottotitolo e il successivo. Per cinese, giapponese e coreano, righe
+# più corte e lettura più lenta.
+LINE_CHARS = {"zh": 16, "ja": 13, "ko": 16}
+READING_CPS = {"zh": 9, "ja": 4, "ko": 12}
+SUB_LINE = 42
+SUB_CPS = 17.0
+SUB_MIN_MS = 834
+SUB_MAX_MS = 7000
+SUB_GAP_MS = 83
+SUB_MAX_EXTEND_MS = 1000       # un sottotitolo veloce può restare dopo la voce
+
+
+def _line_limit(lang):
+    return LINE_CHARS.get((lang or "").split("_")[0].split("-")[0], SUB_LINE)
+
+
+def _cps_limit(lang):
+    return READING_CPS.get((lang or "").split("_")[0].split("-")[0], SUB_CPS)
+
+
+def _end_score(word):
+    """Quanto costa tagliare dopo questa parola: niente alla fine di una
+    frase, poco dopo una virgola, di più a metà frase, molto dopo una
+    parolina che lega alla successiva (articoli, preposizioni,
+    congiunzioni: «la», «di», «e», «the», «of»)."""
+    if word.endswith(_STRONG) or word.endswith(("»", "”", "\"")):
+        return 0.0
+    if word.endswith(CLAUSE_END):
+        return 1.0
+    if len(word) <= 3 and word.isalpha() and word.islower():
+        return 5.0
+    return 3.0
+
+
+def _best_wrap(words, limit, sep=" "):
+    """(posizione dell'a capo, costo) per le parole di un sottotitolo, o
+    (None, None) se non stanno in due righe di limit caratteri."""
+    text = sep.join(words)
+    if len(text) <= limit:
+        return 0, 0.0
+    best, best_score = None, None
+    top = -len(sep)
+    for j in range(1, len(words)):
+        top += len(words[j - 1]) + len(sep)
+        bottom = len(text) - top - len(sep)
+        if top > limit or bottom > limit:
+            continue
+        score = _end_score(words[j - 1]) * 2
+        if top > bottom:
+            score += (top - bottom) / 6                    # piramide
+        if j <= 2 and len(words) > 4:
+            score += 6                                     # parole sole in alto
+        score += abs(top - bottom) / 20
+        if best_score is None or score < best_score:
+            best, best_score = j, score
+    return best, best_score
+
+
+def _tokens(text, lang):
+    """Le «parole» di un testo: per cinese e giapponese, che non separano
+    le parole con gli spazi, i singoli caratteri."""
+    if (lang or "").split("_")[0] in ("zh", "ja"):
+        return [c for c in text if not c.isspace()], ""
+    return text.split(), " "
+
+
+def wrap_lines(text, limit=SUB_LINE, lang=""):
+    """Il testo di un sottotitolo su una riga, o su due a piramide: a capo
+    dopo la punteggiatura se possibile, riga in alto non più lunga di
+    quella in basso, mai una o due parole sole in alto."""
+    words, sep = _tokens(text, lang)
+    if len(sep.join(words)) <= limit:
+        return sep.join(words)
+    best, _score = _best_wrap(words, limit, sep)
+    if best is None:
+        # Non sta in due righe (una parola lunghissima): a capo a metà.
+        best = max(1, len(words) // 2)
+    return sep.join(words[:best]) + "\n" + sep.join(words[best:])
+
+
+def segment_subtitles(units, texts, lang):
+    """Sottotitoli divisi sul testo tradotto, non sulle battute originali:
+    per ogni frase (unit: tempi della frase; text: la sua traduzione) i
+    sottotitoli che servono, ognuno di al massimo due righe, tagliati dopo
+    la punteggiatura dove si può, con tempi proporzionali al testo.
+    Restituisce (lista di Cue con il testo già a capo, sottotitoli più
+    veloci del limite di lettura)."""
+    limit = _line_limit(lang)
+    max_chars = 2 * limit
+    cps = _cps_limit(lang)
+    out = []
+    for unit, text in zip(units, texts):
+        words, sep = _tokens(text or "", lang)
+        if not words:
+            continue
+        span = max(1, unit.end - unit.start)
+        total = len(sep.join(words))
+        per_char = span / total
+        # Divisione migliore in sottotitoli (programmazione dinamica): ogni
+        # pezzo sta in due righe; si preferiscono tagli dopo la
+        # punteggiatura, pezzi non troppo corti, pochi pezzi, durate entro
+        # SUB_MAX_MS.
+        n = len(words)
+        lengths = [len(w) + len(sep) for w in words]
+        best = [0.0] + [None] * n
+        back = [0] * (n + 1)
+        for j in range(1, n + 1):
+            chars = -len(sep)
+            for i in range(j - 1, -1, -1):
+                chars += lengths[i]
+                if chars > max_chars and i < j - 1:
+                    break
+                if best[i] is None:
+                    continue
+                wrap, wrap_cost = _best_wrap(words[i:j], limit, sep)
+                if wrap is None and j - i > 1:
+                    continue                               # non sta in due righe
+                cost = 1.0 + (_end_score(words[j - 1]) if j < n else 0.0) + (wrap_cost or 0.0) / 4
+                duration = chars * per_char
+                if chars < 18 and n > 3:
+                    cost += 3.0
+                if duration < SUB_MIN_MS and n > 1:
+                    cost += 10.0 * (SUB_MIN_MS - duration) / SUB_MIN_MS
+                if duration > SUB_MAX_MS:
+                    cost += 2.0 * (duration - SUB_MAX_MS) / 1000
+                if wrap is None:
+                    cost += 50.0                           # una parola lunghissima
+                total_cost = best[i] + cost
+                if best[j] is None or total_cost < best[j]:
+                    best[j], back[j] = total_cost, i
+        cuts, j = [], n
+        while j > 0:
+            cuts.append((back[j], j))
+            j = back[j]
+        cuts.reverse()
+        done_chars = 0
+        for a, b in cuts:
+            piece = sep.join(words[a:b])
+            start = unit.start + int(done_chars * per_char)
+            done_chars += len(piece) + len(sep)
+            end = unit.start + min(span, int(done_chars * per_char))
+            out.append(Cue(start, end, wrap_lines(piece, limit, lang)))
+    # Tempi: 2 fotogrammi fra un sottotitolo e l'altro, durata minima, e
+    # per un sottotitolo troppo veloce un po' di tempo in più, se dopo c'è
+    # spazio.
+    fast = 0
+    for k, cue in enumerate(out):
+        nxt = out[k + 1].start if k + 1 < len(out) else None
+        room = (nxt - SUB_GAP_MS) if nxt is not None else cue.end + SUB_MAX_EXTEND_MS
+        chars = len(cue.text.replace("\n", " "))
+        need = max(SUB_MIN_MS, int(chars / cps * 1000))
+        end = cue.end
+        if end - cue.start < need:
+            end = min(cue.start + need, cue.end + SUB_MAX_EXTEND_MS, room)
+        end = min(end, room) if nxt is not None else end
+        end = max(end, cue.start + 1)
+        if chars / max(0.001, (end - cue.start) / 1000) > cps + 0.5:
+            fast += 1
+        out[k] = Cue(cue.start, end, cue.text)
+    return out, fast
 
 
 def bilingual_srt(cues, translated):
@@ -799,8 +967,19 @@ class Dubbing:
         self.paths = output_paths(o.media, o.folder, self.src, o.tgt, o.fmt)
         self.work_srt_src = os.path.join(self.run_dir, "originale.srt")
         self.work_srt_tgt = os.path.join(self.run_dir, "tradotto.srt")
-        for path, text in ((self.work_srt_src, to_srt(self.cues)),
-                           (self.work_srt_tgt, to_srt(self.cues, self.translated))):
+        # Sottotitoli divisi con le regole professionali: gli originali
+        # battuta per battuta, quelli tradotti frase per frase sul testo
+        # tradotto (non sui tagli dell'originale).
+        src_subs, _fast = segment_subtitles(self.cues, [c.text for c in self.cues], self.src)
+        if getattr(self, "blocks", None) and getattr(self, "block_texts", None):
+            units = block_cues(self.parts, self.blocks)
+            tgt_subs, fast = segment_subtitles(units, self.block_texts, o.tgt)
+        else:
+            tgt_subs, fast = segment_subtitles(self.cues, self.translated, o.tgt)
+        self.stats["fast_subtitles"] = fast
+        self.stats["subtitles"] = len(tgt_subs)
+        for path, text in ((self.work_srt_src, to_srt(src_subs)),
+                           (self.work_srt_tgt, to_srt(tgt_subs))):
             with open(path, "w", encoding="utf-8") as f:
                 f.write(text)
         if "srt" in o.outputs:

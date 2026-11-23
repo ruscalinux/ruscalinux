@@ -72,8 +72,8 @@ Accanto al video, o nella cartella scelta in **Cartella dei file**. Un video `fi
 | File | Contenuto |
 |---|---|
 | `film.en.srt` | sottotitoli originali |
-| `film.it.srt` | sottotitoli tradotti |
-| `film.en-it.srt` | le due lingue insieme: sopra l'originale, sotto la traduzione |
+| `film.it.srt` | sottotitoli tradotti, divisi come quelli professionali: al massimo due righe da 42 caratteri, a capo dopo la punteggiatura, tempi di lettura comodi |
+| `film.en-it.srt` | le due lingue insieme, battuta per battuta: sopra l'originale, sotto la traduzione (utile per studiare o controllare) |
 | `film.it.opus` | l'audio doppiato da solo |
 | `film.it.mkv` | il video doppiato |
 
