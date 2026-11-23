@@ -237,5 +237,9 @@
   "done_stressed": "In {n} frasi l’accento delle parole ambigue (come «princìpi» o «prìncipi») è stato segnato per la voce.",
   "lexicon": "Lessico delle pronunce",
   "lexicon_sub": "Parole che la voce sbaglia, scritte come vanno dette (una riga: parola, tabulazione, pronuncia)",
-  "lexicon_header": "# Lessico delle pronunce di RuscaDubbing: parola<TAB>come scriverla per la voce.\n# Per correggere l'accento basta scriverlo: tienila<TAB>tiènila\n# Vale per la voce, non per i sottotitoli."
+  "lexicon_header": "# Lessico delle pronunce di RuscaDubbing: parola<TAB>come scriverla per la voce.\n# Per correggere l'accento basta scriverlo: tienila<TAB>tiènila\n# Vale per la voce, non per i sottotitoli.",
+  "burn": "Sottotitoli nell’immagine",
+  "burn_sub": "Quelli tradotti, impressi nel video: per i siti che non leggono le tracce. L’immagine si ricodifica: più lento",
+  "remaining": "circa {time} rimanenti",
+  "stage_burn": "Imprimo i sottotitoli nell’immagine…"
 }

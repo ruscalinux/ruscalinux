@@ -69,7 +69,7 @@ DEFAULTS = {
     "seed": 42, "context": 8192, "gpu": True,
     "whisper_device": "", "llm_device": "", "tts_device": "",
     "threads": tts.physical_cores(), "width": 760, "height": 720, "maximized": False,
-    "theme": "system", "speaker_gender": "auto",
+    "theme": "system", "speaker_gender": "auto", "burn": False,
 }
 
 
@@ -503,6 +503,12 @@ class DubbingWindow(Adw.ApplicationWindow):
         self.out_rows["out_video"].bind_property("active", self.fmt_row, "sensitive",
                                                  GObject.BindingFlags.SYNC_CREATE)
         out.add(self.fmt_row)
+        self.burn_row = Adw.SwitchRow(title=_("burn"), subtitle=_("burn_sub"),
+                                      active=self.cfg["burn"])
+        self.burn_row.connect("notify::active", lambda r, _p: self._set("burn", r.get_active()))
+        self.out_rows["out_video"].bind_property("active", self.burn_row, "sensitive",
+                                                 GObject.BindingFlags.SYNC_CREATE)
+        out.add(self.burn_row)
         self.duck_row = Adw.ComboRow(title=_("ducking"), subtitle=_("ducking_sub"),
                                      model=Gtk.StringList.new([_(f"ducking_{d}") for d in DUCKING]))
         self.duck_row.set_selected(DUCKING.index(self.cfg["ducking"]))
@@ -870,7 +876,8 @@ class DubbingWindow(Adw.ApplicationWindow):
             seed=cfg["seed"], ducking=cfg["ducking"], outputs=self._outputs(), fmt=cfg["fmt"],
             titles=(language_name(src) if src != "auto" else "", dub.NATIVE[cfg["tgt"]]),
             source_srt=self.source_srt, reuse=True, preview=preview,
-            gender=cfg["speaker_gender"], glossary=self.glossary_row.get_text())
+            gender=cfg["speaker_gender"], glossary=self.glossary_row.get_text(),
+            burn=cfg["burn"])
         self.log_lines.clear()
         self.files = {}
         for stage in dub.STAGES:
@@ -900,8 +907,15 @@ class DubbingWindow(Adw.ApplicationWindow):
             self.dubbing.cancel()
 
     def _tick(self):
-        self.clock_label.set_label(_("elapsed", time=duration_text(
-            (time.monotonic() - self._started) * 1000)))
+        elapsed = time.monotonic() - self._started
+        text = _("elapsed", time=duration_text(elapsed * 1000))
+        # Tempo rimanente: dall'avanzamento complessivo, quando ce n'è
+        # abbastanza per una stima sensata.
+        done = self.progress.get_fraction()
+        if done >= 0.05 and elapsed >= 20:
+            left = elapsed * (1 - done) / done
+            text += " · " + _("remaining", time=duration_text(max(1, round(left / 10) * 10) * 1000))
+        self.clock_label.set_label(text)
         return True
 
     def _stage_state(self, stage, state, detail=""):
@@ -944,6 +958,8 @@ class DubbingWindow(Adw.ApplicationWindow):
         elif stage in ("translate", "dub") and "/" in detail:
             i, n = detail.split("/")
             text = _("cue_progress", i=i, n=n)
+        elif stage == "mix" and detail == "burn":
+            text = _("stage_burn")
         elif stage == "dub" and detail == "refit":
             text = _("stage_refit")
         elif stage == "dub" and detail == "normalize":

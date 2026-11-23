@@ -122,7 +122,13 @@ For a careful dubbing: transcribe with RuscaTranscriber, correct the text, then 
 | Voice | Reference voice; model voice (for models with named voices); **maximum speed** (how much a line may be sped up, 1.3× by default); **seed** (the same seed gives the same performance) |
 | Engine | Graphics card on/off; **one card for each step** (transcription, translation, voice); CPU threads; translation context |
 
-**Two graphics cards.** The steps run one after another, but each can use a different card: for example the language model, the largest, on the card with more memory and the voice on the other. On first start each step uses the card chosen in the matching app (RuscaTranscriber, RuscaTranslator, RuscaNarrator).
+**Two graphics cards.** Each step can use a different card: for example the language model, the largest, on the card with more memory and the voice on the other. With translation and voice on different cards, the two steps work **together**: the voice starts speaking the sentences already translated while the model translates the next ones, and the dubbing finishes sooner. On first start each step uses the card chosen in the matching app (RuscaTranscriber, RuscaTranslator, RuscaNarrator).
+
+**Subtitles in the picture.** Some sites and TVs do not read subtitle tracks. With **Subtitles in the Picture** the translated ones are burned into the video: always visible, but they can no longer be turned off, and the picture is re-encoded (slower, still high quality).
+
+**Volume.** The dubbed track always comes out at the same volume, the one recommended for video on the web.
+
+**More accurate Whisper.** If you download whisper.cpp's Silero VAD model (`ggml-silero-v6.2.0.bin`, from huggingface.co/ggml-org/whisper-vad) and put it among the Whisper models, transcription skips silence and music, where Whisper tends to invent sentences. Typical repetitions are removed anyway.
 
 ## 8. Privacy
 

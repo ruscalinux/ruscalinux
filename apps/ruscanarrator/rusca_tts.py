@@ -631,6 +631,9 @@ class Speaker:
                     info = wav_info(clean)
                     rate = rate or info[0]
                     clips.append((clean, info[3] * 1000 // info[0]))
+                    kept = os.path.join(o["keep_dir"], f"{i:05d}.wav") if o["keep_dir"] else ""
+                    if kept and os.path.abspath(kept) != os.path.abspath(old):
+                        shutil.copyfile(clean, kept)
                     continue
                 raw = os.path.join(self.run_dir, f"{i:05d}-tts.wav")
                 cmd, env = self._tts_command(piece.text, raw, voice, o, device)

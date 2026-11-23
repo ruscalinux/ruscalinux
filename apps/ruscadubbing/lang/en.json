@@ -237,5 +237,9 @@
   "done_stressed": "In {n} sentences the stress of ambiguous words was marked for the voice.",
   "lexicon": "Pronunciation Lexicon",
   "lexicon_sub": "Words the voice gets wrong, written as they should be said (one line: word, tab, pronunciation)",
-  "lexicon_header": "# RuscaDubbing pronunciation lexicon: word<TAB>how to write it for the voice.\n# To fix the stress, write the accent: tienila<TAB>tiènila\n# It applies to the voice, not to the subtitles."
+  "lexicon_header": "# RuscaDubbing pronunciation lexicon: word<TAB>how to write it for the voice.\n# To fix the stress, write the accent: tienila<TAB>tiènila\n# It applies to the voice, not to the subtitles.",
+  "burn": "Subtitles in the Picture",
+  "burn_sub": "The translated ones, burned into the video: for sites that do not read subtitle tracks. The picture is re-encoded: slower",
+  "remaining": "about {time} left",
+  "stage_burn": "Burning the subtitles into the picture…"
 }

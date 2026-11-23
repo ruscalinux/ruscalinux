@@ -526,6 +526,11 @@ class Chain(unittest.TestCase):
         self.assertIn("(default)", streams[2])
         self.assertNotIn("(default)", streams[1])
         self.assertIn("h264", streams[0])                    # immagine copiata
+        # Volume finale della traccia doppiata vicino a −16 LUFS.
+        r = subprocess.run([FFMPEG, "-hide_banner", "-nostdin", "-i", files["video"], "-map", "0:a:1",
+                            "-af", "ebur128", "-f", "null", "-"], capture_output=True, text=True)
+        lufs = float(re.findall(r"I:\s+(-?[\d.]+) LUFS", r.stderr)[-1])
+        self.assertAlmostEqual(lufs, -16, delta=2.5)
         info = rd.probe(files["video"])
         self.assertGreaterEqual(info["duration_ms"], 5500)
         # Niente file di lavoro rimasti, niente server acceso.
@@ -594,6 +599,45 @@ class Chain(unittest.TestCase):
         self.assertTrue(any("at all" not in t for m in memory.values() for t in m.values()))
         self.assertEqual(sorted(os.listdir(os.path.join(self.dir.name, "uscita"))),
                          sorted(os.path.basename(p) for p in files.values()))
+
+    def test_parallel(self):
+        """Con due schede diverse la voce dice le frasi mentre il modello
+        traduce le successive; il passaggio finale le riusa tutte."""
+        srt = os.path.join(self.dir.name, "tante.srt")
+        with open(srt, "w", encoding="utf-8") as f:
+            for i in range(12):
+                a, b = i * 3000, i * 3000 + 1500
+                f.write(f"{i + 1}\n00:00:{a // 1000:02d},{a % 1000:03d} --> "
+                        f"00:00:{b // 1000:02d},{b % 1000:03d}\nSentence number {i}.\n\n")
+        video = os.path.join(self.dir.name, "lungo.mkv")
+        subprocess.run([FFMPEG, "-nostdin", "-loglevel", "error", "-f", "lavfi", "-i",
+                        "testsrc=size=64x48:rate=5:duration=38", "-f", "lavfi", "-i",
+                        "sine=frequency=500:duration=38", "-c:v", "libx264", "-preset",
+                        "ultrafast", "-c:a", "aac", "-shortest", "-y", video], check=True)
+        seen = self.run_chain(self.options(media=video, source_srt=srt, src="en", gpu=True,
+                                           llm_device="Scheda A", tts_device="Scheda B",
+                                           outputs={"video"}))
+        error, files, stats = seen["done"]
+        self.assertIsNone(error, error)
+        self.assertEqual(stats.get("parallel"), 12)
+        calls = [json.loads(line) for line in open(os.environ["FAKE_TTS_ARGS"])]
+        said = [c for c in calls if c != ["--list-devices"] and "-p" in c]
+        self.assertEqual(len(said), 12)                # nessuna frase detta due volte
+
+    def test_burn(self):
+        """Sottotitoli impressi: l'immagine si ricodifica in H.264 e cambia
+        dove c'è un sottotitolo."""
+        seen = self.run_chain(self.options(outputs={"video"}, burn=True))
+        error, files, _stats = seen["done"]
+        self.assertIsNone(error, error)
+        streams = self.streams(files["video"])
+        self.assertIn("h264", streams[0])
+        frame = os.path.join(self.dir.name, "f.png")
+        plain = os.path.join(self.dir.name, "g.png")
+        for src, out in ((files["video"], frame), (self.video, plain)):
+            subprocess.run([FFMPEG, "-nostdin", "-loglevel", "error", "-ss", "1.2", "-i", src,
+                            "-frames:v", "1", "-y", out], check=True)
+        self.assertNotEqual(open(frame, "rb").read(), open(plain, "rb").read())
 
     def test_too_long(self):
         P = rd.tts.Piece

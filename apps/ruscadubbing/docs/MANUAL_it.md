@@ -122,7 +122,13 @@ Per un doppiaggio curato: trascrivi con RuscaTranscriber, correggi il testo, poi
 | Voce | Voce di riferimento; voce del modello (per i modelli con voci con nome); **velocità massima** (quanto può accelerare una battuta, 1,3 volte se non la cambi); **seme** (lo stesso seme dà la stessa interpretazione) |
 | Motore | Scheda grafica sì/no; **una scheda per ogni passo** (trascrizione, traduzione, voce); thread della CPU; contesto della traduzione |
 
-**Due schede grafiche.** I passi lavorano uno dopo l'altro, ma ognuno può usare una scheda diversa: per esempio il modello linguistico, che è il più grande, sulla scheda con più memoria e la voce sull'altra. Alla prima apertura ogni passo usa la scheda scelta nell'app corrispondente (RuscaTranscriber, RuscaTranslator, RuscaNarrator).
+**Due schede grafiche.** Ogni passo può usare una scheda diversa: per esempio il modello linguistico, che è il più grande, sulla scheda con più memoria e la voce sull'altra. Con traduzione e voce su schede diverse, i due passi lavorano **insieme**: la voce comincia a dire le frasi già tradotte mentre il modello traduce le successive, e il doppiaggio finisce prima. Alla prima apertura ogni passo usa la scheda scelta nell'app corrispondente (RuscaTranscriber, RuscaTranslator, RuscaNarrator).
+
+**Sottotitoli nell'immagine.** Alcuni siti e alcuni televisori non leggono le tracce di sottotitoli. Con **Sottotitoli nell'immagine** quelli tradotti si imprimono nel video: si vedono sempre, ma non si possono più togliere, e l'immagine si ricodifica (più lento, qualità comunque alta).
+
+**Volume.** La traccia doppiata esce sempre allo stesso volume, quello consigliato per il video sul web.
+
+**Whisper più preciso.** Se scarichi il modello Silero VAD di whisper.cpp (`ggml-silero-v6.2.0.bin`, da huggingface.co/ggml-org/whisper-vad) e lo metti fra i modelli Whisper, la trascrizione salta silenzi e musica, dove Whisper tende a inventare frasi. Le ripetizioni tipiche («il primo, il primo, il primo…») si tolgono comunque.
 
 ## 8. Privacy
 

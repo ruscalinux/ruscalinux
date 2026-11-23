@@ -116,6 +116,10 @@ DUCKING = {"light": "threshold=0.03:ratio=4:attack=30:release=500",
            "medium": "threshold=0.02:ratio=8:attack=20:release=450",
            "strong": "threshold=0.015:ratio=16:attack=15:release=400"}
 VIDEO_FORMATS = ("mkv", "mp4")
+# Volume finale della traccia doppiata: −16 LUFS integrati, picchi a
+# −1,5 dBTP (valori comuni per il video sul web), uguale da un video
+# all'altro. loudnorm lavora a 192 kHz: si torna a 48 kHz.
+FINAL_LOUDNESS = "loudnorm=I=-16:TP=-1.5:LRA=11,aresample=48000"
 
 Cue = collections.namedtuple("Cue", "start end text")       # tempi in ms
 
@@ -671,7 +675,7 @@ def parse_translations(text):
 
 
 def translate_cues(chat, cues, src, tgt, stop_event=None, on_progress=None, max_speed=1.3,
-                   batch=BATCH, known=None, notes=""):
+                   batch=BATCH, known=None, notes="", on_batch=None):
     """Traduce le frasi a gruppi. chat(body) -> testo è la funzione del
     motore (engine.Engine.chat). known: traduzioni già pronte (memoria del
     lavoro salvato), None o "" per quelle da fare. Restituisce
@@ -698,6 +702,9 @@ def translate_cues(chat, cues, src, tgt, stop_event=None, on_progress=None, max_
     def line(i):
         return f"{i + 1}|{budget_chars(cues, i, tgt, max_speed)}|{cues[i].text}"
 
+    known_idx = [i for i in range(len(cues)) if result[i]]
+    if on_batch and known_idx:
+        on_batch(known_idx, result)
     for start in range(0, len(todo), batch):
         if stop_event is not None and stop_event.is_set():
             raise _Stopped()
@@ -733,6 +740,8 @@ def translate_cues(chat, cues, src, tgt, stop_event=None, on_progress=None, max_
                 if short and len(short) < len(result[i]):
                     result[i] = short
                     stats["shortened"] += 1
+        if on_batch:
+            on_batch(idx, result)
     if on_progress:
         on_progress(len(todo), len(todo))
     return result, stats
@@ -832,15 +841,26 @@ def mix_command(ffmpeg, media, dub_wav, out_wav, has_audio, ducking="medium"):
                 "[1:a]aresample=48000,aformat=channel_layouts=stereo,asplit=2[voice][key];"
                 f"[orig][key]sidechaincompress={DUCKING.get(ducking, DUCKING['medium'])}[duck];"
                 "[duck][voice]amix=inputs=2:duration=longest:dropout_transition=0:normalize=0,"
-                "alimiter=limit=0.95[out]",
+                f"alimiter=limit=0.95,{FINAL_LOUDNESS}[out]",
                 "-map", "[out]"]
     else:
-        cmd += ["-i", dub_wav, "-af", "aresample=48000,aformat=channel_layouts=stereo"]
+        cmd += ["-i", dub_wav, "-af",
+                f"aresample=48000,aformat=channel_layouts=stereo,{FINAL_LOUDNESS}"]
     return cmd + ["-c:a", "pcm_s16le", "-f", "wav", "-y", out_wav]
 
 
+# Sottotitoli impressi nell'immagine: libass (filtro subtitles di FFmpeg),
+# carattere senza grazie con il bordo, in basso. L'immagine si ricodifica in
+# H.264 (CRF 20, preset veryfast: buona qualità senza far aspettare).
+BURN_STYLE = ("FontName=Cantarell,FontSize=20,PrimaryColour=&H00FFFFFF,"
+              "OutlineColour=&H00000000,BorderStyle=1,Outline=1.6,Shadow=0,MarginV=22")
+BURN_FILE = "impressi.srt"
+
+
 def mux_command(ffmpeg, media, mix_wav, srt_src, srt_tgt, out, fmt, src, tgt, has_audio,
-                titles=("", ""), max_ms=0):
+                titles=("", ""), max_ms=0, burn=False):
+    """… burn: imprime i sottotitoli tradotti nell'immagine (il comando va
+    lanciato nella cartella in cui c'è BURN_FILE)."""
     """Il video doppiato: immagine copiata (niente ricodifica), audio
     originale (se c'è), audio doppiato come traccia predefinita, sottotitoli
     nelle due lingue. titles: (nome della traccia originale, del doppiaggio)."""
@@ -852,7 +872,12 @@ def mux_command(ffmpeg, media, mix_wav, srt_src, srt_tgt, out, fmt, src, tgt, ha
     if has_audio:
         cmd += ["-map", "0:a:0"]
         audio = 1
-    cmd += ["-map", "1:a:0", "-map", "2:s:0", "-map", "3:s:0", "-c:v", "copy"]
+    cmd += ["-map", "1:a:0", "-map", "2:s:0", "-map", "3:s:0"]
+    if burn:
+        cmd += ["-vf", f"subtitles={BURN_FILE}:charenc=UTF-8:force_style='{BURN_STYLE}'",
+                "-c:v", "libx264", "-crf", "20", "-preset", "veryfast", "-pix_fmt", "yuv420p"]
+    else:
+        cmd += ["-c:v", "copy"]
     dub = audio                                  # indice della traccia doppiata
     if fmt == "mp4":
         cmd += ["-c:a", "aac", "-b:a", "192k", "-c:s", "mov_text", "-movflags", "+faststart"]
@@ -986,8 +1011,9 @@ STAGES = ("transcribe", "translate", "dub", "mix")
 Options = collections.namedtuple("Options", [
     "media", "folder", "src", "tgt", "whisper_model", "llm_model", "voice", "speaker_file",
     "voice_name", "gpu", "whisper_device", "llm_device", "tts_device", "threads", "context", "max_speed", "seed", "ducking",
-    "outputs", "fmt", "titles", "source_srt", "reuse", "preview", "gender", "glossary"],
-    defaults=(True, False, "auto", ""))
+    "outputs", "fmt", "titles", "source_srt", "reuse", "preview", "gender", "glossary",
+    "burn"],
+    defaults=(True, False, "auto", "", False))
 # whisper_device, llm_device, tts_device: la scheda grafica di ogni passo
 # (descrizione di list_devices(), "" = scelta del motore).
 # outputs: insieme di "srt", "audio", "video". source_srt: file SRT della
@@ -996,6 +1022,7 @@ Options = collections.namedtuple("Options", [
 # preview: doppiare solo il primo minuto (file «.prova»).
 # gender: "auto" (dall'altezza della voce e dalla grammatica), "male",
 # "female". glossary: «termine = traduzione; …» (facoltativo).
+# burn: sottotitoli tradotti impressi nell'immagine (si ricodifica).
 
 
 class Dubbing:
@@ -1058,6 +1085,10 @@ class Dubbing:
         self.paths = None
         self.units = None
         self.refit_done = False
+        self.lexicon = None
+        self.pre_queue, self.pregen, self.pre_count = [], {}, 0
+        self.pre_speaker = None
+        self.waiting_dub = False
         os.makedirs(WORK_DIR, mode=0o700, exist_ok=True)
         os.chmod(WORK_DIR, 0o700)
         self.run_dir = tempfile.mkdtemp(prefix="run-", dir=WORK_DIR)
@@ -1123,6 +1154,8 @@ class Dubbing:
             self.transcriber.cancel()
         if self.speaker is not None:
             self.speaker.cancel()
+        if getattr(self, "pre_speaker", None) is not None:
+            self.pre_speaker.cancel()
         # Chiudere il server interrompe anche una richiesta di traduzione in corso.
         self.engine.stop()
         with self._lock:
@@ -1253,10 +1286,21 @@ class Dubbing:
                 self._emit(self.on_log, "ruscadubbing: scheda del discorso:\n" + self.notes)
             else:
                 self._start_llm()
+            on_batch = None
+            if self._parallel():
+                # Due schede: la voce comincia a dire ogni gruppo di frasi
+                # appena è tradotto, mentre il modello traduce i successivi.
+                self._emit(self.on_log, "ruscadubbing: traduzione e voce in parallelo")
+
+                def on_batch(idx, result):
+                    texts = {k: clean_translation(self.units[k].text, result[k])
+                             for k in idx if result[k]}
+                    self._mark_stress_texts(texts)
+                    self._emit(self._pregen_add, texts)
             texts, tstats = translate_cues(
                 self.engine.chat, self.units, self.src, self.o.tgt, self.stop_event,
                 lambda i, n: self._emit(self.on_stage, "translate", i / max(1, n), f"{i}/{n}"),
-                self.o.max_speed, known=self.known, notes=self.notes)
+                self.o.max_speed, known=self.known, notes=self.notes, on_batch=on_batch)
             self.stats.update(tstats)
             self._set_translations(texts)
             if self.o.tgt in speech.HOMOGRAPHS:
@@ -1291,6 +1335,11 @@ class Dubbing:
             return
         if "audio" not in o.outputs and "video" not in o.outputs:
             self._finish(None)
+            return
+        if self.pre_speaker is not None or self.pre_queue:
+            # La voce sta ancora dicendo le frasi già tradotte: si aspetta.
+            self.waiting_dub = True
+            self.on_stage("dub", 0.0, "")
             return
         self._dub()
 
@@ -1335,15 +1384,18 @@ class Dubbing:
         # La voce dice ogni frase intera, dall'inizio della prima battuta.
         units = block_cues(self.parts, self.blocks)
         self.piece_units = [k for k, t in enumerate(self.block_texts) if t.strip()]
-        # Il testo per la voce: omografi segnati, lessico, numeri in lettere.
-        lexicon = speech.load_lexicon(*[os.path.join(d, f"pronunce-{o.tgt}.tsv")
-                                        for d in LEXICON_DIRS])
-        stress = ((self.project.get("stress") or {}).get(getattr(self, "memory_key", ""))
-                  or {})
-        pieces = [tts.Piece(speech.speech_text(self.block_texts[k], o.tgt, lexicon,
-                                               stress.get(self.block_texts[k])),
-                            0, units[k].start, units[k].end)
+        pieces = [tts.Piece(self._speech_text(self.block_texts[k]), 0, units[k].start,
+                            units[k].end)
                   for k in self.piece_units]
+        if reuse is None and self.pregen:
+            # Frasi già dette in parallelo alla traduzione, se il testo è lo
+            # stesso.
+            reuse = {}
+            for i, k in enumerate(self.piece_units):
+                said = self.pregen.get(k)
+                if said and said[0] == pieces[i].text and os.path.isfile(said[1]):
+                    reuse[i] = said[1]
+            self.stats["parallel"] = len(reuse)
         self.pieces = pieces
         self.keep_dir = os.path.join(self.run_dir, "frasi")
         os.makedirs(self.keep_dir, exist_ok=True)
@@ -1406,20 +1458,94 @@ class Dubbing:
             self._emit(self.on_log, f"ruscadubbing: altezza della voce non misurata ({e})")
             return 0
 
+    def _speech_text(self, text):
+        """Il testo da dare alla voce: omografi segnati, lessico, numeri in
+        lettere."""
+        lang = self.o.tgt
+        if self.lexicon is None:
+            self.lexicon = speech.load_lexicon(*[os.path.join(d, f"pronunce-{lang}.tsv")
+                                                 for d in LEXICON_DIRS])
+        stress = ((self.project.get("stress") or {}).get(getattr(self, "memory_key", ""))
+                  or {})
+        return speech.speech_text(text, lang, self.lexicon, stress.get(text))
+
+    def _parallel(self):
+        o = self.o
+        return bool(o.gpu and o.llm_device and o.tts_device and o.llm_device != o.tts_device
+                    and ("audio" in o.outputs or "video" in o.outputs))
+
+    # ── voce in parallelo alla traduzione (due schede) ────────────────────
+    def _pregen_add(self, texts):
+        if texts:
+            self.pre_queue.append(texts)
+        self._pregen_next()
+        return False
+
+    def _pregen_next(self):
+        if self.pre_speaker is not None or self.stop_event.is_set():
+            return
+        if not self.pre_queue:
+            if self.waiting_dub:
+                self.waiting_dub = False
+                self._dub()
+            return
+        texts = self.pre_queue.pop(0)
+        o = self.o
+        keys = sorted(texts)
+        said = [self._speech_text(texts[k]) for k in keys]
+        self.pre_count += 1
+        folder = os.path.join(self.run_dir, "prima", str(self.pre_count))
+        os.makedirs(folder, exist_ok=True)
+        pieces = [tts.Piece(t, 0, self.units[k].start, self.units[k].end)
+                  for k, t in zip(keys, said)]
+        self.pre_speaker = tts.Speaker(
+            on_log=self.on_log,
+            on_done=lambda e, p, s: self._pregen_done(e, keys, said, folder))
+        try:
+            self.pre_speaker.start(pieces, o.voice, srt=False, language=o.tgt,
+                                   speaker_file=o.speaker_file, voice_name=o.voice_name,
+                                   gpu=o.gpu, gpu_device=o.tts_device, threads=o.threads,
+                                   seed=o.seed, normalize=False, keep_dir=folder)
+        except tts.TTSError as e:
+            # Non è grave: le frasi si diranno dopo, nel passaggio normale.
+            self.on_log(f"ruscadubbing: voce in parallelo non partita ({e})")
+            self.pre_speaker = None
+            self.pre_queue.clear()
+            self._pregen_next()
+
+    def _pregen_done(self, error, keys, said, folder):
+        speaker, self.pre_speaker = self.pre_speaker, None
+        if error is None:
+            for j, (k, text) in enumerate(zip(keys, said)):
+                self.pregen[k] = (text, os.path.join(folder, f"{j:05d}.wav"))
+        elif error != "cancelled":
+            self.on_log(f"ruscadubbing: voce in parallelo non riuscita ({error}): "
+                        "quelle frasi si diranno dopo")
+        if speaker is not None:
+            speaker.discard()
+        if self.running:
+            self._pregen_next()
+
     def _mark_stress(self, indices):
         """Con il modello acceso: gli omografi delle frasi indicate, segnati
         con l'accento secondo il senso (solo per la voce), nella memoria."""
+        self._mark_stress_texts({k: self.block_texts[k] for k in indices})
+
+    def _mark_stress_texts(self, texts):
+        """Come _mark_stress(), per i testi dati ({frase: testo})."""
         lang = self.o.tgt
+        if lang not in speech.HOMOGRAPHS:
+            return
         memory = self.project.setdefault("stress", {}).setdefault(self.memory_key, {})
-        todo = [k for k in indices if speech.needs_stress(self.block_texts[k], lang)
-                and self.block_texts[k] not in memory]
+        todo = [k for k in sorted(texts) if speech.needs_stress(texts[k], lang)
+                and texts[k] not in memory]
         for start in range(0, len(todo), BATCH):
             if self.stop_event.is_set():
                 raise _Stopped()
             idx = todo[start:start + BATCH]
             try:
                 got = parse_translations(self.engine.chat(speech.stress_request(
-                    [(k + 1, self.block_texts[k]) for k in idx], lang)))
+                    [(k + 1, texts[k]) for k in idx], lang)))
             except engine.EngineError:
                 raise
             except Exception:      # noqa: BLE001 — gli accenti sono un aiuto
@@ -1427,11 +1553,10 @@ class Dubbing:
                     raise _Stopped()
                 continue
             for k in idx:
-                marked = speech.apply_stress(self.block_texts[k], got.get(k + 1, ""), lang)
-                memory[self.block_texts[k]] = marked
+                memory[texts[k]] = speech.apply_stress(texts[k], got.get(k + 1, ""), lang)
         if todo:
-            self.stats["stressed"] = sum(1 for k in todo
-                                         if memory.get(self.block_texts[k]) != self.block_texts[k])
+            self.stats["stressed"] = self.stats.get("stressed", 0) + sum(
+                1 for k in todo if memory.get(texts[k]) != texts[k])
 
     def _start_llm(self):
         """Avvia llama-server con il modello di traduzione (nel thread di
@@ -1504,10 +1629,10 @@ class Dubbing:
         self._dub(reuse=reuse)
         return False
 
-    def _run(self, cmd):
+    def _run(self, cmd, cwd=None):
         self._emit(self.on_log, "$ " + " ".join(cmd))
         proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                                stderr=subprocess.STDOUT, start_new_session=True)
+                                stderr=subprocess.STDOUT, start_new_session=True, cwd=cwd)
         with self._lock:
             self._proc = proc
         out = proc.communicate()[0].decode("utf-8", "replace")
@@ -1543,10 +1668,16 @@ class Dubbing:
             self._emit(self.on_stage, "mix", 0.6, "")
             if "video" in o.outputs:
                 tmp = self.paths["video"] + ".part"
+                if o.burn and self.info["video"]:
+                    # libass legge il file dalla cartella di lavoro: niente
+                    # percorsi da proteggere nel filtro.
+                    shutil.copyfile(self.work_srt_tgt, os.path.join(self.run_dir, BURN_FILE))
+                    self._emit(self.on_stage, "mix", 0.65, "burn")
                 code, tail = self._run(mux_command(
                     ffmpeg, self.media_work, mix, self.work_srt_src, self.work_srt_tgt, tmp, o.fmt,
                     self.src, o.tgt, has_audio, o.titles,
-                    self.info["duration_ms"] if o.preview else 0))
+                    self.info["duration_ms"] if o.preview else 0,
+                    burn=bool(o.burn and self.info["video"])), cwd=self.run_dir)
                 if code != 0 or not os.path.isfile(tmp):
                     try:
                         os.unlink(tmp)
