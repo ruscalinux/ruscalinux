@@ -71,8 +71,14 @@ const STATES = {
 };
 const DIALOG = ['wake', 'listen', 'think', 'speak'];
 
+// I ripieghi delle specifiche, sezione 9.2: uguali in tutti i tool.
+const LANG_ALIASES = {zh_HK: 'zh_TW', zh_MO: 'zh_TW', zh_SG: 'zh_CN', zh: 'zh_CN',
+    pt: 'pt_BR', sk: 'cs'};
+
 function loadStrings(dir) {
     const read = code => {
+        if (!code)
+            return null;
         try {
             const [, bytes] = GLib.file_get_contents(GLib.build_filenamev([dir, 'lang', `${code}.json`]));
             return JSON.parse(new TextDecoder().decode(bytes));
@@ -82,10 +88,13 @@ function loadStrings(dir) {
     };
     const en = read('en') || {};
     for (const name of GLib.get_language_names()) {
-        const code = name.split(/[._@]/)[0];
-        const found = read(name.split(/[.@]/)[0]) || read(code);
-        if (found)
-            return Object.assign({}, en, found);
+        const base = name.split(/[.@]/)[0];
+        const lang = base.split('_')[0];
+        for (const code of [base, LANG_ALIASES[base], lang, LANG_ALIASES[lang]]) {
+            const found = read(code);
+            if (found)
+                return Object.assign({}, en, found);
+        }
     }
     return en;
 }
