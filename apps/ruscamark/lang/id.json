@@ -230,6 +230,18 @@
   "voice_help_inline": "Tebal dan miring",
   "voice_help_langs": "Perintah suara ada dalam bahasa Inggris dan Italia: dikte dalam salah satu bahasa ini untuk memakainya.",
   "voice_help_off": "Perintah suara mati: nyalakan di Preferensi → Suara.",
+  "btn_pause": "Jeda",
+  "btn_resume": "Lanjutkan",
+  "btn_insert": "Sisipkan",
+  "btn_discard": "Buang",
+  "voice_paused": "Dijeda, mikrofon mati",
+  "voice_behind": "tertinggal {s} dtk",
+  "voice_draft_left": "Draf menunggu: koreksi, lalu Sisipkan",
+  "tip_draft": "Teks dikte: koreksi di sini, lalu Sisipkan (Ctrl+Enter)",
+  "pref_voice_review": "Periksa kalimat sebelum disisipkan",
+  "pref_voice_review_sub": "Teks dikte terkumpul dalam draf yang bisa dikoreksi; Sisipkan memasukkannya ke dokumen",
+  "draft_close_title": "Draf belum disisipkan",
+  "draft_close_body": "Draf berisi teks dikte yang belum ada di dokumen.",
   "app_summary": "Menulis Markdown dengan format langsung",
   "desktop_keywords": "Markdown;penyunting;teks;menulis;catatan;"
 }

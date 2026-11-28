@@ -18,6 +18,7 @@ import ast
 import json
 import os
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
@@ -432,6 +433,27 @@ class TestDettaturaVosk(_Fakes):
         self.assertEqual(texts, ["blocchi 24"])
         d.close()
 
+    def test_pausa_e_ripresa(self):
+        """Pausa: la frase in corso si scrive, il microfono si chiude, il
+        modello resta caricato; Riprendi riapre il microfono."""
+        model = self.fake_vosk()
+        texts, states, delays = [], [], []
+        d = rv.Dictation(on_state=states.append, on_text=texts.append, on_delay=delays.append)
+        d.start("vosk", {"vosk_model": model})
+        self.assertTrue(run_loop(lambda: texts))
+        d.pause()
+        self.assertTrue(d.paused)
+        self.assertTrue(run_loop(lambda: "paused" in states))
+        self.assertIsNone(d._mic)                      # microfono chiuso
+        n = len(texts)
+        d.resume()
+        self.assertTrue(run_loop(lambda: states[-1] == "listening" and len(texts) > n))
+        self.assertEqual(states.count("loading"), 1)  # modello caricato una volta sola
+        self.assertTrue(delays and all(x >= 0 for x in delays))
+        d.stop()
+        self.assertTrue(run_loop(lambda: "stopped" in states))
+        d.close()
+
     def test_file_audio_con_vosk(self):
         model = self.fake_vosk()
         done = []
@@ -443,6 +465,50 @@ class TestDettaturaVosk(_Fakes):
         self.assertIsNone(error, getattr(error, "detail", error))
         self.assertTrue(markdown.startswith("# Intervista\n\n"), markdown)
         self.assertIn("Ciao virgola come stai punto interrogativo.", markdown)
+
+
+def tone(seconds, level):
+    """Blocchi di 20 ms di un'onda quadra con il valore efficace dato (0–1)."""
+    amp = int(level * 32768)
+    frame = struct.pack("<320h", *([amp, -amp] * 160))
+    return [frame] * int(seconds / 0.02)
+
+
+@NEED
+class TestTaglioFrasi(unittest.TestCase):
+    def test_la_soglia_non_sale_da_sola(self):
+        """Il rumore è il minimo recente, non la media dei livelli fuori
+        dalla voce. Con la regola di prima questo stesso audio dava due
+        «frasi» di solo rumore (che Whisper trasforma in testo inventato) e
+        la soglia saliva insieme alla voce bassa."""
+        cut = rv.SpeechCutter()
+        # ventola di fondo (0,015) con voce bassa a tratti (0,035), sotto la
+        # soglia: per un minuto non è una frase
+        quiet = tone(5.0, 0.015)
+        for _ in range(110):
+            quiet += tone(0.3, 0.035) + tone(0.25, 0.015)
+        self.assertEqual([x for x in map(cut.feed, quiet) if x], [])
+        self.assertLess(cut.threshold(), 0.05)
+        # poi una frase detta normalmente si sente ancora
+        segments = [x for x in map(cut.feed, tone(1.0, 0.08) + tone(1.0, 0.015)) if x]
+        self.assertEqual(len(segments), 1)
+        self.assertGreater(len(segments[0]), 16000 * 2 * 1.0)
+
+    def test_ventola_forte_dall_inizio(self):
+        """Un rumore più forte della soglia iniziale si impara: non è una
+        frase lunga 25 secondi, e la voce sopra di lui si sente."""
+        cut = rv.SpeechCutter()
+        noise = [x for x in map(cut.feed, tone(10.0, 0.03)) if x]
+        self.assertLessEqual(len(noise), 1)             # al più l'avvio
+        segments = [x for x in map(cut.feed, tone(1.0, 0.15) + tone(1.0, 0.03)) if x]
+        self.assertEqual(len(segments), 1)
+
+    def test_frase_in_corso_alla_pausa(self):
+        cut = rv.SpeechCutter()
+        for f in tone(0.2, 0.0) + tone(0.6, 0.06):
+            self.assertIsNone(cut.feed(f))
+        self.assertTrue(cut.flush())
+        self.assertIsNone(cut.flush())
 
 
 @NEED

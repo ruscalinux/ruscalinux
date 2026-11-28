@@ -230,6 +230,18 @@
   "voice_help_inline": "粗體與斜體",
   "voice_help_langs": "語音命令只有英語和義大利語：請用其中一種語言聽寫才能使用。",
   "voice_help_off": "語音命令已關閉：請在「偏好設定 → 語音」中開啟。",
+  "btn_pause": "暫停",
+  "btn_resume": "繼續",
+  "btn_insert": "插入",
+  "btn_discard": "捨棄",
+  "voice_paused": "已暫停，麥克風已關閉",
+  "voice_behind": "落後 {s} 秒",
+  "voice_draft_left": "草稿在等待：修改後按「插入」",
+  "tip_draft": "聽寫的文字：在這裡修改，然後「插入」(Ctrl+Enter)",
+  "pref_voice_review": "插入前檢查句子",
+  "pref_voice_review_sub": "聽寫的文字先彙集到可修改的草稿；「插入」把它放進文件",
+  "draft_close_title": "草稿未插入",
+  "draft_close_body": "草稿中有尚未放進文件的聽寫文字。",
   "app_summary": "即時格式化的 Markdown 寫作",
   "desktop_keywords": "Markdown;編輯器;文字;寫作;筆記;"
 }

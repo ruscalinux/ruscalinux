@@ -230,6 +230,18 @@
   "voice_help_inline": "Đậm và nghiêng",
   "voice_help_langs": "Lệnh giọng nói có bằng tiếng Anh và tiếng Ý: hãy đọc chính tả bằng một trong hai ngôn ngữ này để dùng.",
   "voice_help_off": "Lệnh giọng nói đang tắt: hãy bật trong Tùy thích → Giọng nói.",
+  "btn_pause": "Tạm dừng",
+  "btn_resume": "Tiếp tục",
+  "btn_insert": "Chèn",
+  "btn_discard": "Bỏ",
+  "voice_paused": "Đang tạm dừng, micrô tắt",
+  "voice_behind": "chậm {s} giây",
+  "voice_draft_left": "Bản nháp đang chờ: sửa rồi bấm Chèn",
+  "tip_draft": "Văn bản đọc chính tả: sửa ở đây rồi Chèn (Ctrl+Enter)",
+  "pref_voice_review": "Kiểm tra câu trước khi chèn",
+  "pref_voice_review_sub": "Văn bản đọc chính tả gom vào một bản nháp để sửa; Chèn đưa nó vào tài liệu",
+  "draft_close_title": "Bản nháp chưa được chèn",
+  "draft_close_body": "Bản nháp có văn bản đọc chính tả chưa có trong tài liệu.",
   "app_summary": "Viết Markdown với định dạng trực tiếp",
   "desktop_keywords": "Markdown;trình soạn thảo;văn bản;viết;ghi chú;"
 }

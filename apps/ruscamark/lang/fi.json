@@ -230,6 +230,18 @@
   "voice_help_inline": "Lihavointi ja kursivointi",
   "voice_help_langs": "Puhekomennot ovat englanniksi ja italiaksi: sanele jollakin näistä kielistä käyttääksesi niitä.",
   "voice_help_off": "Puhekomennot ovat pois päältä: ota ne käyttöön kohdassa Asetukset → Puhe.",
+  "btn_pause": "Tauko",
+  "btn_resume": "Jatka",
+  "btn_insert": "Lisää",
+  "btn_discard": "Hylkää",
+  "voice_paused": "Tauolla, mikrofoni suljettu",
+  "voice_behind": "{s} s jäljessä",
+  "voice_draft_left": "Luonnos odottaa: korjaa se ja valitse Lisää",
+  "tip_draft": "Saneltu teksti: korjaa se tässä ja valitse Lisää (Ctrl+Enter)",
+  "pref_voice_review": "Tarkista lauseet ennen lisäämistä",
+  "pref_voice_review_sub": "Saneltu teksti kertyy korjattavaan luonnokseen; Lisää vie sen asiakirjaan",
+  "draft_close_title": "Luonnosta ei lisätty",
+  "draft_close_body": "Luonnoksessa on sanelua, jota ei vielä ole asiakirjassa.",
   "app_summary": "Kirjoita Markdownia reaaliaikaisella muotoilulla",
   "desktop_keywords": "Markdown;editori;teksti;kirjoittaminen;muistiinpanot;"
 }

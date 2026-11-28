@@ -230,6 +230,18 @@
   "voice_help_inline": "Tučně a kurzívou",
   "voice_help_langs": "Hlasové příkazy existují v angličtině a italštině: diktujte v jednom z těchto jazyků.",
   "voice_help_off": "Hlasové příkazy jsou vypnuté: zapněte je v Předvolbách → Hlas.",
+  "btn_pause": "Pozastavit",
+  "btn_resume": "Pokračovat",
+  "btn_insert": "Vložit",
+  "btn_discard": "Zahodit",
+  "voice_paused": "Pozastaveno, mikrofon vypnutý",
+  "voice_behind": "zpoždění {s} s",
+  "voice_draft_left": "Koncept čeká: opravte ho a pak Vložit",
+  "tip_draft": "Nadiktovaný text: opravte ho zde a pak Vložit (Ctrl+Enter)",
+  "pref_voice_review": "Kontrolovat věty před vložením",
+  "pref_voice_review_sub": "Nadiktovaný text se sbírá v konceptu k opravě; Vložit ho přenese do dokumentu",
+  "draft_close_title": "Koncept nevložen",
+  "draft_close_body": "Koncept obsahuje nadiktovaný text, který ještě není v dokumentu.",
   "app_summary": "Pište v Markdownu s živým formátováním",
   "desktop_keywords": "Markdown;editor;text;psaní;poznámky;"
 }

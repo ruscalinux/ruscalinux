@@ -230,6 +230,18 @@
   "voice_help_inline": "Negrita y cursiva",
   "voice_help_langs": "Los comandos de voz existen en inglés e italiano: dicta en uno de estos idiomas para usarlos.",
   "voice_help_off": "Los comandos de voz están desactivados: actívalos en Preferencias → Voz.",
+  "btn_pause": "Pausa",
+  "btn_resume": "Reanudar",
+  "btn_insert": "Insertar",
+  "btn_discard": "Descartar",
+  "voice_paused": "En pausa, micrófono cerrado",
+  "voice_behind": "{s} s de retraso",
+  "voice_draft_left": "El borrador espera: corrígelo y luego Insertar",
+  "tip_draft": "Texto dictado: corrígelo aquí y luego Insertar (Ctrl+Intro)",
+  "pref_voice_review": "Revisar las frases antes de insertarlas",
+  "pref_voice_review_sub": "El texto dictado se acumula en un borrador que puedes corregir; Insertar lo lleva al documento",
+  "draft_close_title": "Borrador sin insertar",
+  "draft_close_body": "El borrador contiene texto dictado que aún no está en el documento.",
   "app_summary": "Escribe en Markdown con formato en vivo",
   "desktop_keywords": "Markdown;editor;texto;escritura;notas;"
 }

@@ -230,6 +230,18 @@
   "voice_help_inline": "Fett und kursiv",
   "voice_help_langs": "Sprachbefehle gibt es auf Englisch und Italienisch: Diktieren Sie in einer dieser Sprachen, um sie zu nutzen.",
   "voice_help_off": "Sprachbefehle sind aus: Schalten Sie sie unter Einstellungen → Stimme ein.",
+  "btn_pause": "Pause",
+  "btn_resume": "Fortsetzen",
+  "btn_insert": "Einfügen",
+  "btn_discard": "Verwerfen",
+  "voice_paused": "Pausiert, Mikrofon aus",
+  "voice_behind": "{s} s im Rückstand",
+  "voice_draft_left": "Der Entwurf wartet: korrigieren, dann Einfügen",
+  "tip_draft": "Diktierter Text: hier korrigieren, dann Einfügen (Strg+Eingabe)",
+  "pref_voice_review": "Sätze vor dem Einfügen prüfen",
+  "pref_voice_review_sub": "Diktierter Text sammelt sich in einem Entwurf zum Korrigieren; Einfügen übernimmt ihn ins Dokument",
+  "draft_close_title": "Entwurf nicht eingefügt",
+  "draft_close_body": "Der Entwurf enthält diktierten Text, der noch nicht im Dokument steht.",
   "app_summary": "Markdown schreiben mit Live-Formatierung",
   "desktop_keywords": "Markdown;Editor;Text;Schreiben;Notizen;"
 }

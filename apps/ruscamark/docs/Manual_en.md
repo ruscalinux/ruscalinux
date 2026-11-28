@@ -333,7 +333,13 @@ RuscaMark writes what you say, turns an audio or video file into a document and 
 
 ### Dictation
 
-Press the **microphone** in the header bar (**Ctrl+Shift+D**) and speak: the text appears at the cursor and, if there is a selection, replaces it. The voice bar appears above the status bar, with the microphone level, the state and, with Vosk, the words being recognised. **Stop** (or Ctrl+Shift+D again) stops listening. Each sentence enters the text in a single step, which Ctrl+Z undoes.
+Press the **microphone** in the header bar (**Ctrl+Shift+D**) and speak. The voice bar appears above the status bar, with the microphone level, the state and, with Vosk, the words being recognised. **Stop** (or Ctrl+Shift+D again) stops listening; everything you have already said is still written.
+
+**The draft (default).** Dictated text does not go straight into the document: it collects in a **draft** below the voice bar, sentence after sentence. You can correct it with the keyboard even while you keep speaking: new sentences are added at the end and the cursor stays where you are correcting. **Insert** (or **Ctrl+Enter** in the draft) puts it into the document at the cursor, in a single step that Ctrl+Z undoes; **Discard** empties it. After **Stop** the draft stays until you insert or discard it, and if you close the window RuscaMark asks what to do with it. So you can dictate calmly: a long pause truncates nothing, at most it starts a new sentence in the draft. If you prefer each sentence to go straight into the document, turn off *Check sentences before inserting* in Preferences → Voice.
+
+**Pause.** Closes the microphone without stopping dictation: the sentence you were saying is finished and written, the model stays loaded, and **Resume** reopens the microphone at once.
+
+**Delay.** If recognition falls behind your speech (it happens with large models on slow processors), the bar shows by how many seconds, for example "3 s behind": no word is lost, it just arrives later. If the delay keeps growing, use a smaller model.
 
 Choose the engine in Preferences → Voice → *Engine*:
 
@@ -407,7 +413,7 @@ Main menu → **Preferences…** (Ctrl+,). Every change applies immediately. Pre
 | Export | PDF and HTML theme | Colours, typefaces and headings of exports and preview: see section 11. |
 | Export | Personal themes | *Open Folder* opens `~/.local/share/ruscamark/themes/`, where your own `.css` themes go. |
 | Export | Embed images in HTML export | See section 11. |
-| Voice → Dictation | Engine, Spoken language, Voice commands | See section 12. |
+| Voice → Dictation | Engine, Spoken language, Voice commands, Check sentences before inserting | See section 12. |
 | Voice → Vosk | Model, Models folder | *Automatic choice* uses the largest model for the spoken language. |
 | Voice → Whisper | Model, Run on, Card to use, Models folder | Processor or graphics card (Vulkan) and which card: see section 12. |
 | Voice → Read aloud | Voice, Voice licence, Speed, Read code blocks too, Voices folder | See section 12. |
@@ -510,7 +516,8 @@ The personal dictionary in `~/.config/enchant/` is shared with other programs: i
 | Table columns are misaligned | Put the cursor in the table and press Ctrl+Shift+T. |
 | A line with `---` under it becomes a heading | Leave a blank line before `---` to get a horizontal rule. |
 | Dictation does not start | Read the message: it says whether the engine (`ruscavosk-engine` or `ruscawhisper-engine`), the model or `pipewire-bin` is missing. Preferences → Voice shows what is there. |
-| The voice bar stays on "Listening" but writes nothing | Check the microphone in Settings → Sound. With Vosk the sentence enters after a one-second pause; with Whisper after about 0.7 seconds. |
+| The voice bar stays on "Listening" but writes nothing | Check the microphone in Settings → Sound. With Vosk the sentence enters after a one-second pause; with Whisper after about 0.7 seconds. With the draft on, text goes into the draft, not the document: press **Insert**. |
+| After a while dictation writes later and later | Recognition is slower than your speech: the bar shows the delay. Use a smaller model (for example `vosk-model-small-en-us-0.15`) or pause a little more. To see what happens, start RuscaMark from a terminal with `RUSCAMARK_VOICE_DEBUG=1 ruscamark`: for each sentence it prints how much audio, how much delay and how long it took (with `=2` also the recognised text). This stays on the terminal and is never saved. |
 | Whisper is slow | Use a smaller model, or *Graphics card (Vulkan)* in Preferences → Voice. |
 | Whisper stops with an error on the graphics card | Choose another card in *Card to use*, or *Processor (CPU)*. |
 | Vosk writes "." instead of the word "period" | It is a voice command: turn off *Voice commands* or use Whisper. |

@@ -230,6 +230,18 @@
   "voice_help_inline": "Grassetto e corsivo",
   "voice_help_langs": "I comandi a voce esistono in italiano e in inglese: detta in una di queste lingue per usarli.",
   "voice_help_off": "I comandi a voce sono spenti: accendili in Preferenze → Voce.",
+  "btn_pause": "Pausa",
+  "btn_resume": "Riprendi",
+  "btn_insert": "Inserisci",
+  "btn_discard": "Scarta",
+  "voice_paused": "In pausa, microfono chiuso",
+  "voice_behind": "{s} s indietro",
+  "voice_draft_left": "La bozza aspetta: correggila, poi Inserisci",
+  "tip_draft": "Testo dettato: correggilo qui, poi Inserisci (Ctrl+Invio)",
+  "pref_voice_review": "Controlla le frasi prima di inserirle",
+  "pref_voice_review_sub": "Il testo dettato si raccoglie in una bozza da correggere; Inserisci lo mette nel documento",
+  "draft_close_title": "Bozza non inserita",
+  "draft_close_body": "La bozza contiene testo dettato che non è ancora nel documento.",
   "app_summary": "Scrivi in Markdown con la formattazione dal vivo",
   "desktop_keywords": "Markdown;editor;testo;scrittura;note;"
 }

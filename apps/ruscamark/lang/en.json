@@ -230,6 +230,18 @@
   "voice_help_inline": "Bold and italic",
   "voice_help_langs": "Voice commands exist in English and Italian: dictate in one of these languages to use them.",
   "voice_help_off": "Voice commands are off: turn them on in Preferences → Voice.",
+  "btn_pause": "Pause",
+  "btn_resume": "Resume",
+  "btn_insert": "Insert",
+  "btn_discard": "Discard",
+  "voice_paused": "Paused, microphone off",
+  "voice_behind": "{s} s behind",
+  "voice_draft_left": "The draft is waiting: correct it, then Insert",
+  "tip_draft": "Dictated text: correct it here, then Insert (Ctrl+Enter)",
+  "pref_voice_review": "Check sentences before inserting",
+  "pref_voice_review_sub": "Dictated text collects in a draft you can correct; Insert puts it in the document",
+  "draft_close_title": "Draft not inserted",
+  "draft_close_body": "The draft holds dictated text that is not in the document yet.",
   "app_summary": "Write Markdown with live formatting",
   "desktop_keywords": "Markdown;editor;text;writing;notes;"
 }

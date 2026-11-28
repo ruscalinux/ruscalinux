@@ -230,6 +230,18 @@
   "voice_help_inline": "Aldin și cursiv",
   "voice_help_langs": "Comenzile vocale există în engleză și italiană: dictează într-una dintre aceste limbi ca să le folosești.",
   "voice_help_off": "Comenzile vocale sunt oprite: pornește-le în Preferințe → Voce.",
+  "btn_pause": "Pauză",
+  "btn_resume": "Reia",
+  "btn_insert": "Inserează",
+  "btn_discard": "Renunță",
+  "voice_paused": "În pauză, microfon închis",
+  "voice_behind": "{s} s în urmă",
+  "voice_draft_left": "Ciorna așteaptă: corecteaz-o, apoi Inserează",
+  "tip_draft": "Text dictat: corectează-l aici, apoi Inserează (Ctrl+Enter)",
+  "pref_voice_review": "Verifică propozițiile înainte de inserare",
+  "pref_voice_review_sub": "Textul dictat se adună într-o ciornă de corectat; Inserează îl pune în document",
+  "draft_close_title": "Ciornă neinserată",
+  "draft_close_body": "Ciorna conține text dictat care nu este încă în document.",
   "app_summary": "Scrieți Markdown cu formatare în timp real",
   "desktop_keywords": "Markdown;editor;text;scriere;notițe;"
 }

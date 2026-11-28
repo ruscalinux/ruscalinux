@@ -230,6 +230,18 @@
   "voice_help_inline": "太字と斜体",
   "voice_help_langs": "音声コマンドは英語とイタリア語にあります：使うにはどちらかの言語で音声入力してください。",
   "voice_help_off": "音声コマンドはオフです：設定 → 音声でオンにしてください。",
+  "btn_pause": "一時停止",
+  "btn_resume": "再開",
+  "btn_insert": "挿入",
+  "btn_discard": "破棄",
+  "voice_paused": "一時停止中、マイクはオフ",
+  "voice_behind": "{s} 秒遅れ",
+  "voice_draft_left": "下書きが待っています：修正してから挿入",
+  "tip_draft": "音声入力したテキスト：ここで修正してから挿入 (Ctrl+Enter)",
+  "pref_voice_review": "挿入前に文を確認する",
+  "pref_voice_review_sub": "音声入力したテキストは修正できる下書きにたまり、挿入で文書に入ります",
+  "draft_close_title": "下書きが挿入されていません",
+  "draft_close_body": "下書きに、まだ文書に入っていない音声入力のテキストがあります。",
   "app_summary": "ライブ書式で Markdown を書く",
   "desktop_keywords": "Markdown;エディター;テキスト;執筆;メモ;"
 }

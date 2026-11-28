@@ -230,6 +230,18 @@
   "voice_help_inline": "Kalın ve italik",
   "voice_help_langs": "Sesli komutlar İngilizce ve İtalyanca vardır: kullanmak için bu dillerden birinde dikte edin.",
   "voice_help_off": "Sesli komutlar kapalı: Tercihler → Ses bölümünden açın.",
+  "btn_pause": "Duraklat",
+  "btn_resume": "Sürdür",
+  "btn_insert": "Ekle",
+  "btn_discard": "At",
+  "voice_paused": "Duraklatıldı, mikrofon kapalı",
+  "voice_behind": "{s} sn geride",
+  "voice_draft_left": "Taslak bekliyor: düzeltin, sonra Ekle",
+  "tip_draft": "Dikte edilen metin: burada düzeltin, sonra Ekle (Ctrl+Enter)",
+  "pref_voice_review": "Eklemeden önce cümleleri denetle",
+  "pref_voice_review_sub": "Dikte edilen metin düzeltilebilir bir taslakta toplanır; Ekle onu belgeye koyar",
+  "draft_close_title": "Taslak eklenmedi",
+  "draft_close_body": "Taslakta henüz belgede olmayan dikte edilmiş metin var.",
   "app_summary": "Canlı biçimlendirmeyle Markdown yazın",
   "desktop_keywords": "Markdown;düzenleyici;metin;yazı;notlar;"
 }

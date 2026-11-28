@@ -230,6 +230,18 @@
   "voice_help_inline": "Fetstil och kursiv",
   "voice_help_langs": "Röstkommandon finns på engelska och italienska: diktera på ett av dessa språk för att använda dem.",
   "voice_help_off": "Röstkommandon är avstängda: slå på dem i Inställningar → Röst.",
+  "btn_pause": "Pausa",
+  "btn_resume": "Fortsätt",
+  "btn_insert": "Infoga",
+  "btn_discard": "Kasta",
+  "voice_paused": "Pausad, mikrofonen av",
+  "voice_behind": "{s} s efter",
+  "voice_draft_left": "Utkastet väntar: rätta det och välj Infoga",
+  "tip_draft": "Dikterad text: rätta den här och välj Infoga (Ctrl+Retur)",
+  "pref_voice_review": "Kontrollera meningar innan de infogas",
+  "pref_voice_review_sub": "Dikterad text samlas i ett utkast som du kan rätta; Infoga lägger den i dokumentet",
+  "draft_close_title": "Utkastet är inte infogat",
+  "draft_close_body": "Utkastet innehåller dikterad text som ännu inte finns i dokumentet.",
   "app_summary": "Skriv Markdown med direkt formatering",
   "desktop_keywords": "Markdown;redigerare;text;skriva;anteckningar;"
 }

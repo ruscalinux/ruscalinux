@@ -230,6 +230,18 @@
   "voice_help_inline": "粗体和斜体",
   "voice_help_langs": "语音命令只有英语和意大利语：请用其中一种语言听写才能使用。",
   "voice_help_off": "语音命令已关闭：请在“首选项 → 语音”中打开。",
+  "btn_pause": "暂停",
+  "btn_resume": "继续",
+  "btn_insert": "插入",
+  "btn_discard": "丢弃",
+  "voice_paused": "已暂停，麦克风已关闭",
+  "voice_behind": "落后 {s} 秒",
+  "voice_draft_left": "草稿在等待：修改后点“插入”",
+  "tip_draft": "听写的文本：在这里修改，然后“插入”(Ctrl+Enter)",
+  "pref_voice_review": "插入前检查句子",
+  "pref_voice_review_sub": "听写的文本先汇集到可修改的草稿中；“插入”把它放进文档",
+  "draft_close_title": "草稿未插入",
+  "draft_close_body": "草稿中有尚未放进文档的听写文本。",
   "app_summary": "实时格式化的 Markdown 写作",
   "desktop_keywords": "Markdown;编辑器;文本;写作;笔记;"
 }

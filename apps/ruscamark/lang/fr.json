@@ -230,6 +230,18 @@
   "voice_help_inline": "Gras et italique",
   "voice_help_langs": "Les commandes vocales existent en anglais et en italien : dictez dans l’une de ces langues pour les utiliser.",
   "voice_help_off": "Les commandes vocales sont désactivées : activez-les dans Préférences → Voix.",
+  "btn_pause": "Pause",
+  "btn_resume": "Reprendre",
+  "btn_insert": "Insérer",
+  "btn_discard": "Abandonner",
+  "voice_paused": "En pause, microphone fermé",
+  "voice_behind": "{s} s de retard",
+  "voice_draft_left": "Le brouillon attend : corrigez-le, puis Insérer",
+  "tip_draft": "Texte dicté : corrigez-le ici, puis Insérer (Ctrl+Entrée)",
+  "pref_voice_review": "Vérifier les phrases avant de les insérer",
+  "pref_voice_review_sub": "Le texte dicté s’accumule dans un brouillon à corriger ; Insérer le place dans le document",
+  "draft_close_title": "Brouillon non inséré",
+  "draft_close_body": "Le brouillon contient du texte dicté qui n’est pas encore dans le document.",
   "app_summary": "Écrire en Markdown avec mise en forme en direct",
   "desktop_keywords": "Markdown;éditeur;texte;écriture;notes;"
 }

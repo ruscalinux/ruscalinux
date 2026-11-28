@@ -230,6 +230,18 @@
   "voice_help_inline": "Vet en cursief",
   "voice_help_langs": "Spraakopdrachten bestaan in het Engels en Italiaans: dicteer in een van deze talen om ze te gebruiken.",
   "voice_help_off": "Spraakopdrachten staan uit: zet ze aan in Voorkeuren → Stem.",
+  "btn_pause": "Pauzeren",
+  "btn_resume": "Hervatten",
+  "btn_insert": "Invoegen",
+  "btn_discard": "Verwerpen",
+  "voice_paused": "Gepauzeerd, microfoon uit",
+  "voice_behind": "{s} s achter",
+  "voice_draft_left": "Het concept wacht: verbeter het en kies Invoegen",
+  "tip_draft": "Gedicteerde tekst: verbeter hem hier en kies Invoegen (Ctrl+Enter)",
+  "pref_voice_review": "Zinnen controleren vóór het invoegen",
+  "pref_voice_review_sub": "Gedicteerde tekst verzamelt zich in een concept om te verbeteren; Invoegen zet hem in het document",
+  "draft_close_title": "Concept niet ingevoegd",
+  "draft_close_body": "Het concept bevat gedicteerde tekst die nog niet in het document staat.",
   "app_summary": "Markdown schrijven met live opmaak",
   "desktop_keywords": "Markdown;editor;tekst;schrijven;notities;"
 }

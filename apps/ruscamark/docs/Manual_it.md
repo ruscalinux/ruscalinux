@@ -333,7 +333,13 @@ RuscaMark scrive quello che dici, trasforma un file audio o video in un document
 
 ### Dettatura
 
-Premi il **microfono** nella barra del titolo (**Ctrl+Maiusc+D**) e parla: il testo compare dove c'è il cursore e, se c'è una selezione, la sostituisce. Sopra la barra di stato compare la barra della voce, con il livello del microfono, lo stato e, con Vosk, le parole che sta riconoscendo. **Ferma** (o di nuovo Ctrl+Maiusc+D) smette di ascoltare. Ogni frase entra nel testo in un solo passo, annullabile con Ctrl+Z.
+Premi il **microfono** nella barra del titolo (**Ctrl+Maiusc+D**) e parla. Sopra la barra di stato compare la barra della voce, con il livello del microfono, lo stato e, con Vosk, le parole che sta riconoscendo. **Ferma** (o di nuovo Ctrl+Maiusc+D) smette di ascoltare; tutto quello che hai già detto viene ancora scritto.
+
+**La bozza (predefinita).** Il testo dettato non va subito nel documento: si raccoglie in una **bozza** sotto la barra della voce, frase dopo frase. Puoi correggerla con la tastiera anche mentre continui a parlare: le frasi nuove si aggiungono in fondo e il cursore resta dove stai correggendo. **Inserisci** (o **Ctrl+Invio** nella bozza) la mette nel documento dove c'è il cursore, in un solo passo annullabile con Ctrl+Z; **Scarta** la svuota. Dopo **Ferma** la bozza resta finché non la inserisci o la scarti, e se chiudi la finestra RuscaMark chiede che cosa farne. Così puoi dettare con calma: una pausa lunga non tronca niente, al massimo comincia una frase nuova nella bozza. Se preferisci che ogni frase vada direttamente nel documento, spegni *Controlla le frasi prima di inserirle* in Preferenze → Voce.
+
+**Pausa.** Chiude il microfono senza fermare la dettatura: la frase che stavi dicendo viene finita e scritta, il modello resta caricato, e **Riprendi** riapre il microfono subito.
+
+**Ritardo.** Se il riconoscimento resta indietro rispetto al parlato (succede con i modelli grandi sui processori lenti), la barra mostra di quanti secondi, per esempio «3 s indietro»: nessuna parola si perde, arriva solo più tardi. Se il ritardo cresce sempre, usa un modello più piccolo.
 
 Il motore si sceglie in Preferenze → Voce → *Motore*:
 
@@ -407,7 +413,7 @@ Dal menu principale → **Preferenze…** (Ctrl+,). Ogni modifica vale subito. L
 | Esportazione | Tema di PDF e HTML | Colori, caratteri e titoli degli export e dell'anteprima: vedi sezione 11. |
 | Esportazione | Temi personali | *Apri la cartella* apre `~/.local/share/ruscamark/themes/`, dove mettere i propri temi `.css`. |
 | Esportazione | Incorpora le immagini nell'export HTML | Vedi sezione 11. |
-| Voce → Dettatura | Motore, Lingua parlata, Comandi a voce | Vedi sezione 12. |
+| Voce → Dettatura | Motore, Lingua parlata, Comandi a voce, Controlla le frasi prima di inserirle | Vedi sezione 12. |
 | Voce → Vosk | Modello, Cartella dei modelli | *Scelta automatica* usa il modello più grande della lingua parlata. |
 | Voce → Whisper | Modello, Esegui su, Scheda da usare, Cartella dei modelli | Processore o scheda grafica (Vulkan) e quale scheda: vedi sezione 12. |
 | Voce → Lettura ad alta voce | Voce, Licenza della voce, Velocità, Leggi anche i blocchi di codice, Cartella delle voci | Vedi sezione 12. |
@@ -510,7 +516,8 @@ Il dizionario personale in `~/.config/enchant/` è condiviso con altri programmi
 | Le colonne di una tabella sono storte | Metti il cursore nella tabella e premi Ctrl+Maiusc+T. |
 | Una riga con `---` sotto diventa un titolo | Lascia una riga vuota prima di `---` per avere una linea orizzontale. |
 | La dettatura non parte | Leggi il messaggio: dice se manca il motore (`ruscavosk-engine` o `ruscawhisper-engine`), il modello o `pipewire-bin`. Preferenze → Voce mostra che cosa c'è. |
-| La barra della voce resta «In ascolto» ma non scrive nulla | Controlla il microfono in Impostazioni → Audio. Con Vosk la frase entra dopo un secondo di pausa; con Whisper dopo circa 0,7 secondi. |
+| La barra della voce resta «In ascolto» ma non scrive nulla | Controlla il microfono in Impostazioni → Audio. Con Vosk la frase entra dopo un secondo di pausa; con Whisper dopo circa 0,7 secondi. Con la bozza attiva il testo va nella bozza, non nel documento: premi **Inserisci**. |
+| Dopo un po' la dettatura scrive sempre più tardi | Il riconoscimento è più lento del parlato: la barra mostra il ritardo. Usa un modello più piccolo (per esempio `vosk-model-small-it-0.22`) o fai qualche pausa in più. Per vedere che cosa succede, avvia RuscaMark dal terminale con `RUSCAMARK_VOICE_DEBUG=1 ruscamark`: per ogni frase scrive quanto audio, quanto ritardo e quanto tempo è servito (con `=2` anche il testo riconosciuto). Questi dati restano sul terminale e non vengono salvati. |
 | Whisper è lento | Usa un modello più piccolo, oppure *Scheda grafica (Vulkan)* in Preferenze → Voce. |
 | Whisper si ferma con un errore sulla scheda grafica | Scegli un'altra scheda in *Scheda da usare*, oppure *Processore (CPU)*. |
 | Vosk scrive «.» al posto della parola «punto» | È un comando a voce: spegni *Comandi a voce* o usa Whisper. |

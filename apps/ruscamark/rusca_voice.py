@@ -30,6 +30,7 @@ import re
 import shutil
 import signal
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -56,6 +57,20 @@ VOSK_PAUSE = 1.0
 # Dopo «Ferma» il microfono resta aperto ancora un poco: l'ultima parola
 # detta arriva da PipeWire con un piccolo ritardo.
 STOP_GRACE = 0.4
+# Il testo parziale di Vosk costa tanto più quanto è lunga la frase in corso:
+# si chiede solo se il riconoscimento è al passo con il parlato (meno di
+# tanto audio in coda). Se resta indietro recupera prima, e il testo arriva.
+PARTIAL_MAX_BACKLOG = 0.3
+# Oltre questo ritardo la barra della voce lo mostra.
+SHOW_BACKLOG = 1.0
+# RUSCAMARK_VOICE_DEBUG=1: sul terminale, per ogni frase, audio, ritardo e
+# tempi; =2 anche il testo riconosciuto. Mai nella finestra né su disco.
+DEBUG = int(os.environ.get("RUSCAMARK_VOICE_DEBUG", "0") or 0)
+
+
+def _log(*args):
+    if DEBUG:
+        print("ruscamark voce:", *args, file=sys.stderr, flush=True)
 # Whisper: una frase è il parlato fra due silenzi di almeno WHISPER_PAUSE.
 WHISPER_PAUSE = 0.7
 WHISPER_PREROLL = 0.3                # s di audio tenuti prima della voce
@@ -458,13 +473,17 @@ class Dictation:
     (recognizer); si libera con close()."""
 
     def __init__(self, on_state=None, on_partial=None, on_text=None, on_level=None,
-                 on_error=None):
+                 on_error=None, on_delay=None):
         self.on_state = on_state or (lambda s: None)
         self.on_partial = on_partial or (lambda t: None)
         self.on_text = on_text or (lambda t: None)
         self.on_level = on_level or (lambda x: None)
         self.on_error = on_error or (lambda e: None)
+        self.on_delay = on_delay or (lambda seconds: None)   # audio in coda, in secondi
         self._stop = threading.Event()
+        self._pause = threading.Event()
+        self._resume = threading.Event()
+        self._queue = None
         self._thread = None
         self._mic = None
         self._mic_lock = threading.Lock()
@@ -506,14 +525,41 @@ class Dictation:
         ancora (l'ultima frase non si perde), e con Whisper si scrivono le
         frasi in coda; poi arriva "stopped"."""
         self._stop.set()
+        self._resume.set()                       # se era in pausa, esce
         timer = threading.Timer(STOP_GRACE, self._stop_mic)
         timer.daemon = True
         timer.start()
+
+    @property
+    def paused(self):
+        return self._pause.is_set()
+
+    def pause(self):
+        """Chiude il microfono senza fermare la dettatura: la frase in corso
+        si finisce di riconoscere e si scrive, il modello resta caricato."""
+        if self.running and not self._pause.is_set():
+            self._resume.clear()
+            self._pause.set()
+            timer = threading.Timer(STOP_GRACE, self._stop_mic)
+            timer.daemon = True
+            timer.start()
+
+    def resume(self):
+        """Riapre il microfono dopo pause()."""
+        if self._pause.is_set():
+            self._pause.clear()
+            self._resume.set()
+
+    def backlog(self):
+        """Secondi d'audio registrati e non ancora riconosciuti."""
+        q = self._queue
+        return q.qsize() * FRAME / (RATE * 2) if q is not None else 0.0
 
     def cancel(self):
         """Smette subito, senza scrivere ciò che resta (chiusura)."""
         self._stop.set()
         self._cancelled = True
+        self._resume.set()
         self._stop_mic()
         proc = self._proc
         if proc is not None and proc.poll() is None:
@@ -570,6 +616,7 @@ class Dictation:
 
     def _run(self, engine, options):
         self._cancelled = False
+        self._pause.clear()
         try:
             if engine == "vosk":
                 self._run_vosk(options)
@@ -590,41 +637,60 @@ class Dictation:
         ferma. Il microfono si legge in un thread a parte che mette tutto in
         coda: se il riconoscimento resta indietro rispetto al parlato
         recupera dopo, e PipeWire non deve mai scartare l'audio perché il
-        tubo è pieno. Dopo lo stop si consuma l'audio rimasto nel tubo."""
-        mic = self._start_mic()
-        frames = queue.Queue()
-
-        def read():
-            n = 0
-            try:
-                while True:
-                    data = mic.stdout.read(FRAME)
-                    if not data:
-                        break
-                    n += 1
-                    if n % 3 == 0:
-                        self._emit(self.on_level, min(1.0, _rms(data) * 6.0))
-                    frames.put(data)
-            except (OSError, ValueError):
-                pass
-            finally:
-                frames.put(None)
-        threading.Thread(target=read, daemon=True).start()
-        block = []
+        tubo è pieno. Dopo lo stop si consuma l'audio rimasto nel tubo.
+        In pausa il microfono è chiuso: si restituisce un blocco vuoto (b"")
+        perché chi riconosce finisca la frase in corso, poi si aspetta."""
         while True:
-            data = frames.get()
-            if data is None:
-                break
-            if self._cancelled:
-                continue                    # chiusura: si svuota senza riconoscere
-            block.append(data)
-            if len(block) >= per:
+            mic = self._start_mic()
+            frames = queue.Queue()
+            self._queue = frames
+
+            def read(mic=mic, frames=frames):
+                n = 0
+                try:
+                    while True:
+                        data = mic.stdout.read(FRAME)
+                        if not data:
+                            break
+                        n += 1
+                        if n % 3 == 0:
+                            self._emit(self.on_level, min(1.0, _rms(data) * 6.0))
+                        frames.put(data)
+                except (OSError, ValueError):
+                    pass
+                finally:
+                    frames.put(None)
+            threading.Thread(target=read, daemon=True).start()
+            block, last_delay = [], 0.0
+            while True:
+                data = frames.get()
+                if data is None:
+                    break
+                if self._cancelled:
+                    continue                    # chiusura: si svuota senza riconoscere
+                block.append(data)
+                if len(block) >= per:
+                    yield b"".join(block)
+                    block = []
+                    now = time.monotonic()
+                    if now - last_delay >= 0.5:
+                        last_delay = now
+                        self._emit(self.on_delay, self.backlog())
+            if block and not self._cancelled:
                 yield b"".join(block)
-                block = []
-        if block and not self._cancelled:
-            yield b"".join(block)
-        if not self._stop.is_set():
-            raise VoiceError("err_mic", f"pw-record: {mic.poll()}")
+            self._queue = None
+            self._emit(self.on_delay, 0.0)
+            if self._stop.is_set() or self._cancelled:
+                return
+            if not self._pause.is_set():
+                raise VoiceError("err_mic", f"pw-record: {mic.poll()}")
+            yield b""                           # pausa: finire la frase in corso
+            self._emit(self.on_level, 0.0)
+            self._emit(self.on_state, "paused")
+            self._resume.wait()
+            if self._stop.is_set() or self._cancelled:
+                return
+            self._emit(self.on_state, "listening")
 
     # Vosk: parola per parola mentre si parla.
     def _run_vosk(self, options):
@@ -641,25 +707,48 @@ class Dictation:
         rec = self._rec[1]
         rec.reset()
         self._emit(self.on_state, "listening")
-        partial, quiet, count = "", 0.0, 0
+        partial, quiet, count, heard = "", 0.0, 0, 0.0
         for data in self._frames(VOSK_BLOCK):
-            if rec.accept(data):
-                self._final(rec.result().get("text", ""))
-                partial, quiet = "", 0.0
+            if not data:                                 # pausa
+                self._vosk_final(rec, partial, heard)
+                partial, quiet, heard = "", 0.0, 0.0
                 continue
-            quiet += len(data) / (RATE * 2)              # secondi d'audio
+            seconds = len(data) / (RATE * 2)
+            heard += seconds
+            if rec.accept(data):
+                text = rec.result().get("text", "")
+                _log(f"frase chiusa da Vosk: {heard:.1f} s d'audio, ritardo {self.backlog():.1f} s",
+                     f"«{text}»" if DEBUG > 1 else "")
+                self._final(text)
+                partial, quiet, heard = "", 0.0, 0.0
+                continue
+            quiet += seconds
             count += 1
             if count % PARTIAL_EVERY:
+                continue
+            if self.backlog() > PARTIAL_MAX_BACKLOG:
+                # In ritardo: niente testo parziale, che è la parte costosa;
+                # la pausa si misura sul parziale, quindi aspetta anche lei.
                 continue
             text = rec.partial()
             if text != partial:
                 partial, quiet = text, 0.0
                 self._emit(self.on_partial, text)
             elif partial and quiet >= VOSK_PAUSE:
-                self._final(longer(rec.final_result().get("text", ""), partial))
-                partial, quiet = "", 0.0
+                self._vosk_final(rec, partial, heard)
+                partial, quiet, heard = "", 0.0, 0.0
         if not self._cancelled:
-            self._final(longer(rec.final_result().get("text", ""), partial))
+            self._vosk_final(rec, partial, heard)
+
+    def _vosk_final(self, rec, partial, heard):
+        start = time.monotonic()
+        final = rec.final_result().get("text", "")
+        text = longer(final, partial)
+        _log(f"frase: {heard:.1f} s d'audio, risultato in {time.monotonic() - start:.2f} s, "
+             f"ritardo {self.backlog():.1f} s, parole finale/parziale "
+             f"{len(final.split())}/{len(partial.split())}",
+             f"«{text}»" if DEBUG > 1 else "")
+        self._final(text)
 
     def _final(self, text):
         text = " ".join((text or "").split())
@@ -686,36 +775,17 @@ class Dictation:
             worker.join()
 
     def _listen_whisper(self, jobs):
-        pre = collections.deque(maxlen=int(WHISPER_PREROLL / 0.02))
-        speech, voiced, silent = bytearray(), 0, 0
-        noise, loud = 0.004, 0
-        in_speech = False
+        cutter = SpeechCutter()
         for data in self._frames():
-            level = _rms(data)
-            threshold = max(0.012, noise * 3.0)
-            if not in_speech:
-                noise = 0.97 * noise + 0.03 * min(level, 0.05)
-                loud = loud + 1 if level > threshold else 0
-                pre.append(data)
-                if loud >= 3:                         # 60 ms di voce
-                    in_speech = True
-                    speech = bytearray(b"".join(pre))
-                    voiced, silent = loud, 0
-                continue
-            speech += data
-            if level > threshold:
-                voiced += 1
-                silent = 0
-            else:
-                silent += 1
-            seconds = len(speech) / (RATE * 2)
-            if silent * 0.02 >= WHISPER_PAUSE or seconds >= WHISPER_MAX:
-                if voiced * 0.02 >= WHISPER_MIN_SPEECH:
-                    jobs.put(bytes(speech))
-                in_speech, speech, voiced, silent, loud = False, bytearray(), 0, 0, 0
-                pre.clear()
-        if in_speech and voiced * 0.02 >= WHISPER_MIN_SPEECH and not self._cancelled:
-            jobs.put(bytes(speech))
+            segment = cutter.flush() if not data else cutter.feed(data)
+            if segment:
+                _log(f"frase per Whisper: {len(segment) / (RATE * 2):.1f} s, "
+                     f"soglia {cutter.threshold():.3f}")
+                jobs.put(segment)
+        if not self._cancelled:
+            segment = cutter.flush()
+            if segment:
+                jobs.put(segment)
 
     def _whisper_worker(self, jobs, options, devices):
         while True:
@@ -734,7 +804,7 @@ class Dictation:
                 self.prompt = (self.prompt + " " + text)[-PROMPT_CHARS:]
                 self._emit(self.on_text, text)
             if not self._stop.is_set():
-                self._emit(self.on_state, "listening")
+                self._emit(self.on_state, "paused" if self._pause.is_set() else "listening")
 
     def _transcribe(self, pcm, options, devices):
         run = tempfile.mkdtemp(prefix="frase-", dir=LIVE_DIR)
@@ -770,6 +840,64 @@ class Dictation:
             return " ".join(s.text for s in segments).strip()
         finally:
             shutil.rmtree(run, ignore_errors=True)
+
+
+class SpeechCutter:
+    """Taglia il parlato del microfono in frasi per Whisper: una frase va
+    dalla voce a un silenzio di WHISPER_PAUSE, con WHISPER_PREROLL di audio
+    prima, al massimo WHISPER_MAX. La voce si riconosce dall'energia, sopra
+    una soglia tre volte il rumore di fondo. Il rumore è il livello più
+    basso degli ultimi NOISE_WINDOW secondi, misurato sempre, anche mentre
+    si parla: la voce ha sempre delle pause e non lo fa salire, e una ventola
+    si impara anche se è più forte della soglia iniziale. Prima il rumore
+    seguiva la media dei livelli fuori dalla voce, compresa la voce bassa:
+    la soglia saliva da sola e dopo un po' la voce non si sentiva più."""
+
+    NOISE_WINDOW = 5.0
+
+    def __init__(self):
+        self.pre = collections.deque(maxlen=int(WHISPER_PREROLL / 0.02))
+        self.speech = bytearray()
+        self.levels = collections.deque(maxlen=int(self.NOISE_WINDOW / 0.02))
+        self.noise = 0.004
+        self.loud = self.voiced = self.silent = 0
+        self.in_speech = False
+
+    def threshold(self):
+        return max(0.012, self.noise * 3.0)
+
+    def feed(self, data):
+        """Un blocco di 20 ms; restituisce una frase finita o None."""
+        level = _rms(data)
+        self.levels.append(level)
+        self.noise = min(self.levels)
+        threshold = self.threshold()
+        if not self.in_speech:
+            self.loud = self.loud + 1 if level > threshold else 0
+            self.pre.append(data)
+            if self.loud >= 3:                                      # 60 ms di voce
+                self.in_speech = True
+                self.speech = bytearray(b"".join(self.pre))
+                self.voiced, self.silent = self.loud, 0
+            return None
+        self.speech += data
+        if level > threshold:
+            self.voiced += 1
+            self.silent = 0
+        else:
+            self.silent += 1
+        if self.silent * 0.02 >= WHISPER_PAUSE or len(self.speech) / (RATE * 2) >= WHISPER_MAX:
+            return self.flush()
+        return None
+
+    def flush(self):
+        """La frase in corso, se c'è abbastanza voce (pausa, stop)."""
+        segment = bytes(self.speech) if self.in_speech and \
+            self.voiced * 0.02 >= WHISPER_MIN_SPEECH else None
+        self.in_speech, self.speech = False, bytearray()
+        self.voiced = self.silent = self.loud = 0
+        self.pre.clear()
+        return segment
 
 
 # ── trascrizione di un file ────────────────────────────────────────────────

@@ -230,6 +230,18 @@
   "voice_help_inline": "굵게와 기울임",
   "voice_help_langs": "음성 명령은 영어와 이탈리아어로 있습니다: 사용하려면 이 언어 중 하나로 받아쓰세요.",
   "voice_help_off": "음성 명령이 꺼져 있습니다: 환경설정 → 음성에서 켜세요.",
+  "btn_pause": "일시 정지",
+  "btn_resume": "다시 시작",
+  "btn_insert": "삽입",
+  "btn_discard": "버리기",
+  "voice_paused": "일시 정지됨, 마이크 꺼짐",
+  "voice_behind": "{s}초 지연",
+  "voice_draft_left": "초안이 기다리고 있습니다: 고친 뒤 삽입",
+  "tip_draft": "받아쓴 텍스트: 여기서 고친 뒤 삽입 (Ctrl+Enter)",
+  "pref_voice_review": "삽입하기 전에 문장 확인",
+  "pref_voice_review_sub": "받아쓴 텍스트는 고칠 수 있는 초안에 모이고, 삽입하면 문서에 들어갑니다",
+  "draft_close_title": "초안이 삽입되지 않음",
+  "draft_close_body": "초안에 아직 문서에 없는 받아쓴 텍스트가 있습니다.",
   "app_summary": "실시간 서식으로 Markdown 작성",
   "desktop_keywords": "Markdown;편집기;텍스트;글쓰기;메모;"
 }

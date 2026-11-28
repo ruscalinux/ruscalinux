@@ -214,6 +214,18 @@ _BUILTIN_STRINGS = {
         'voice_help_inline': 'Bold and italic',
         'voice_help_langs': 'Voice commands exist in English and Italian: dictate in one of these languages to use them.',
         'voice_help_off': 'Voice commands are off: turn them on in Preferences → Voice.',
+        'btn_pause': 'Pause',
+        'btn_resume': 'Resume',
+        'btn_insert': 'Insert',
+        'btn_discard': 'Discard',
+        'voice_paused': 'Paused, microphone off',
+        'voice_behind': '{s} s behind',
+        'voice_draft_left': 'The draft is waiting: correct it, then Insert',
+        'tip_draft': 'Dictated text: correct it here, then Insert (Ctrl+Enter)',
+        'pref_voice_review': 'Check sentences before inserting',
+        'pref_voice_review_sub': 'Dictated text collects in a draft you can correct; Insert puts it in the document',
+        'draft_close_title': 'Draft not inserted',
+        'draft_close_body': 'The draft holds dictated text that is not in the document yet.',
         'pref_font': 'Text font',
         'mi_import_audio': 'Import from Audio…',
         'mi_dictate': 'Dictation',
@@ -448,6 +460,18 @@ _BUILTIN_STRINGS = {
         'voice_help_inline': 'Grassetto e corsivo',
         'voice_help_langs': 'I comandi a voce esistono in italiano e in inglese: detta in una di queste lingue per usarli.',
         'voice_help_off': 'I comandi a voce sono spenti: accendili in Preferenze → Voce.',
+        'btn_pause': 'Pausa',
+        'btn_resume': 'Riprendi',
+        'btn_insert': 'Inserisci',
+        'btn_discard': 'Scarta',
+        'voice_paused': 'In pausa, microfono chiuso',
+        'voice_behind': '{s} s indietro',
+        'voice_draft_left': 'La bozza aspetta: correggila, poi Inserisci',
+        'tip_draft': 'Testo dettato: correggilo qui, poi Inserisci (Ctrl+Invio)',
+        'pref_voice_review': 'Controlla le frasi prima di inserirle',
+        'pref_voice_review_sub': 'Il testo dettato si raccoglie in una bozza da correggere; Inserisci lo mette nel documento',
+        'draft_close_title': 'Bozza non inserita',
+        'draft_close_body': 'La bozza contiene testo dettato che non è ancora nel documento.',
         'pref_font': 'Carattere del testo',
         'mi_import_audio': 'Importa da audio…',
         'mi_dictate': 'Dettatura',
@@ -739,7 +763,8 @@ DEFAULT_CONFIG = {
     # Voce (rusca_voice.py). Modelli e voce: "" = scelta automatica.
     "voice_engine": "vosk",        # vosk (in tempo reale) | whisper (a frasi, più preciso)
     "voice_lang": "doc",           # doc (lingua del documento) | auto | codice (it, en…)
-    "voice_commands": True,        # Vosk: «virgola», «punto», «a capo» diventano segni
+    "voice_commands": True,        # comandi a voce: punteggiatura (Vosk) e Markdown
+    "voice_review": True,          # le frasi vanno in una bozza da controllare
     "vosk_model": "", "whisper_model": "",
     "voice_gpu": False,            # Whisper: False = processore, True = scheda grafica (Vulkan)
     "voice_gpu_device": "",        # nome della scheda (rusca_whisper.list_devices()), "" = automatica
@@ -4974,8 +4999,14 @@ class RuscaWindow(Adw.ApplicationWindow):
     # lavoro è in rusca_voice.py; qui ci sono i comandi, la barra della voce
     # sopra la barra di stato e la pagina «Voce» delle Preferenze.
     def _build_voice_bar(self):
-        box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10,
-                      margin_start=12, margin_end=6, margin_top=4, margin_bottom=4)
+        """La barra della voce, sopra la barra di stato. Prima riga: stato,
+        testo in corso, ritardo, comandi, Pausa e Ferma. Seconda riga, con
+        «Controlla le frasi prima di inserirle»: la bozza, dove il testo
+        dettato si accumula e si corregge prima di andare nel documento."""
+        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4,
+                        margin_start=12, margin_end=6, margin_top=4, margin_bottom=4)
+        box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        outer.append(box)
         self.voice_icon = Gtk.Image(icon_name="audio-input-microphone-symbolic")
         box.append(self.voice_icon)
         self.voice_level = Gtk.LevelBar(min_value=0.0, max_value=1.0, valign=Gtk.Align.CENTER)
@@ -4991,6 +5022,11 @@ class RuscaWindow(Adw.ApplicationWindow):
         attrs.insert(Pango.attr_style_new(Pango.Style.ITALIC))
         self.voice_partial.set_attributes(attrs)
         box.append(self.voice_partial)
+        # Ritardo del riconoscimento rispetto al parlato (si vede solo se c'è).
+        self.voice_delay = Gtk.Label(visible=False)
+        self.voice_delay.add_css_class("warning")
+        self.voice_delay.add_css_class("numeric")
+        box.append(self.voice_delay)
         # «?»: l'elenco dei comandi a voce, mentre si detta.
         self.voice_help_btn = Gtk.MenuButton(icon_name="help-about-symbolic",
                                              valign=Gtk.Align.CENTER)
@@ -5008,28 +5044,167 @@ class RuscaWindow(Adw.ApplicationWindow):
             button.set_popover(pop)
         self.voice_help_btn.set_create_popup_func(help_popover)
         box.append(self.voice_help_btn)
+        self.voice_pause_btn = Gtk.Button(label=self.t("btn_pause"), valign=Gtk.Align.CENTER)
+        self.voice_pause_btn.connect("clicked", lambda *_: self._toggle_voice_pause())
+        box.append(self.voice_pause_btn)
         self.voice_stop_btn = Gtk.Button(label=self.t("btn_stop"), valign=Gtk.Align.CENTER)
         self.voice_stop_btn.connect("clicked", lambda *_: self._stop_voice())
         box.append(self.voice_stop_btn)
+
+        # La bozza: testo normale, modificabile anche mentre si detta (le
+        # frasi nuove si aggiungono in fondo, il cursore resta dov'è).
+        draft = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        self.draft_buffer = Gtk.TextBuffer()
+        self.draft_view = Gtk.TextView(buffer=self.draft_buffer, wrap_mode=Gtk.WrapMode.WORD_CHAR,
+                                       top_margin=6, bottom_margin=6, left_margin=8,
+                                       right_margin=8)
+        self.draft_view.add_css_class("ruscamark-editor")
+        self.draft_view.update_property([Gtk.AccessibleProperty.LABEL], [self.t("tip_draft")])
+        self.draft_view.set_tooltip_text(self.t("tip_draft"))
+        keys = Gtk.EventControllerKey()
+        keys.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+
+        def on_key(_c, keyval, _code, state):
+            if keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter) and \
+                    state & Gdk.ModifierType.CONTROL_MASK:
+                self._insert_draft()
+                return True
+            return False
+        keys.connect("key-pressed", on_key)
+        self.draft_view.add_controller(keys)
+        self.draft_buffer.connect("changed", lambda *_: self._sync_draft())
+        self._draft_end = self.draft_buffer.create_mark(None, self.draft_buffer.get_end_iter(),
+                                                        False)
+        draft_sw = Gtk.ScrolledWindow(child=self.draft_view, hexpand=True,
+                                      hscrollbar_policy=Gtk.PolicyType.NEVER,
+                                      min_content_height=64, max_content_height=150,
+                                      propagate_natural_height=True)
+        draft_sw.add_css_class("card")
+        self.draft_scroller = draft_sw
+        draft.append(draft_sw)
+        actions = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6,
+                          valign=Gtk.Align.START)
+        self.draft_insert_btn = Gtk.Button(label=self.t("btn_insert"))
+        self.draft_insert_btn.add_css_class("suggested-action")
+        self.draft_insert_btn.set_tooltip_text("Ctrl+Enter")
+        self.draft_insert_btn.connect("clicked", lambda *_: self._insert_draft())
+        actions.append(self.draft_insert_btn)
+        self.draft_discard_btn = Gtk.Button(label=self.t("btn_discard"))
+        self.draft_discard_btn.connect("clicked", lambda *_: self._discard_draft())
+        actions.append(self.draft_discard_btn)
+        draft.append(actions)
+        self.draft_revealer = Gtk.Revealer(child=draft,
+                                           transition_type=Gtk.RevealerTransitionType.SLIDE_UP)
+        outer.append(self.draft_revealer)
         self.voice_revealer = Gtk.Revealer(transition_type=Gtk.RevealerTransitionType.SLIDE_UP,
-                                           child=box)
+                                           child=outer)
         self.toolbar.add_bottom_bar(self.voice_revealer)
+        self._sync_draft()
+
+    def _draft_text(self):
+        b = self.draft_buffer
+        return b.get_text(b.get_start_iter(), b.get_end_iter(), True)
+
+    def _draft_wanted(self):
+        """La bozza si vede durante la dettatura (se è attiva) e finché
+        contiene del testo, anche dopo Ferma."""
+        return bool(self._draft_text().strip()) or (
+            self._voice_mode == "dictation" and bool(self.cfg.get("voice_review", True)))
+
+    def _sync_draft(self):
+        has_text = bool(self._draft_text().strip())
+        self.draft_insert_btn.set_sensitive(has_text)
+        self.draft_discard_btn.set_sensitive(has_text)
+        if self._voice_mode in ("dictation", "draft"):
+            self.draft_revealer.set_reveal_child(self._draft_wanted())
+        if self._voice_mode == "draft" and not has_text:
+            self._voice_mode = None
+            self.voice_revealer.set_reveal_child(False)
+
+    def _show_draft_mode(self):
+        """Dettatura ferma, bozza ancora da inserire."""
+        self._voice_mode = "draft"
+        self.voice_icon.set_from_icon_name("document-edit-symbolic")
+        for w in (self.voice_level, self.voice_help_btn, self.voice_pause_btn,
+                  self.voice_stop_btn, self.voice_delay):
+            w.set_visible(False)
+        self.voice_status.set_label(self.t("voice_draft_left"))
+        self.voice_partial.set_label("")
+        self.draft_revealer.set_reveal_child(True)
+        self.voice_revealer.set_reveal_child(True)
 
     def _show_voice_bar(self, mode, status, detail=""):
         self._voice_mode = mode
         self.voice_icon.set_from_icon_name("audio-input-microphone-symbolic" if mode == "dictation"
                                            else "audio-speakers-symbolic")
-        self.voice_level.set_visible(mode == "dictation")
-        self.voice_help_btn.set_visible(mode == "dictation")
+        dictating = mode == "dictation"
+        for w in (self.voice_level, self.voice_help_btn, self.voice_pause_btn):
+            w.set_visible(dictating)
+        self.voice_stop_btn.set_visible(True)
+        self.voice_delay.set_visible(False)
+        self.voice_pause_btn.set_label(self.t("btn_pause"))
         self.voice_level.set_value(0.0)
         self.voice_status.set_label(f"{status} · {detail}" if detail else status)
         self.voice_partial.set_label("")
+        self.draft_revealer.set_reveal_child(dictating and self._draft_wanted())
         self.voice_revealer.set_reveal_child(True)
 
     def _hide_voice_bar(self, mode):
         if self._voice_mode == mode:
+            if self._draft_text().strip():
+                self._show_draft_mode()           # la bozza aspetta
+                return
             self._voice_mode = None
             self.voice_revealer.set_reveal_child(False)
+
+    def _toggle_voice_pause(self):
+        d = self.dictation
+        if d is None or not d.running:
+            return
+        if d.paused:
+            d.resume()
+            self.voice_pause_btn.set_label(self.t("btn_pause"))
+        else:
+            d.pause()
+            self.voice_pause_btn.set_label(self.t("btn_resume"))
+
+    def _on_dictation_delay(self, seconds):
+        if self._voice_mode != "dictation":
+            return
+        late = seconds >= voice.SHOW_BACKLOG
+        self.voice_delay.set_visible(late)
+        if late:
+            self.voice_delay.set_label(self.t("voice_behind", s=int(round(seconds))))
+
+    def _insert_draft(self):
+        """La bozza nel documento, al cursore, in un passo di annullamento."""
+        text = self._draft_text()
+        if not text.strip():
+            return
+        before = self._text_before_cursor(2)
+        text = text.lstrip(" ")
+        if before and before[-1] not in " \t\n" and text[:1] not in ("\n", *".,;:?!)»”"):
+            text = " " + text
+        buf = self.buffer
+        buf.begin_user_action()
+        buf.delete_selection(True, True)
+        buf.insert_at_cursor(text)
+        buf.end_user_action()
+        self.view.scroll_mark_onscreen(buf.get_insert())
+        self.draft_buffer.set_text("")
+        if self._voice_mode != "dictation":
+            self.view.grab_focus()
+
+    def _discard_draft(self):
+        self.draft_buffer.set_text("")
+
+    def _append_draft(self, out):
+        """Una frase nuova in fondo alla bozza; il cursore di chi corregge
+        resta dov'è."""
+        buf = self.draft_buffer
+        buf.insert(buf.get_end_iter(), out)
+        buf.move_mark(self._draft_end, buf.get_end_iter())
+        self.draft_view.scroll_mark_onscreen(self._draft_end)
 
     def _stop_voice(self):
         if self.dictation is not None and self.dictation.running:
@@ -5150,7 +5325,7 @@ class RuscaWindow(Adw.ApplicationWindow):
                 on_state=self._on_dictation_state, on_partial=self._on_dictation_partial,
                 on_text=self._on_dictation_text,
                 on_level=lambda x: self.voice_level.set_value(x),
-                on_error=self._on_dictation_error)
+                on_error=self._on_dictation_error, on_delay=self._on_dictation_delay)
         engine = self.cfg.get("voice_engine", "vosk")
         if engine not in voice.ENGINES:
             engine = "vosk"
@@ -5181,7 +5356,10 @@ class RuscaWindow(Adw.ApplicationWindow):
         if self._voice_mode != "dictation":
             return
         label = {"loading": "voice_loading", "listening": "voice_listening",
-                 "writing": "voice_writing"}.get(state, "voice_listening")
+                 "writing": "voice_writing", "paused": "voice_paused"}.get(state, "voice_listening")
+        if state == "paused":
+            self.voice_level.set_value(0.0)
+            self.voice_partial.set_label("")
         self.voice_status.set_label(f"{self.t(label)} · {self._dictation_detail}")
 
     def _on_dictation_partial(self, text):
@@ -5191,11 +5369,20 @@ class RuscaWindow(Adw.ApplicationWindow):
     def _on_dictation_text(self, text):
         engine = self.dictation.engine if self.dictation else "vosk"
         on = bool(self.cfg.get("voice_commands", True))
+        # Comandi di punteggiatura solo con Vosk (Whisper scrive i segni da
+        # sé); comandi Markdown con tutti e due i motori.
+        if self.cfg.get("voice_review", True):
+            # Nella bozza: il testo che precede è quello del documento più
+            # quello già nella bozza.
+            before = self._text_before_cursor(400) + self._draft_text()
+            out = voice.dictation_text(text, before, self._commands_language(),
+                                       commands=engine == "vosk" and on, markdown=on)
+            if out:
+                self._append_draft(out)
+            return
         buf = self.buffer
         buf.begin_user_action()
         buf.delete_selection(True, True)
-        # Comandi di punteggiatura solo con Vosk (Whisper scrive i segni da
-        # sé); comandi Markdown con tutti e due i motori.
         out = voice.dictation_text(text, self._text_before_cursor(400),
                                    self._commands_language(),
                                    commands=engine == "vosk" and on, markdown=on)
@@ -5449,6 +5636,16 @@ class RuscaWindow(Adw.ApplicationWindow):
             save()
         commands_row.connect("notify::active", on_commands)
         dictation.add(commands_row)
+        review_row = Adw.SwitchRow(title=t("pref_voice_review"), subtitle=t("pref_voice_review_sub"),
+                                   active=bool(self.cfg.get("voice_review", True)))
+
+        def on_review(r, _p):
+            self.cfg["voice_review"] = r.get_active()
+            save()
+            if self._voice_mode == "dictation":
+                self.draft_revealer.set_reveal_child(self._draft_wanted())
+        review_row.connect("notify::active", on_review)
+        dictation.add(review_row)
         help_row = Adw.ActionRow(title=t("mi_voice_help").rstrip("…"), activatable=True)
         help_row.add_suffix(Gtk.Image(icon_name="go-next-symbolic"))
         help_row.connect("activated", lambda _r: self._action_voice_help())
@@ -5760,6 +5957,8 @@ class RuscaWindow(Adw.ApplicationWindow):
         self.spell_toggle_btn.set_tooltip_text(self.t("spell_toggle_tip"))
         self._spell_hide_btn.set_tooltip_text(self.t("spell_hide_tip"))
         self.voice_stop_btn.set_label(self.t("btn_stop"))
+        self.draft_insert_btn.set_label(self.t("btn_insert"))
+        self.draft_discard_btn.set_label(self.t("btn_discard"))
         self.voice_help_btn.set_tooltip_text(self.t("mi_voice_help").rstrip("…"))
         self._update_counts()
         self._update_title()
@@ -6151,6 +6350,29 @@ class RuscaWindow(Adw.ApplicationWindow):
     def _on_close_request(self, *_):
         if self._closing:
             return False
+        if self._draft_text().strip():
+            # Il testo dettato e non ancora inserito non si perde in silenzio.
+            dlg = Adw.AlertDialog(heading=self.t("draft_close_title"),
+                                  body=self.t("draft_close_body"))
+            dlg.add_response("cancel", self.t("btn_cancel"))
+            dlg.add_response("discard", self.t("btn_discard"))
+            dlg.add_response("insert", self.t("btn_insert"))
+            dlg.set_response_appearance("discard", Adw.ResponseAppearance.DESTRUCTIVE)
+            dlg.set_response_appearance("insert", Adw.ResponseAppearance.SUGGESTED)
+            dlg.set_default_response("insert")
+            dlg.set_close_response("cancel")
+
+            def answer(_d, response):
+                if response == "insert":
+                    self._insert_draft()
+                elif response == "discard":
+                    self._discard_draft()
+                else:
+                    return
+                self.close()
+            dlg.connect("response", answer)
+            dlg.present(self)
+            return True
         if self.buffer.get_modified():
             self._confirm_discard_close()
             return True

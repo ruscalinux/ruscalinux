@@ -230,6 +230,18 @@
   "voice_help_inline": "Negrito e itálico",
   "voice_help_langs": "Os comandos de voz existem em inglês e italiano: dite numa destas línguas para os usar.",
   "voice_help_off": "Os comandos de voz estão desligados: ligue-os em Preferências → Voz.",
+  "btn_pause": "Pausa",
+  "btn_resume": "Retomar",
+  "btn_insert": "Inserir",
+  "btn_discard": "Descartar",
+  "voice_paused": "Em pausa, microfone fechado",
+  "voice_behind": "{s} s de atraso",
+  "voice_draft_left": "O rascunho está à espera: corrija-o e depois Inserir",
+  "tip_draft": "Texto ditado: corrija-o aqui e depois Inserir (Ctrl+Enter)",
+  "pref_voice_review": "Rever as frases antes de as inserir",
+  "pref_voice_review_sub": "O texto ditado acumula-se num rascunho para corrigir; Inserir coloca-o no documento",
+  "draft_close_title": "Rascunho não inserido",
+  "draft_close_body": "O rascunho contém texto ditado que ainda não está no documento.",
   "app_summary": "Escreva em Markdown com formatação em tempo real",
   "desktop_keywords": "Markdown;editor;texto;escrita;notas;"
 }

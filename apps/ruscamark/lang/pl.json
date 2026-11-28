@@ -230,6 +230,18 @@
   "voice_help_inline": "Pogrubienie i kursywa",
   "voice_help_langs": "Polecenia głosowe istnieją po angielsku i włosku: dyktuj w jednym z tych języków, aby z nich korzystać.",
   "voice_help_off": "Polecenia głosowe są wyłączone: włącz je w Preferencjach → Głos.",
+  "btn_pause": "Wstrzymaj",
+  "btn_resume": "Wznów",
+  "btn_insert": "Wstaw",
+  "btn_discard": "Odrzuć",
+  "voice_paused": "Wstrzymano, mikrofon wyłączony",
+  "voice_behind": "{s} s opóźnienia",
+  "voice_draft_left": "Szkic czeka: popraw go, potem Wstaw",
+  "tip_draft": "Podyktowany tekst: popraw go tutaj, potem Wstaw (Ctrl+Enter)",
+  "pref_voice_review": "Sprawdzaj zdania przed wstawieniem",
+  "pref_voice_review_sub": "Podyktowany tekst zbiera się w szkicu do poprawienia; Wstaw przenosi go do dokumentu",
+  "draft_close_title": "Szkic nie został wstawiony",
+  "draft_close_body": "Szkic zawiera podyktowany tekst, którego jeszcze nie ma w dokumencie.",
   "app_summary": "Pisanie w Markdown z formatowaniem na żywo",
   "desktop_keywords": "Markdown;edytor;tekst;pisanie;notatki;"
 }

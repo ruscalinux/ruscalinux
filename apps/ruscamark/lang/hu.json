@@ -230,6 +230,18 @@
   "voice_help_inline": "Félkövér és dőlt",
   "voice_help_langs": "Hangparancsok angolul és olaszul vannak: használatukhoz e nyelvek egyikén diktáljon.",
   "voice_help_off": "A hangparancsok ki vannak kapcsolva: kapcsolja be őket a Beállítások → Beszéd részben.",
+  "btn_pause": "Szünet",
+  "btn_resume": "Folytatás",
+  "btn_insert": "Beszúrás",
+  "btn_discard": "Elvetés",
+  "voice_paused": "Szünetel, mikrofon kikapcsolva",
+  "voice_behind": "{s} mp lemaradás",
+  "voice_draft_left": "A piszkozat vár: javítsa, majd Beszúrás",
+  "tip_draft": "Diktált szöveg: itt javítsa, majd Beszúrás (Ctrl+Enter)",
+  "pref_voice_review": "Mondatok ellenőrzése beszúrás előtt",
+  "pref_voice_review_sub": "A diktált szöveg javítható piszkozatba gyűlik; a Beszúrás a dokumentumba teszi",
+  "draft_close_title": "A piszkozat nincs beszúrva",
+  "draft_close_body": "A piszkozatban olyan diktált szöveg van, amely még nincs a dokumentumban.",
   "app_summary": "Markdown írása élő formázással",
   "desktop_keywords": "Markdown;szerkesztő;szöveg;írás;jegyzetek;"
 }
