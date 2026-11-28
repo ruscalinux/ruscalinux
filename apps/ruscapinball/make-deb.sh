@@ -167,7 +167,7 @@ Section: games
 Priority: optional
 Architecture: all
 Depends: python3 (>= 3.10), python3-pygame (>= 2.1)
-Recommends: fonts-dejavu-core
+Recommends: fonts-dejavu-core, fonts-noto-core, fonts-noto-cjk, python3-arabic-reshaper, python3-bidi
 Installed-Size: $SIZE
 Maintainer: Nunzio Curcuruto <info@ruscalinux.org>
 Homepage: https://www.ruscalinux.org

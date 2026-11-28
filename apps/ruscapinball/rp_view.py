@@ -16,10 +16,17 @@
 #     rilievo.
 
 import math
+import unicodedata
 
 import pygame
 
 import rp_table as T
+
+try:   # arabo: lettere legate e ordine da destra a sinistra (pacchetti Debian)
+    import arabic_reshaper
+    from bidi.algorithm import get_display
+except ImportError:
+    arabic_reshaper = get_display = None
 
 # ── Palette: RuscaLinux (specifiche, sezione 4.1) più tre toni di ametista ──
 PRUGNA_900 = (0x2D, 0x0A, 0x1D)
@@ -100,13 +107,153 @@ def ellipse_rect(x, y, r, z=0.0):
 
 
 # ── Caratteri ──────────────────────────────────────────────────────────────
+# DejaVu non ha le scritture di cinese, giapponese, coreano e hindi, e pygame
+# non cerca da sé un altro carattere: i pezzi di testo che il carattere
+# principale non sa disegnare si scrivono con un secondo carattere, scelto
+# per la lingua (i Noto della ISO). L'hindi passa da HarfBuzz (set_script),
+# che compone le sillabe; l'arabo si prepara con python3-arabic-reshaper
+# (lettere legate) e python3-bidi (ordine da destra a sinistra), perché
+# pygame non sa scrivere da destra a sinistra. Senza quei due pacchetti
+# l'arabo non si sceglie (ruscapinball.I18n) e resta l'inglese.
+SCRIPT_FONTS = {
+    "zh_CN": "notosanscjksc,notosansmonocjksc,wenquanyizenhei,droidsansfallback",
+    "zh_TW": "notosanscjktc,notosansmonocjktc,notosanscjkhk,wenquanyizenhei",
+    "ja": "notosanscjkjp,notosansmonocjkjp,ipagothic,takaogothic",
+    "ko": "notosanscjkkr,notosansmonocjkkr,nanumgothic,unbatang",
+    "hi": "notosansdevanagari,notosansdevanagariui,lohitdevanagari,freesans",
+    "ar": "notosansarabicui,notosansarabic,dejavusans,freesans",
+}
+HB_SCRIPTS = {"hi": "Deva"}
+# DejaVu Sans Mono non ha tutte le lettere del vietnamita (ắ, ẫ, Ỷ…): HarfBuzz
+# le scomporrebbe in lettera e segni, disegnati male. DejaVu Sans le ha tutte.
+NO_MONO = {"vi"}
+RTL_READY = arabic_reshaper is not None
+_language = "en"
+
+
+def set_language(code):
+    """La lingua dell'interfaccia: decide il secondo carattere. Prima di font()."""
+    global _language
+    _language = code
+
+
+def _rtl(s):
+    return any(unicodedata.bidirectional(c) in ("R", "AL") for c in s)
+
+
+class Font:
+    """Un carattere di pygame con il ripiego per le scritture che non ha.
+
+    Ha la parte dell'interfaccia di pygame.font.Font che usa il gioco:
+    render(), size() e get_linesize()."""
+
+    # Un carattere che nessun font ha: il suo disegno è quello dei mancanti.
+    # metrics() non basta: con SDL_ttf recente dà le misure del riquadro vuoto.
+    NOTDEF = "\U0010FFFD"
+
+    def __init__(self, main, extra=None):
+        self.main, self.extra = main, extra
+        self._own = {}
+        self._notdef = None
+
+    def _pixels(self, ch):
+        img = self.main.render(ch, False, (255, 255, 255))
+        return img.get_size(), pygame.image.tobytes(img, "RGBA")
+
+    def _has(self, ch):
+        own = self._own.get(ch)
+        if own is None:
+            if self._notdef is None:
+                self._notdef = self._pixels(self.NOTDEF)
+            own = ch.isspace() or self._pixels(ch) != self._notdef
+            self._own[ch] = own
+        return own
+
+    def runs(self, s):
+        """Pezzi del testo, nell'ordine in cui si disegnano: [(carattere, testo)]."""
+        if self.extra is None:
+            return [(self.main, s)]
+        if get_display is not None and _rtl(s):
+            s = get_display(arabic_reshaper.reshape(s))
+        out = []
+        for ch in s:
+            f = self.main if self._has(ch) else self.extra
+            if ch.isspace() and out:
+                f = out[-1][0]
+            if out and out[-1][0] is f:
+                out[-1][1].append(ch)
+            else:
+                out.append((f, [ch]))
+        return [(f, "".join(chars)) for f, chars in out]
+
+    def size(self, s):
+        runs = self.runs(s)
+        if len(runs) == 1:
+            return runs[0][0].size(runs[0][1])
+        return sum(f.size(t)[0] for f, t in runs), self._height(runs)
+
+    @staticmethod
+    def _ascent(runs):
+        return max(f.get_ascent() for f, _ in runs)
+
+    def _height(self, runs):
+        return self._ascent(runs) + max(-f.get_descent() for f, _ in runs)
+
+    def render(self, s, aa, color):
+        runs = self.runs(s)
+        if len(runs) == 1 and runs[0][0] is self.main:
+            return self.main.render(s, aa, color)
+        imgs = [(f, f.render(t, aa or f is self.extra, color)) for f, t in runs]
+        ascent = self._ascent(runs)
+        out = pygame.Surface((max(1, sum(i.get_width() for _, i in imgs)), self._height(runs)),
+                             pygame.SRCALPHA)
+        x = 0
+        for f, img in imgs:
+            out.blit(img, (x, ascent - f.get_ascent()))
+            x += img.get_width()
+        return out
+
+    def get_linesize(self):
+        if self.extra is None:
+            return self.main.get_linesize()
+        return max(self.main.get_linesize(), self.extra.get_linesize())
+
+
+def _script_font(size, bold, linesize):
+    """Il secondo carattere, alto al massimo come il principale (linesize):
+    i Noto CJK, a pari corpo, hanno righe molto più alte, e i pannelli non
+    entrerebbero più nello schermo."""
+    names = SCRIPT_FONTS.get(_language)
+    if not names:
+        return None
+    path = pygame.font.match_font(names, bold=bold) or pygame.font.match_font(names)
+    if not path:
+        return None
+    f = None
+    for s in range(size, max(6, int(size * 0.6)) - 1, -1):
+        try:
+            f = pygame.font.Font(path, s)
+        except (pygame.error, OSError):
+            return None
+        if f.get_linesize() <= linesize:
+            break
+    script = HB_SCRIPTS.get(_language)
+    if script:
+        try:
+            f.set_script(script)
+        except (pygame.error, AttributeError):   # SDL_ttf senza HarfBuzz
+            pass
+    return f
+
+
 def font(size, bold=True, mono=True):
-    names = "dejavusansmono,liberationmono,freemono" if mono else \
-        "dejavusans,liberationsans,freesans"
+    names = "dejavusansmono,liberationmono,freemono" if mono and _language not in NO_MONO \
+        else "dejavusans,liberationsans,freesans"
     try:
-        return pygame.font.SysFont(names, size, bold=bold)
+        main = pygame.font.SysFont(names, size, bold=bold)
     except (pygame.error, OSError):
-        return pygame.font.Font(None, size + 6)
+        main = pygame.font.Font(None, size + 6)
+    return Font(main, _script_font(size, bold, main.get_linesize()))
 
 
 def blit_text(surf, fnt, s, color, aa=False, **anchor):

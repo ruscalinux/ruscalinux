@@ -91,6 +91,8 @@ class I18n:
         available = set()
         if os.path.isdir(LANG_DIR):
             available = {f[:-5] for f in os.listdir(LANG_DIR) if f.endswith(".json")}
+        if not V.RTL_READY:   # senza python3-arabic-reshaper e python3-bidi
+            available.discard("ar")   # le lettere uscirebbero staccate e al contrario
         self.code = pick_language(available)
         self.fallback = self._load("en")
         self.strings = self._load(self.code) if self.code != "en" else self.fallback
@@ -178,8 +180,11 @@ class Settings:
 
 
 # ── Disegno ────────────────────────────────────────────────────────────────
-def text(surf, fnt, s, color, aa=True, **anchor):
+def text(surf, fnt, s, color, aa=True, max_w=None, **anchor):
     img = fnt.render(s, aa, color)
+    if max_w and img.get_width() > max_w:   # lingue lunghe: si stringe, non si taglia
+        k = max_w / img.get_width()
+        img = pygame.transform.scale(img, (max_w, max(1, round(img.get_height() * k))))
     rect = img.get_rect(**anchor)
     surf.blit(img, rect)
     return rect
@@ -239,6 +244,7 @@ class Game:
     def __init__(self, screen, i18n, sounds, scores, settings):
         self.screen, self.t, self.snd = screen, i18n, sounds
         self.scores, self.settings = scores, settings
+        V.set_language(i18n.code)
         F = V.font
         self.fonts = {
             # fondo del tavolo e HUD: caratteri a blocchi, senza sfumature
@@ -914,13 +920,13 @@ class Game:
         best = self.scores.table[0][1] if self.scores.table else 0
         top_label = t("top_label")
         text(s, fit(F, ("hud", "hud_small", "hud_tiny"), top_label, 170), top_label,
-             AMETISTA_300, False, topright=(SCREEN_W - 16, 16))
+             AMETISTA_300, False, max_w=170, topright=(SCREEN_W - 16, 16))
         self.draw_box(pygame.Rect(SCREEN_W - 156, 40, 140, 32),
                       f"{best:,}".replace(",", "."), F["hud"])
         # a destra: punti, moltiplicatore, bonus
         score_label = t("score_label")
         text(s, fit(F, ("hud", "hud_small", "hud_tiny"), score_label, 130), score_label,
-             AMETISTA_300, False, topleft=(SCREEN_W - 140, 300))
+             AMETISTA_300, False, max_w=130, topleft=(SCREEN_W - 140, 300))
         self.draw_box(pygame.Rect(SCREEN_W - 140, 324, 128, 38),
                       f"{self.score:,}".replace(",", "."), F["hud"])
         for i, n in enumerate((2, 3, 4, 5)):
@@ -931,27 +937,27 @@ class Game:
             text(s, F["hud_tiny"], f"{n}×", PRUGNA_900 if on else ROSA_300, False, center=(cx, cy))
         bonus = f"{t('bonus_label')} {self.bonus * BONUS_UNIT:,}".replace(",", ".")
         text(s, fit(F, ("hud_small", "hud_tiny"), bonus, 130), bonus, ROSA_200, False,
-             topleft=(SCREEN_W - 140, 420))
+             max_w=130, topleft=(SCREEN_W - 140, 420))
         # a sinistra: pallina, tilt, pallina extra
         playing = self.state in ("play", "entry", "gameover")
         ball_label = t("ball_label")
         text(s, fit(F, ("hud", "hud_small", "hud_tiny"), ball_label, 125), ball_label,
-             AMETISTA_300, False, topleft=(14, 300))
+             AMETISTA_300, False, max_w=125, topleft=(14, 300))
         if playing:
             value = f"{min(self.ball_num, self.balls_total)}/{self.balls_total}"
             text(s, F["hud_big"], value, CREMA, False, topleft=(14, 322))
         else:
             demo = t("demo")
             text(s, fit(F, ("hud", "hud_small", "hud_tiny"), demo, 125), demo, CREMA, False,
-                 topleft=(14, 330))
-        text(s, F["hud_tiny"], t("tilt_label"), AMETISTA_300, False, topleft=(14, 372))
+                 max_w=125, topleft=(14, 330))
+        text(s, F["hud_tiny"], t("tilt_label"), AMETISTA_300, False, max_w=125, topleft=(14, 372))
         for i in range(3):
             on = playing and (self.tilt or self.tilt_meter > i + 0.01)
             pygame.draw.circle(s, ROSA_300 if on else PRUGNA_750, (22 + i * 18, 398), 6)
             pygame.draw.circle(s, PRUGNA_600, (22 + i * 18, 398), 6, 1)
         extra = t("extra_label")
         text(s, fit(F, ("hud_small", "hud_tiny"), extra, 125), extra, AMETISTA_300, False,
-             topleft=(14, 420))
+             max_w=125, topleft=(14, 420))
         on = playing and self.extra_pending()
         box = pygame.Rect(14, 440, 34, 24)
         pygame.draw.rect(s, ROSA_250 if on else PRUGNA_750, box)
@@ -967,12 +973,12 @@ class Game:
         if self.state == "attract" and not self.attract_panel():
             if int(self.clock_t * 2) % 2 == 0:
                 text(s, self.fonts["hud"], self.t("press_start"), CREMA, False,
-                     center=(SCREEN_W // 2, y))
+                     max_w=SCREEN_W - 40, center=(SCREEN_W // 2, y))
             return
         if self.messages:
             msg = self.messages[-1][0]
             fnt = fit(self.fonts, ("hud", "hud_small", "hud_tiny"), msg, SCREEN_W - 40)
-            text(s, fnt, msg, CREMA, False, center=(SCREEN_W // 2, y))
+            text(s, fnt, msg, CREMA, False, max_w=SCREEN_W - 40, center=(SCREEN_W // 2, y))
             return
         marquee = "   ·   ".join(("PINBALL AMETHYST", "RUSCALINUX 2026", self.t("marquee"),
                                   "WWW.RUSCALINUX.ORG")) + "   ·   "
@@ -1000,7 +1006,7 @@ class Game:
         for line, fnt, col in lines:
             lh = fonts[fnt].get_linesize() + 6
             if line:
-                text(self.screen, fonts[fnt], line, col, center=(SCREEN_W // 2, yy + lh // 2))
+                text(self.screen, fonts[fnt], line, col, max_w=width - 24, center=(SCREEN_W // 2, yy + lh // 2))
             yy += lh
         return rect
 
@@ -1060,14 +1066,26 @@ class Game:
 
 
 def wrap(s, fnt, width):
-    words, lines, cur = s.split(), [], ""
-    for w in words:
-        test = (cur + " " + w).strip()
-        if fnt.size(test)[0] > width and cur:
-            lines.append(cur)
-            cur = w
-        else:
+    """Righe di al massimo width pixel. Cinese e giapponese non hanno spazi:
+    una parola che non sta in una riga si divide fra i caratteri."""
+    lines, cur = [], ""
+    for w in s.split():
+        test = f"{cur} {w}" if cur else w
+        if fnt.size(test)[0] <= width:
             cur = test
+            continue
+        if cur:
+            lines.append(cur)
+        cur = ""
+        if fnt.size(w)[0] <= width:
+            cur = w
+            continue
+        for ch in w:
+            if cur and fnt.size(cur + ch)[0] > width:
+                lines.append(cur)
+                cur = ch
+            else:
+                cur += ch
     if cur:
         lines.append(cur)
     return lines

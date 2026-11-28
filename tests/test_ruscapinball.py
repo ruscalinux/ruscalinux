@@ -392,8 +392,157 @@ class DataTest(unittest.TestCase):
             self.assertEqual(R.I18n().code, "it")
             os.environ["LANGUAGE"] = "de_DE"
             os.environ["LANG"] = "de_DE.UTF-8"
+            self.assertEqual(R.I18n().code, "de")
+            os.environ["LANGUAGE"] = "sk_SK"           # ripiego: ceco
+            self.assertEqual(R.I18n().code, "cs")
+            os.environ["LANGUAGE"] = "zh_HK"           # ripiego: cinese tradizionale
+            self.assertEqual(R.I18n().code, "zh_TW")
+            os.environ["LANGUAGE"] = "eo"              # lingua non tradotta
+            os.environ["LANG"] = "eo.UTF-8"
             self.assertEqual(R.I18n().code, "en")
             self.assertEqual(R.I18n()("chiave_inesistente"), "chiave_inesistente")
+            os.environ["LANGUAGE"] = "ar_EG"
+            ready = R.V.RTL_READY
+            try:   # senza arabic-reshaper e bidi l'arabo uscirebbe staccato e al contrario
+                R.V.RTL_READY = False
+                self.assertEqual(R.I18n().code, "en")
+                R.V.RTL_READY = True
+                self.assertEqual(R.I18n().code, "ar")
+            finally:
+                R.V.RTL_READY = ready
+                os.environ.pop("LANGUAGE", None)
+                os.environ.pop("LANG", None)
+
+    def test_all_languages(self):
+        """Le 26 lingue della sezione 9: stesse chiavi e stessi segnaposto dell'inglese."""
+        import re
+        langs = ("en it zh_CN zh_TW es hi ar pt_BR pt_PT ru ja de fr ko id tr pl nl uk "
+                 "cs vi sv ro hu el fi").split()
+        files = {f[:-5] for f in os.listdir(os.path.join(ROOT, "lang")) if f.endswith(".json")}
+        self.assertEqual(files, set(langs))
+        ph = re.compile(r"\{[a-z_0-9]*\}")
+        en = _lang("en")
+        for code in langs:
+            data = _lang(code)
+            self.assertEqual(set(data), set(en), code)
+            for key, value in en.items():
+                self.assertEqual(sorted(ph.findall(data[key])), sorted(ph.findall(value)),
+                                 f"{code}: {key}")
+                self.assertTrue(data[key].strip(), f"{code}: {key} vuota")
+
+
+def _lang(code):
+    with open(os.path.join(ROOT, "lang", code + ".json"), encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+LANGS = sorted(f[:-5] for f in os.listdir(os.path.join(ROOT, "lang")) if f.endswith(".json"))
+
+
+@unittest.skipIf(pygame is None, "serve pygame")
+class LanguageDrawTest(unittest.TestCase):
+    """Ogni schermata in ogni lingua: si disegna e i pannelli stanno nello schermo."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.env = {k: os.environ.get(k) for k in ("LANGUAGE", "LANG", "XDG_DATA_HOME",
+                                                    "XDG_CONFIG_HOME")}
+        os.environ["XDG_DATA_HOME"] = os.environ["XDG_CONFIG_HOME"] = self.tmp.name
+
+    def tearDown(self):
+        for k, v in self.env.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+        self.tmp.cleanup()
+
+    def test_every_screen_in_every_language(self):
+        import importlib
+        import ruscapinball as R
+        R = importlib.reload(R)
+        pygame.init()
+        screen = pygame.display.set_mode((R.SCREEN_W, R.SCREEN_H))
+        for code in LANGS:
+            if code == "ar" and not R.V.RTL_READY:
+                continue
+            with self.subTest(lang=code):
+                os.environ["LANGUAGE"] = code
+                i18n = R.I18n()
+                self.assertEqual(i18n.code, code)
+                g = R.Game(screen, i18n, R.Sounds(False), R.Scores(), R.Settings())
+                panels = []
+                draw_panel = g.draw_panel
+                g.draw_panel = lambda *a, **k: panels.append(draw_panel(*a, **k)) or panels[-1]
+                g.clock_t = 0.1
+                g.draw()
+                g.info = True
+                g.draw()
+                g.info = False
+                g.start_game()
+                for state in ("play", "entry", "gameover"):
+                    g.state = state
+                    g.gameover_until = g.clock_t + 5
+                    g.draw()
+                g.paused = True
+                g.draw()
+                self.assertTrue(panels)
+                for rect in panels:
+                    self.assertGreaterEqual(rect.top, 0)
+                    self.assertLessEqual(rect.bottom, R.SCREEN_H)
+
+    def test_wrap_without_spaces(self):
+        import rp_view as V
+        pygame.init()
+        V.set_language("zh_CN")
+        f = V.font(16, bold=False, mono=False)
+        import ruscapinball as R
+        lines = R.wrap("设计、规格说明和测试由作者完成；代码在人工智能工具的辅助下编写。", f, 120)
+        self.assertGreater(len(lines), 1)
+        self.assertTrue(all(f.size(line)[0] <= 120 for line in lines))
+        V.set_language("en")
+
+
+@unittest.skipIf(pygame is None, "serve pygame")
+class GlyphTest(unittest.TestCase):
+    """Ogni carattere di ogni lingua è nel carattere principale o nel secondo
+    (con i caratteri della ISO: DejaVu, Noto). Si legge la tabella cmap con
+    fontTools; senza fontTools o senza i caratteri si salta."""
+
+    def test_every_character_has_a_glyph(self):
+        try:
+            from fontTools.ttLib import TTFont
+        except ImportError:
+            self.skipTest("serve fontTools")
+        import rp_view as V
+        pygame.font.init()
+
+        def cmap(path):
+            if path.endswith(".ttc"):
+                return TTFont(path, fontNumber=0).getBestCmap()
+            return TTFont(path).getBestCmap()
+
+        mono = pygame.font.match_font("dejavusansmono", bold=True)
+        sans = pygame.font.match_font("dejavusans", bold=True)
+        if not mono or not sans:
+            self.skipTest("servono i caratteri DejaVu")
+        for code in LANGS:
+            data = _lang(code)
+            main = cmap(sans if code in V.NO_MONO else mono)
+            extra = {}
+            if code in V.SCRIPT_FONTS:
+                path = pygame.font.match_font(V.SCRIPT_FONTS[code], bold=True)
+                if not path:
+                    continue   # carattere della ISO assente qui: lo controlla la ISO
+                extra = cmap(path)
+            text = "".join(data.values())
+            if code == "ar":
+                if not V.RTL_READY:
+                    continue
+                text = V.get_display(V.arabic_reshaper.reshape(text))
+            missing = sorted({c for c in text if not c.isspace()
+                              and ord(c) not in main and ord(c) not in extra})
+            self.assertEqual(missing, [], code)
 
 
 if __name__ == "__main__":

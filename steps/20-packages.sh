@@ -183,6 +183,10 @@ python3-pil
 
 # RuscaPinball: il flipper (finestra, suoni e gamepad con SDL 2)
 python3-pygame
+# RuscaPinball in arabo: lettere legate e testo da destra a sinistra,
+# che pygame non sa fare da sé
+python3-arabic-reshaper
+python3-bidi
 
 # RuscaDubbing: i numeri in lettere per la voce («16» -> «sedici»)
 python3-num2words
