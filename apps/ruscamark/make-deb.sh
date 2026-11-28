@@ -18,6 +18,12 @@
 #   * tema comune RuscaLinux (style.css), icona simbolica, metainfo
 #     e voce del menu con testi tradotti presi da lang/;
 #   * Recommends: hunspell-en-gb (ortografia en_GB, controllo presente);
+#   * carattere del testo Literata (SIL OFL 1.1) in /usr/share/ruscamark/fonts,
+#     con il testo della licenza;
+#   * voce: dettatura, trascrizione di file audio e lettura ad alta voce con i
+#     motori delle RuscaLinux OS Apps (ruscavosk-engine, ruscawhisper-engine,
+#     ruscapiper-engine), raccomandati e non obbligatori: senza, RuscaMark
+#     dice che cosa installare;
 #   * GPL-3.0, nota IA nel file copyright (specifiche, sez. 12.2),
 #     elaborazione solo locale (no telemetria).
 #
@@ -56,6 +62,23 @@ DEB_NAME="${PKG}-${SUFFIX}_${VER}_${ARCH}.deb"
 [ -f ruscamark.svg ] || { echo "ERRORE: ruscamark.svg non trovato."; exit 1; }
 [ -f ruscamark-symbolic.svg ] || { echo "ERRORE: ruscamark-symbolic.svg non trovato."; exit 1; }
 [ -f style.css ] || { echo "ERRORE: style.css (tema RuscaLinux) non trovato."; exit 1; }
+for f in fonts/Literata-Regular.ttf fonts/Literata-Italic.ttf fonts/Literata-Bold.ttf \
+         fonts/Literata-BoldItalic.ttf fonts/Literata-OFL.txt; do
+    [ -f "$f" ] || { echo "ERRORE: $f (carattere del testo) non trovato."; exit 1; }
+done
+# Moduli della voce: rusca_voice.py è di RuscaMark; gli altri sono copie
+# identiche di quelli di RuscaLLisse e RuscaTranscriber (si cambiano lì).
+VOICE_FILES="rusca_voice.py rusca_vosk.py rusca_whisper.py rusca_piper.py speech_text.py"
+for f in $VOICE_FILES pronunce.tsv; do
+    [ -f "$f" ] || { echo "ERRORE: $f (voce) non trovato."; exit 1; }
+done
+# Nel repository le copie si confrontano con gli originali (come RuscaPallas).
+for pair in rusca_vosk.py:ruscallisse rusca_piper.py:ruscallisse speech_text.py:ruscallisse \
+            pronunce.tsv:ruscallisse rusca_whisper.py:ruscatranscriber; do
+    f="${pair%%:*}"; other="../${pair##*:}/$f"
+    [ -f "$other" ] || continue
+    cmp -s "$f" "$other" || { echo "ERRORE: $f non è identico a $other (copialo da lì)."; exit 1; }
+done
 grep -q "^APP_VERSION = \"${VER}\"" ruscamark.py || { echo "ERRORE: APP_VERSION diversa da ${VER}."; exit 1; }
 # Privacy e sicurezza sono documentate nei manuali docs/Manual_{it,en}.md.
 
@@ -103,7 +126,7 @@ PYCHECK
 
 # Markdown: motore comune rusca_markdown.py, basato su markdown-it-py
 # (CommonMark); python3-markdown non serve.
-RECOMMENDS="gir1.2-spelling-1, gir1.2-gtksource-5, hunspell-it, hunspell-en-gb"
+RECOMMENDS="gir1.2-spelling-1, gir1.2-gtksource-5, hunspell-it, hunspell-en-gb, ruscavosk-engine, ruscawhisper-engine (>= ${VER}), ruscapiper-engine, pipewire-bin, ffmpeg"
 SUGGESTS="xdg-utils, hunspell-en-us"
 
 rm -rf "$OUT"
@@ -122,6 +145,13 @@ mkdir -p "${ROOT}/DEBIAN" \
 install -m 755 ruscamark.py "${ROOT}/usr/share/${APP}/ruscamark.py"
 install -m 644 rusca_markdown.py "${ROOT}/usr/share/${APP}/rusca_markdown.py"
 install -m 644 markdown_it_mark.py "${ROOT}/usr/share/${APP}/markdown_it_mark.py"   # componente esterno (MIT)
+for f in $VOICE_FILES pronunce.tsv; do
+    install -m 644 "$f" "${ROOT}/usr/share/${APP}/$f"
+done
+# Carattere del testo: Literata (componente esterno, SIL OFL 1.1), registrato
+# solo per RuscaMark: non si installa nelle cartelle dei caratteri di sistema.
+install -d "${ROOT}/usr/share/${APP}/fonts"
+install -m 644 fonts/Literata-*.ttf fonts/Literata-OFL.txt fonts/README.md "${ROOT}/usr/share/${APP}/fonts/"
 # Tema comune e icona accanto al programma (li cerca in /usr/share/ruscamark).
 install -m 644 style.css "${ROOT}/usr/share/${APP}/style.css"
 install -m 644 ruscamark.svg "${ROOT}/usr/share/${APP}/ruscamark.svg"
@@ -225,10 +255,25 @@ RuscaMark is a GNOME Markdown editor. Formatting is applied while you type,
 the page stays centred, spelling is checked live with local dictionaries,
 and documents can be exported to HTML and PDF. Everything is processed
 locally. If FILE is given, it is opened at start.
+Dictation writes what you say at the cursor (Ctrl+Shift+D), with Vosk
+(word by word) or Whisper (one sentence at a time, on the processor or on
+a graphics card through Vulkan); an audio or video file can be transcribed
+into a new document (Ctrl+Shift+O); Piper reads the document aloud
+(Ctrl+Shift+R). The engines are the separate packages ruscavosk-engine,
+ruscawhisper-engine and ruscapiper-engine.
 .SH FILES
 .TP
 .I ~/.config/ruscamark/config.json
 Preferences and window size.
+.TP
+.I ~/.local/share/ruscavosk/models/
+Vosk models (one folder each).
+.TP
+.I ~/.local/share/ruscawhisper/models/
+Whisper models (ggml .bin files).
+.TP
+.I ~/.local/share/ruscapiper/voices/
+Piper voices (.onnx and .onnx.json).
 .SH SEE ALSO
 /usr/share/doc/ruscamark/Manual_en.md
 .SH AUTHOR
@@ -255,6 +300,12 @@ License: GPL-3+
 Comment: Design, specifications and testing by the author; code written
  with the assistance of AI tools. See NOTA-IA.md in the RuscaLinux repository.
 
+Files: fonts/Literata-*.ttf
+Copyright: 2017 The Literata Project Authors (https://github.com/googlefonts/literata)
+License: OFL-1.1
+Comment: External component: Literata 3.103, the default text font, unmodified
+ static TTF files. Full license text in /usr/share/ruscamark/fonts/Literata-OFL.txt
+
 Files: markdown_it_mark.py
 Copyright: 2014-2015 Vitaly Puzrin, Alex Kocharin (markdown-it-mark)
  2020 ExecutableBookProject (markdown-it-py)
@@ -276,6 +327,10 @@ License: GPL-3+
  .
  On Debian systems, the complete text of the GNU General Public License
  version 3 can be found in "/usr/share/common-licenses/GPL-3".
+
+License: OFL-1.1
+ SIL Open Font License, Version 1.1. The complete text is installed next to
+ the font files, in /usr/share/ruscamark/fonts/Literata-OFL.txt.
 
 License: Expat
  Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -301,6 +356,13 @@ COPYRIGHT
 cat > "${ROOT}/usr/share/doc/${PKG}/changelog" <<CHANGELOG
 ${PKG} (${VER}) unstable; urgency=medium
 
+  * Carattere del testo predefinito: Literata (SIL OFL 1.1, incluso), per
+    l'editor, l'anteprima, il PDF e il tema di export predefinito.
+  * Voce: dettatura con Vosk (in tempo reale) o Whisper (a frasi, su
+    processore o scheda grafica Vulkan, con la scelta della scheda);
+    «Importa da audio» trascrive un file audio o video in un documento
+    Markdown; «Leggi ad alta voce» con Piper. Pagina «Voce» nelle
+    Preferenze.
   * Interfaccia portata su libadwaita secondo le linee guida GNOME e il
     tema comune RuscaLinux (style.css); colori di editor e anteprima dalla
     palette ufficiale, stile chiaro/scuro che segue il sistema.
@@ -385,7 +447,10 @@ SIZE_KB=$(du -sk "${ROOT}/usr" | cut -f1)
     echo " RuscaLinux, controllo ortografico live con suggerimenti nel menu"
     echo " contestuale (libspelling / GSpell 2), interfaccia in $(echo $LANGS | wc -w) lingue"
     echo " ufficiali di RuscaLinux, obiettivo parole, Trova/Sostituisci, export"
-    echo " HTML e PDF. Tutta l'elaborazione avviene in locale."
+    echo " HTML e PDF, nel carattere Literata. Dettatura con Vosk o Whisper"
+    echo " (processore o scheda grafica Vulkan), trascrizione di file audio e"
+    echo " video in Markdown, lettura ad alta voce con Piper. Tutta"
+    echo " l'elaborazione avviene in locale."
 } > "${ROOT}/DEBIAN/control"
 
 # ---- validazioni opzionali (non bloccanti) -----------------------------------

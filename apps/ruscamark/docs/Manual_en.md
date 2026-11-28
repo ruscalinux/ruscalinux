@@ -42,6 +42,9 @@ Recommended packages (installed automatically by `apt` when available):
 | `gir1.2-gtksource-5` | Advanced editor: undo/redo, highlighted search |
 | `gir1.2-spelling-1` | Live spell checking |
 | `hunspell-it`, `hunspell-en-gb` | Italian and British English dictionaries |
+| `ruscavosk-engine`, `ruscawhisper-engine` | Dictation and transcription of audio files (section 12) |
+| `ruscapiper-engine` | Reading aloud |
+| `pipewire-bin`, `ffmpeg` | Microphone and playback; reading audio and video files |
 
 For other languages install the matching dictionary, for example `hunspell-fr` or `hunspell-de-de`.
 
@@ -60,11 +63,13 @@ You can also drag a `.md` file into the window.
 
 ## 3. The window
 
-- **Header bar**: New and Open on the left; preview, Save and the main menu on the right. The main menu also holds export, live rendering, spell checking, full screen, formatting, search, word goal, Preferences, Keyboard Shortcuts and About.
+- **Header bar**: New and Open on the left; the dictation microphone, preview, Save and the main menu on the right. The main menu also holds Import from Audio, export, live rendering, spell checking, full screen, formatting, search, word goal, dictation, Read Aloud, Preferences, Keyboard Shortcuts and About.
+- **Typeface**: the text is set in **Literata**, a typeface designed for long reading on screen that also prints well; it is included with RuscaMark and also used in the PDF. You can choose another one in Preferences.
 - **Light or dark style**: RuscaMark follows the GNOME setting; in Preferences you can also force the light or the dark style.
 - **Writing page**: the text sits in a centred column whose width is set in Preferences (68 characters by default). The margins are recalculated whenever you resize, maximise or full-screen the window, and when you open the preview.
 - **Status bar**: words, characters and lines, cursor position and word goal.
 - **Spelling bar**: appears below the text when spell checking is on.
+- **Voice bar**: appears above the status bar during dictation and reading aloud, with the **Stop** button (section 12).
 
 ## 4. Two ways to view your text
 
@@ -236,6 +241,9 @@ Tip: save the document before inserting images, so paths are relative and the do
 | Ctrl+Shift+I | Image |
 | Ctrl+Shift+T | Insert or align table |
 | Ctrl+1 … Ctrl+6, Ctrl+0 | Heading level / normal text |
+| Ctrl+Shift+D | Dictation on/off |
+| Ctrl+Shift+R | Read aloud / stop reading |
+| Ctrl+Shift+O | Import from audio |
 | Ctrl+W | Close the window |
 | Ctrl+Q | Quit |
 
@@ -270,10 +278,10 @@ PDF and HTML share the **same style**, whatever the editor's light or dark style
 
 | Theme | Look |
 |---|---|
-| **RuscaLinux – Guide** (default) | The style of the RuscaLinux OS Apps reference guides: level-1 heading in a **banner** with a pink-to-plum gradient, plum level-2 headings with a pink rule, code on dark plum with a pink bar, tables with a plum header, DejaVu Sans. |
+| **RuscaLinux – Guide** (default) | The style of the RuscaLinux OS Apps reference guides: level-1 heading in a **banner** with a pink-to-plum gradient, plum level-2 headings with a pink rule, code on dark plum with a pink bar, tables with a plum header, text in Literata. |
 | **Neutral** | Plain greys: heading with a rule, code on light grey, blue links. Prints well in black and white too. |
 | **RuscaLinux – Strip** | The RuscaLinux palette, lighter: a gradient strip at the top of the first page, plum heading without a box, code on dark plum, split footer (title on the left, pages on the right). |
-| **Classic** | A serif typeface (Noto Serif or DejaVu Serif) and sepia tones, like a book. |
+| **Classic** | A serif typeface (Literata) and sepia tones, like a book. |
 | **Sea** | Blues, with the gradient heading banner. |
 
 In every theme the paragraph right after the main heading is an introduction in a larger size, inline code is a coloured "pill", tables span the full width with alternating rows, and every page ends with the footer "*title* - page *N* / *total*", where the title is the first level-1 heading (or the file name). There is no reference to the program or the website.
@@ -319,14 +327,70 @@ The main variables: text and heading colours (`--fg`, `--title`, `--h3`, `--link
 
 HTML written inside the Markdown (for example `<br>` or `<div>`) is not executed but shown as text: this is a safety choice.
 
-## 12. Preferences
+## 12. Voice: dictation, transcription and reading aloud
 
-Main menu → **Preferences…** (Ctrl+,). Every change applies immediately.
+RuscaMark writes what you say, turns an audio or video file into a document and reads aloud. It uses the engines of the RuscaLinux OS Apps, which are separate packages: **ruscavosk-engine** (Vosk), **ruscawhisper-engine** (whisper.cpp) and **ruscapiper-engine** (Piper). If one is missing, RuscaMark says so when it is needed and in Preferences → Voice. Models and voices are not in the packages: copy them into the folders shown below; each one has its own licence, which must be respected.
+
+### Dictation
+
+Press the **microphone** in the header bar (**Ctrl+Shift+D**) and speak: the text appears at the cursor and, if there is a selection, replaces it. The voice bar appears above the status bar, with the microphone level, the state and, with Vosk, the words being recognised. **Stop** (or Ctrl+Shift+D again) stops listening. Each sentence enters the text in a single step, which Ctrl+Z undoes.
+
+Choose the engine in Preferences → Voice → *Engine*:
+
+| | Vosk | Whisper |
+|---|---|---|
+| How it writes | Word by word while you speak; the sentence enters the text after a one-second pause | One sentence at a time, after each pause of about 0.7 seconds |
+| Punctuation and capitals | You say them (see below) | It writes them itself |
+| Accuracy | Good | Very good |
+| Where it runs | Always on the processor | On the processor or on the graphics card (Vulkan) |
+| Models | Folders in `~/.local/share/ruscavosk/models/`, for example `vosk-model-en-us-0.22` or `vosk-model-small-en-us-0.15` | `.bin` files in `~/.local/share/ruscawhisper/models/`, for example `ggml-large-v3-turbo.bin` |
+
+With Whisper each sentence starts the engine, which reloads the model: on the graphics card a large model answers in a couple of seconds; for dictating on the processor a small model such as `ggml-small.bin` is better. Whisper also receives the last words already written, so it keeps the same style and punctuation.
+
+**Punctuation by voice (Vosk only).** Vosk writes words, not signs: in English and Italian these words become signs.
+
+| You say | It writes |
+|---|---|
+| comma · full stop / period · colon · semicolon | `,` `.` `:` `;` |
+| question mark · exclamation mark / exclamation point | `?` `!` |
+| new line · new paragraph | a new line · an empty line |
+| open parenthesis · close parenthesis | `(` `)` |
+| open quote · close quote | `“` `”` |
+
+In Italian: *virgola, punto, due punti, punto e virgola, punto interrogativo, punto esclamativo, a capo, nuovo paragrafo, apri/chiudi parentesi, apri/chiudi virgolette*. After a full stop, question mark, exclamation mark or new line the next word gets a capital letter. A command always counts, even inside a sentence: "the period of" becomes "the. Of". If that happens often, turn off *Punctuation by voice* or use Whisper.
+
+Speech is text: if you say something Markdown would read as formatting (an asterisk, "1." at the start of a line), RuscaMark protects it with a backslash, as RuscaTranscriber does.
+
+**Spoken language.** *Same as the document* (default) uses the language of the spelling dictionary; you can choose one of the 24 languages of the RuscaLinux OS Apps, or *Automatic* (Whisper only). With Vosk the model decides the language: RuscaMark uses the one chosen in Preferences or, with *Automatic choice*, the largest one for the spoken language.
+
+**Processor or graphics card (Whisper).** In Preferences → Voice → Whisper, *Run on* is *Processor (CPU)* (default) or *Graphics card (Vulkan)*. With the graphics card, *Card to use* offers *Automatic* and the computer's integrated and dedicated cards, with their memory: the choice is saved by name, and if the card is gone the engine decides. If a card's driver gives trouble, go back to the processor. Vosk and Piper always run on the processor.
+
+### Import from Audio
+
+Main menu → **Import from Audio…** (**Ctrl+Shift+O**): choose an audio or video file, in any format FFmpeg can read. The engine is the dictation engine. The resulting document has a heading with the file name and the text in paragraphs (a new one after a pause of at least two seconds); it is not saved yet, and Save proposes the same name as the file with `.md`. The open document is replaced: if it has unsaved changes, RuscaMark asks first. **Cancel** stops the work.
+
+- With *Same as the document* the language of a file is *Automatic*: audio in another language, transcribed as if it were English, would become invented text.
+- With Vosk each sentence gets a capital letter and a final full stop. For long files Whisper is more accurate.
+- If the Whisper models include the speech detection model `ggml-silero-v6.2.0.bin`, Whisper transcribes only the parts with a voice, as in RuscaTranscriber.
+
+### Read Aloud
+
+Main menu → **Read Aloud** (**Ctrl+Shift+R**) reads the selection, or the document from the cursor's paragraph to the end. The same command, or **Stop**, interrupts it. The text is read as in the preview: no markers, the text of links and not the address, formulas as symbols; code blocks and footnotes are skipped (code blocks can be read, from Preferences).
+
+- Piper voices are pairs `name.onnx` and `name.onnx.json` in `~/.local/share/ruscapiper/voices/` (the same as RuscaLLisse). With *Automatic choice* RuscaMark uses the voice of the document's language. Speed goes from 0.7 to 1.3.
+- Preferences show the voice licence, if its MODEL_CARD file states it. Many Piper voices derive from the English "lessac" voice, distributed for non-commercial research only: for public or commercial use choose a voice with a verified free licence.
+- The stress corrections of RuscaLLisse's pronunciation lexicon (`~/.local/share/ruscallisse/pronunce.tsv`) apply here too.
+
+While RuscaMark reads, dictation stays off (the microphone would hear the voice), and vice versa.
+
+## 13. Preferences
+
+Main menu → **Preferences…** (Ctrl+,). Every change applies immediately. Preferences have two pages: **General** and **Voice**.
 
 | Group | Option | Effect |
 |---|---|---|
 | Appearance | Style | *Follow System* (default), *Light* or *Dark*. |
-| Appearance | System font and Size | Typeface of the editor and the preview. |
+| Appearance | Text font and Size | Typeface of the editor and the preview: Literata (default, at the top of the list) or one of the installed typefaces. The typeface of the PDF and HTML is the theme's (section 11). |
 | Appearance | Line spacing | *Compact*, *Normal* (default) or *Airy*: the space between lines in the editor and the preview, in proportion to the font size (1.25 – 1.5 – 1.75 times). Code blocks and tables stay compact. |
 | Writing | Live rendering of formatting | Same as Ctrl+L. |
 | Writing | Centred page | When on, text stays in a centred column; when off it uses the full width and a vertical guide line marks the page width. |
@@ -334,16 +398,20 @@ Main menu → **Preferences…** (Ctrl+,). Every change applies immediately.
 | Export | PDF and HTML theme | Colours, typefaces and headings of exports and preview: see section 11. |
 | Export | Personal themes | *Open Folder* opens `~/.local/share/ruscamark/themes/`, where your own `.css` themes go. |
 | Export | Embed images in HTML export | See section 11. |
+| Voice → Dictation | Engine, Spoken language, Punctuation by voice | See section 12. |
+| Voice → Vosk | Model, Models folder | *Automatic choice* uses the largest model for the spoken language. |
+| Voice → Whisper | Model, Run on, Card to use, Models folder | Processor or graphics card (Vulkan) and which card: see section 12. |
+| Voice → Read aloud | Voice, Voice licence, Speed, Read code blocks too, Voices folder | See section 12. |
 
 Side margins adapt to the window: in narrow windows they are at least 4% of the width (16 to 48 pixels); in wide windows the free space is split evenly between both sides.
 
-## 13. Interface languages
+## 14. Interface languages
 
 English, Simplified Chinese, Spanish, Hindi, Arabic, Brazilian Portuguese, Russian, Japanese, German, French, Italian, Korean, Indonesian, Turkish and Polish. RuscaMark always uses the system language; to change it, use GNOME Settings → System → Region & Language. With Arabic the whole interface switches to right-to-left.
 
 Translations are JSON files in `/usr/share/ruscamark/lang/`. To fix or customise a translation, copy the file to `~/.config/ruscamark/lang/` and edit it: your copy takes precedence. Any missing phrase is shown in English.
 
-## 14. Files and folders
+## 15. Files and folders
 
 | Path | Contents |
 |---|---|
@@ -353,10 +421,15 @@ Translations are JSON files in `/usr/share/ruscamark/lang/`. To fix or customise
 | `~/.local/share/gtksourceview-5/styles/` | Pink and plum editor colour schemes |
 | `~/.config/enchant/<language>.dic` | Personal dictionary (including elision fragments) |
 | `~/.config/enchant/<language>.dic.ruscamark-added` | List of the fragments added by RuscaMark, so your own words are never touched |
+| `~/.local/share/ruscavosk/models/` | Vosk models (one folder per model; also `/usr/share/ruscavosk/models/`) |
+| `~/.local/share/ruscawhisper/models/` | Whisper models, `.bin` files (also `/usr/share/ruscawhisper/models/`) |
+| `~/.local/share/ruscapiper/voices/` | Piper voices, `.onnx` and `.onnx.json` (also `/usr/share/ruscapiper/voices/`) |
+| `~/.cache/ruscamark/trascrizione/` | Working files of a Whisper transcription, deleted at the end and at every start |
+| `$XDG_RUNTIME_DIR/ruscamark/` | A sentence dictated with Whisper, in memory, deleted as soon as it is read |
 
 To restore the default settings, close RuscaMark and delete `config.json`.
 
-## 15. Privacy and security
+## 16. Privacy and security
 
 | Principle | How RuscaMark follows it |
 |---|---|
@@ -375,7 +448,15 @@ RuscaMark contains no code that connects to the network. In particular:
 
 - the preview shows only images stored on your computer; those with an `https://…` address are not downloaded and a notice is shown instead;
 - spell checking uses only the installed dictionaries (hunspell); your text never leaves your computer;
-- in the About window, the "Website", "Support" and "License" rows open your browser or mail program, and only when you choose them.
+- in the About window, the "Website", "Support" and "License" rows open your browser or mail program, and only when you choose them;
+- dictation, transcription and reading aloud run on your computer, with the engines of the RuscaLinux OS Apps, which open no connections or ports.
+
+### Microphone and audio
+
+- The microphone opens only when you turn dictation on, and the voice bar shows it for as long as it stays open.
+- With Vosk the microphone audio passes through memory only and is never written to disk.
+- Whisper reads a file: each dictated sentence becomes a short WAV file in a private session folder (`$XDG_RUNTIME_DIR/ruscamark/`, usually in memory), deleted as soon as it is read. Transcribing a file uses `~/.cache/ruscamark/trascrizione/`, which is emptied at the end and at every start.
+- Neither the audio nor the dictated text is kept anywhere else: only what you save remains.
 
 Exported HTML is an ordinary file: if the document contains remote images, the **browser** that opens the HTML will download them. For a fully self-contained file, use local images and turn on "Embed images in HTML export".
 
@@ -387,7 +468,7 @@ Exported HTML is an ordinary file: if the document contains remote images, the *
 
 ### Files written to your computer
 
-RuscaMark writes only the documents you save or export, plus the configuration files listed in section 14, all inside your home folder. It does not modify system files. In the personal dictionary it adds only the Italian and French elision fragments, keeping a separate list of them so the words you added yourself are never altered.
+RuscaMark writes only the documents you save or export, plus the configuration files listed in section 15, all inside your home folder. It does not modify system files. In the personal dictionary it adds only the Italian and French elision fragments, keeping a separate list of them so the words you added yourself are never altered.
 
 ### Package integrity
 
@@ -401,13 +482,13 @@ sha256sum -c SHA256SUMS
 
 ```bash
 sudo apt remove ruscamark
-rm -rf ~/.config/ruscamark
+rm -rf ~/.config/ruscamark ~/.cache/ruscamark
 rm -f ~/.local/share/gtksourceview-5/styles/ruscamark-*.xml
 ```
 
 The personal dictionary in `~/.config/enchant/` is shared with other programs: if you wish, delete any words you no longer need by hand.
 
-## 16. Troubleshooting
+## 17. Troubleshooting
 
 | Problem | Solution |
 |---|---|
@@ -419,13 +500,23 @@ The personal dictionary in `~/.config/enchant/` is shared with other programs: i
 | An image does not appear in the preview | Check the path: a relative path starts from the saved document's folder. Remote images are deliberately not shown. |
 | Table columns are misaligned | Put the cursor in the table and press Ctrl+Shift+T. |
 | A line with `---` under it becomes a heading | Leave a blank line before `---` to get a horizontal rule. |
+| Dictation does not start | Read the message: it says whether the engine (`ruscavosk-engine` or `ruscawhisper-engine`), the model or `pipewire-bin` is missing. Preferences → Voice shows what is there. |
+| The voice bar stays on "Listening" but writes nothing | Check the microphone in Settings → Sound. With Vosk the sentence enters after a one-second pause; with Whisper after about 0.7 seconds. |
+| Whisper is slow | Use a smaller model, or *Graphics card (Vulkan)* in Preferences → Voice. |
+| Whisper stops with an error on the graphics card | Choose another card in *Card to use*, or *Processor (CPU)*. |
+| Vosk writes "." instead of the word "period" | It is a voice command: turn off *Punctuation by voice* or use Whisper. |
+| Reading aloud does not start | Install `ruscapiper-engine` and copy a voice (`.onnx` with its `.onnx.json`) into the voices folder. |
 
 Support: info@ruscalinux.org
 
-## 17. License and development note
+## 18. License and development note
 
 RuscaMark is free software released under the GPL-3.0 license: <https://www.gnu.org/licenses/gpl-3.0.html>.
 
 The common Markdown engine includes an external component: the highlight rule `==text==`, a port of the [markdown-it-mark](https://github.com/markdown-it/markdown-it-mark) plugin (MIT license, © Vitaly Puzrin and Alex Kocharin; Python structure from markdown-it-py, © ExecutableBookProject), in its own file `markdown_it_mark.py`. It is also listed in the About window, under “External Components”.
+
+The text typeface is **Literata 3.103** (© The Literata Project Authors, <https://github.com/googlefonts/literata>), under the SIL Open Font License 1.1, which allows distribution together with GPL software: the font files are unmodified and the licence text is in `/usr/share/ruscamark/fonts/Literata-OFL.txt`. The licence allows embedding it in exported PDFs.
+
+Dictation, transcription and reading aloud use three engines that are separate packages, also listed under “External Components”: Vosk (Apache 2.0 licence, © Alpha Cephei Inc.), whisper.cpp (MIT licence, © The ggml authors) and Piper (GPL-3.0 licence, © Michael Hansen and the Piper authors).
 
 The note on the use of AI tools is in the program's About window and in the `NOTA-IA.md` file of the repository.

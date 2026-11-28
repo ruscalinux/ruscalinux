@@ -64,10 +64,11 @@ VER="1.99.3"                       # = VERSION in release.conf
 # giorni. Prima di pubblicare la ISO, prova RuscaTranscriber.
 GIORNI_MINIMI=14
 
-# Opzioni di whisper-cli usate da RuscaTranscriber (rusca_whisper.py). Se una
+# Opzioni di whisper-cli usate da RuscaTranscriber (rusca_whisper.py) e dalla
+# dettatura di RuscaMark (rusca_voice.py, che aggiunge --prompt). Se una
 # release non ne riconosce una, il motore non partirebbe: la build si ferma.
 # Aggiornare l'elenco quando il programma comincia a usare un'opzione nuova.
-OPZIONI_USATE="-m -f -l -t -oj -of -pp -ng -sns --vad -vm"
+OPZIONI_USATE="-m -f -l -t -oj -of -pp -ng -sns --vad -vm --prompt"
 
 # File di examples/ (la cartella da cui si compilano whisper-cli e
 # whisper-bench). I primi sono di whisper.cpp; i secondi sono librerie di

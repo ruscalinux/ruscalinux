@@ -65,7 +65,9 @@
   /* Piè di pagina */
   --footer-align: center;   /* center: «titolo - pag. N / M» | split: titolo a sinistra, N / M a destra */
 
-  /* Caratteri */
-  --font: "DejaVu Sans", "Verdana", "Bitstream Vera Sans";
+  /* Caratteri. Literata è inclusa in RuscaMark (fonts/, SIL OFL 1.1) e si
+     incorpora nel PDF; nell'export HTML vale se chi legge l'ha installata,
+     altrimenti si usa la famiglia seguente. */
+  --font: "Literata", "DejaVu Serif", "Georgia";
   --mono: "DejaVu Sans Mono", "Bitstream Vera Sans Mono";
 }

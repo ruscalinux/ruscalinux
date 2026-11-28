@@ -24,6 +24,7 @@ import json
 import html
 import signal
 import shutil
+import threading
 import base64
 import mimetypes
 import unicodedata
@@ -77,6 +78,15 @@ if SPELL_BACKEND is None:
     except Exception:
         Gspell = None
 HAVE_SPELL = SPELL_BACKEND is not None
+# Voce: dettatura (Vosk o Whisper), trascrizione di file audio e lettura ad
+# alta voce (Piper). I motori sono pacchetti a parte, raccomandati: senza,
+# i comandi restano e dicono che cosa installare.
+try:
+    import rusca_voice as voice
+    import speech_text as speech_lexicon
+except ImportError:                     # file mancanti: niente voce
+    voice = None
+    speech_lexicon = None
 HAS_FILEDIALOG = hasattr(Gtk, "FileDialog")
 # ----------------------------------------------------------------------------
 # i18n integrato (ex i18n.py): le lingue delle RuscaLinux OS Apps (specifiche,
@@ -197,7 +207,77 @@ _BUILTIN_STRINGS = {
         'spacing_compact': 'Compact',
         'spacing_normal': 'Normal',
         'spacing_airy': 'Airy',
-        'pref_font': 'System font',
+        'pref_font': 'Text font',
+        'mi_import_audio': 'Import from Audio…',
+        'mi_dictate': 'Dictation',
+        'mi_read_aloud': 'Read Aloud',
+        'tip_dictate': 'Dictation (Ctrl+Shift+D)',
+        'btn_stop': 'Stop',
+        'sc_group_voice': 'Voice',
+        'voice_starting': 'Starting…',
+        'voice_loading': 'Loading the model…',
+        'voice_listening': 'Listening',
+        'voice_writing': 'Writing…',
+        'voice_reading': 'Reading aloud',
+        'read_nothing': 'Nothing to read here',
+        'filter_audio': 'Audio and video',
+        'import_title': 'Transcription',
+        'import_body': '{name}\nwith {engine}. The text becomes a new document, to be saved.',
+        'import_stage_audio': 'Reading the audio…',
+        'import_stage_model': 'Loading the model…',
+        'import_stage_speech': 'Recognising speech…',
+        'import_done': 'Transcription complete: remember to save it',
+        'pref_page_general': 'General',
+        'pref_page_voice': 'Voice',
+        'pref_group_dictation': 'Dictation',
+        'pref_dictation_desc': 'Speak and RuscaMark writes at the cursor (Ctrl+Shift+D). The same engine turns audio and video files into documents (main menu → Import from Audio).',
+        'pref_voice_engine': 'Engine',
+        'engine_vosk': 'Vosk — real time',
+        'engine_whisper': 'Whisper — by sentence',
+        'pref_voice_lang': 'Spoken language',
+        'pref_voice_lang_sub': 'For audio files, “Same as the document” means automatic',
+        'voice_lang_doc': 'Same as the document',
+        'voice_lang_auto': 'Automatic (Whisper only)',
+        'pref_voice_commands': 'Punctuation by voice',
+        'pref_voice_commands_sub': 'Vosk only, in English and Italian: say “comma”, “full stop”, “new line”, “new paragraph”',
+        'pref_vosk_desc': 'Recognises while you speak. It always runs on the processor.',
+        'pref_whisper_desc': 'Writes each sentence after a pause, with punctuation. Much faster on the graphics card.',
+        'pref_model': 'Model',
+        'model_auto': 'Automatic choice',
+        'no_models': 'No model found: copy one into the models folder',
+        'pref_models_folder': 'Models folder',
+        'pref_processor': 'Run on',
+        'proc_cpu': 'Processor (CPU)',
+        'proc_vulkan': 'Graphics card (Vulkan)',
+        'gpu_device': 'Card to use',
+        'gpu_device_auto': 'Automatic',
+        'pref_group_reading': 'Read aloud',
+        'pref_reading_desc': 'Piper reads the selection, or the document from the cursor onwards (Ctrl+Shift+R). It runs on the processor.',
+        'pref_tts_voice': 'Voice',
+        'no_voices': 'No voice found: copy one into the voices folder',
+        'pref_tts_licence': 'Voice licence',
+        'licence_unknown': 'Licence not stated',
+        'pref_tts_speed': 'Speed',
+        'pref_tts_code': 'Read code blocks too',
+        'pref_voices_folder': 'Voices folder',
+        'err_voice_missing': 'The voice modules of RuscaMark are missing: reinstall the package.',
+        'err_voice_internal': 'The voice stopped because of an unexpected error.',
+        'err_no_mic': "PipeWire's recorder (pw-record) is missing: install pipewire-bin.",
+        'err_mic': 'The microphone does not answer: check it in Settings → Sound.',
+        'err_no_vosk': 'ruscavosk-engine is not installed: install it to dictate with Vosk.',
+        'err_no_vosk_model': 'No Vosk model: copy one into the folder shown in Preferences → Voice.',
+        'err_vosk_model': 'The Vosk model cannot be opened: it may be incomplete.',
+        'err_no_whisper': 'ruscawhisper-engine is not installed: install it to use Whisper.',
+        'err_no_whisper_model': 'No Whisper model: copy one into the folder shown in Preferences → Voice.',
+        'err_whisper_start': 'Whisper did not start',
+        'err_whisper': 'Speech recognition stopped with an error. If it happens on the graphics card, try the processor.',
+        'err_no_ffmpeg': 'FFmpeg is not installed: it is needed to read audio and video files.',
+        'err_audio': 'The audio of the file cannot be read',
+        'err_no_piper': 'ruscapiper-engine is not installed: install it to read aloud.',
+        'err_no_voice': 'No Piper voice: copy one (.onnx and .onnx.json) into the folder shown in Preferences → Voice.',
+        'err_voice_load': 'The voice cannot be loaded',
+        'err_play': 'Audio playback does not work (pw-play)',
+        'err_voice': 'The voice could not say a sentence',
         'pref_size': 'Size',
         'btn_cancel': 'Cancel',
         'btn_ok': 'OK',
@@ -354,7 +434,77 @@ _BUILTIN_STRINGS = {
         'spacing_compact': 'Compatta',
         'spacing_normal': 'Normale',
         'spacing_airy': 'Ariosa',
-        'pref_font': 'Font di sistema',
+        'pref_font': 'Carattere del testo',
+        'mi_import_audio': 'Importa da audio…',
+        'mi_dictate': 'Dettatura',
+        'mi_read_aloud': 'Leggi ad alta voce',
+        'tip_dictate': 'Dettatura (Ctrl+Maiusc+D)',
+        'btn_stop': 'Ferma',
+        'sc_group_voice': 'Voce',
+        'voice_starting': 'Avvio…',
+        'voice_loading': 'Caricamento del modello…',
+        'voice_listening': 'In ascolto',
+        'voice_writing': 'Sto scrivendo…',
+        'voice_reading': 'Lettura ad alta voce',
+        'read_nothing': 'Non c’è niente da leggere',
+        'filter_audio': 'Audio e video',
+        'import_title': 'Trascrizione',
+        'import_body': '{name}\ncon {engine}. Il testo diventa un nuovo documento, da salvare.',
+        'import_stage_audio': 'Lettura dell’audio…',
+        'import_stage_model': 'Caricamento del modello…',
+        'import_stage_speech': 'Riconoscimento del parlato…',
+        'import_done': 'Trascrizione completata: ricordati di salvarla',
+        'pref_page_general': 'Generale',
+        'pref_page_voice': 'Voce',
+        'pref_group_dictation': 'Dettatura',
+        'pref_dictation_desc': 'Parla e RuscaMark scrive dove c’è il cursore (Ctrl+Maiusc+D). Lo stesso motore trasforma i file audio e video in documenti (menu principale → Importa da audio).',
+        'pref_voice_engine': 'Motore',
+        'engine_vosk': 'Vosk — in tempo reale',
+        'engine_whisper': 'Whisper — a frasi',
+        'pref_voice_lang': 'Lingua parlata',
+        'pref_voice_lang_sub': 'Per i file audio «Come il documento» vale «Automatica»',
+        'voice_lang_doc': 'Come il documento',
+        'voice_lang_auto': 'Automatica (solo Whisper)',
+        'pref_voice_commands': 'Punteggiatura a voce',
+        'pref_voice_commands_sub': 'Solo Vosk, in italiano e in inglese: di’ «virgola», «punto», «a capo», «nuovo paragrafo»',
+        'pref_vosk_desc': 'Riconosce mentre parli. Lavora sempre sul processore.',
+        'pref_whisper_desc': 'Scrive ogni frase dopo una pausa, con la punteggiatura. Molto più veloce sulla scheda grafica.',
+        'pref_model': 'Modello',
+        'model_auto': 'Scelta automatica',
+        'no_models': 'Nessun modello: copiane uno nella cartella dei modelli',
+        'pref_models_folder': 'Cartella dei modelli',
+        'pref_processor': 'Esegui su',
+        'proc_cpu': 'Processore (CPU)',
+        'proc_vulkan': 'Scheda grafica (Vulkan)',
+        'gpu_device': 'Scheda da usare',
+        'gpu_device_auto': 'Automatica',
+        'pref_group_reading': 'Lettura ad alta voce',
+        'pref_reading_desc': 'Piper legge la selezione, o il documento dal cursore in poi (Ctrl+Maiusc+R). Lavora sul processore.',
+        'pref_tts_voice': 'Voce',
+        'no_voices': 'Nessuna voce: copiane una nella cartella delle voci',
+        'pref_tts_licence': 'Licenza della voce',
+        'licence_unknown': 'Licenza non indicata',
+        'pref_tts_speed': 'Velocità',
+        'pref_tts_code': 'Leggi anche i blocchi di codice',
+        'pref_voices_folder': 'Cartella delle voci',
+        'err_voice_missing': 'Mancano i moduli della voce di RuscaMark: reinstalla il pacchetto.',
+        'err_voice_internal': 'La voce si è fermata per un errore imprevisto.',
+        'err_no_mic': 'Manca il registratore di PipeWire (pw-record): installa pipewire-bin.',
+        'err_mic': 'Il microfono non risponde: controllalo in Impostazioni → Audio.',
+        'err_no_vosk': 'ruscavosk-engine non è installato: installalo per dettare con Vosk.',
+        'err_no_vosk_model': 'Nessun modello Vosk: copiane uno nella cartella indicata in Preferenze → Voce.',
+        'err_vosk_model': 'Il modello Vosk non si apre: potrebbe essere incompleto.',
+        'err_no_whisper': 'ruscawhisper-engine non è installato: installalo per usare Whisper.',
+        'err_no_whisper_model': 'Nessun modello Whisper: copiane uno nella cartella indicata in Preferenze → Voce.',
+        'err_whisper_start': 'Whisper non è partito',
+        'err_whisper': 'Il riconoscimento vocale si è fermato con un errore. Se succede con la scheda grafica, prova il processore.',
+        'err_no_ffmpeg': 'FFmpeg non è installato: serve per leggere i file audio e video.',
+        'err_audio': 'Impossibile leggere l’audio del file',
+        'err_no_piper': 'ruscapiper-engine non è installato: installalo per leggere ad alta voce.',
+        'err_no_voice': 'Nessuna voce Piper: copiane una (.onnx e .onnx.json) nella cartella indicata in Preferenze → Voce.',
+        'err_voice_load': 'La voce non si carica',
+        'err_play': 'La riproduzione dell’audio non funziona (pw-play)',
+        'err_voice': 'La voce non è riuscita a dire una frase',
         'pref_size': 'Dimensione',
         'btn_cancel': 'Annulla',
         'btn_ok': 'OK',
@@ -554,9 +704,16 @@ CONFIG_DIR  = os.path.join(GLib.get_user_config_dir(), "ruscamark")
 STYLES_DIR  = os.path.join(GLib.get_user_data_dir(), "gtksourceview-5", "styles")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
 OLD_CONFIG_FILE = os.path.join(GLib.get_user_config_dir(), "ruscaeditor", "config.json")
+# Carattere del testo predefinito: Literata (SIL Open Font License 1.1),
+# incluso in fonts/ e registrato solo per RuscaMark (register_bundled_fonts()).
+# Pensato per la lettura lunga sullo schermo, regge bene la stampa.
+TEXT_FONT = "Literata"
+FONT_FILES = ("Literata-Regular.ttf", "Literata-Italic.ttf",
+              "Literata-Bold.ttf", "Literata-BoldItalic.ttf")
+FONT_DIRS = (os.path.join(_PROGRAM_DIR, "fonts"), "/usr/share/ruscamark/fonts")
 DEFAULT_CONFIG = {
     # Stile: "system" segue GNOME, "light"/"dark" lo forzano.
-    "style": "system", "font": "Sans", "font_size": 13,
+    "style": "system", "font": TEXT_FONT, "font_size": 13,
     "goal": 0, "lang": "it_IT", "show_preview": False,
     "live": True, "center_page": True, "page_chars": 80,
     "line_spacing": "normal",      # interlinea dell'editor: compact | normal | airy
@@ -565,6 +722,15 @@ DEFAULT_CONFIG = {
     "spell_on": True,              # persiste lo stato del controllo ortografico
     "spell_panel_hidden": True,    # primo avvio: pannello nascosto
     "win_w": 1240, "win_h": 800, "paned": 620,
+    # Voce (rusca_voice.py). Modelli e voce: "" = scelta automatica.
+    "voice_engine": "vosk",        # vosk (in tempo reale) | whisper (a frasi, più preciso)
+    "voice_lang": "doc",           # doc (lingua del documento) | auto | codice (it, en…)
+    "voice_commands": True,        # Vosk: «virgola», «punto», «a capo» diventano segni
+    "vosk_model": "", "whisper_model": "",
+    "voice_gpu": False,            # Whisper: False = processore, True = scheda grafica (Vulkan)
+    "voice_gpu_device": "",        # nome della scheda (rusca_whisper.list_devices()), "" = automatica
+    "tts_voice": "", "tts_speed": 1.0,
+    "tts_code": False,             # leggi anche i blocchi di codice
 }
 # ----------------------------------------------------------------------------
 # Colori di editor e anteprima, dalla palette ufficiale RuscaLinux
@@ -678,6 +844,11 @@ def load_config():
     cfg.pop("ui_lang", None)          # la lingua segue sempre il sistema
     if cfg.get("style") not in ("system", "light", "dark"):
         cfg["style"] = "system"
+    # Fino alla 1.99.3 il carattere predefinito era «Sans» e si salvava con
+    # le altre impostazioni anche se nessuno l'aveva scelto: chi non l'ha mai
+    # cambiato nelle Preferenze passa a Literata.
+    if not cfg.get("font_chosen") and cfg.get("font") == "Sans":
+        cfg["font"] = TEXT_FONT
     return cfg
 
 def save_config(cfg):
@@ -697,6 +868,40 @@ def ensure_style_schemes():
     except Exception:
         pass
 
+_FONTS_REGISTERED = None
+
+
+def register_bundled_fonts():
+    """Registra Literata (fonts/) per questo processo, senza installarla nel
+    sistema: fontconfig la offre a Pango come i caratteri installati, per
+    l'editor, l'anteprima e il PDF. Va chiamata prima che GTK crei la mappa
+    dei caratteri. True se il Regular è disponibile."""
+    global _FONTS_REGISTERED
+    if _FONTS_REGISTERED is not None:
+        return _FONTS_REGISTERED
+    folder = next((d for d in FONT_DIRS
+                   if os.path.isfile(os.path.join(d, FONT_FILES[0]))), None)
+    ok = False
+    if folder:
+        try:
+            import ctypes
+            try:
+                fc = ctypes.CDLL("libfontconfig.so.1")
+            except OSError:
+                fc = ctypes.CDLL("libfontconfig.so")
+            fc.FcConfigAppFontAddFile.restype = ctypes.c_int
+            fc.FcConfigAppFontAddFile.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
+            for i, name in enumerate(FONT_FILES):
+                path = os.path.join(folder, name)
+                if os.path.isfile(path):
+                    added = bool(fc.FcConfigAppFontAddFile(None, os.fsencode(path)))
+                    ok = ok or (i == 0 and added)
+        except (OSError, AttributeError):
+            ok = False
+    _FONTS_REGISTERED = ok
+    return ok
+
+
 def system_font_families():
     """Elenco font di sistema, compatibile con Pango nuovo e vecchio."""
     fm = None
@@ -708,11 +913,12 @@ def system_font_families():
         except Exception:
             fm = None
     if fm is None:
-        return ["Sans", "Serif", "Monospace"]
+        return [TEXT_FONT, "Sans", "Serif", "Monospace"]
     try:
-        return sorted({f.get_name() for f in fm.list_families()})
+        names = sorted({f.get_name() for f in fm.list_families()} - {TEXT_FONT})
+        return [TEXT_FONT] + names          # il predefinito in testa
     except Exception:
-        return ["Sans", "Serif", "Monospace"]
+        return [TEXT_FONT, "Sans", "Serif", "Monospace"]
 # ----------------------------------------------------------------------------
 # Markdown: analisi del motore comune (rusca_markdown.parser(), CommonMark
 # con le estensioni delle specifiche, sezione 1.2). MarkdownDoc trasforma il
@@ -1678,11 +1884,12 @@ class MarkdownDoc:
 # senza cartella themes/: lo stile delle guide di riferimento delle RuscaLinux
 # OS Apps. Banner del titolo con sfumatura rosa → prugna, titoli prugna con
 # filetto rosa, codice su fondo prugna scuro con barra rosa, citazioni su
-# rosa chiaro, tabelle con intestazione prugna e righe alternate,
-# DejaVu Sans / DejaVu Sans Mono (fonts-dejavu-core su Debian).
+# rosa chiaro, tabelle con intestazione prugna e righe alternate.
+# Testo in Literata (incluso in fonts/, comodo da leggere anche stampato),
+# codice in DejaVu Sans Mono (fonts-dejavu-core su Debian).
 # I colori sono fissi: l'export non dipende dal tema chiaro/scuro dell'editor.
 # ----------------------------------------------------------------------------
-GUIDE_FONT = "DejaVu Sans, Verdana, Bitstream Vera Sans"
+GUIDE_FONT = "Literata, DejaVu Serif, Georgia"
 GUIDE_MONO = "DejaVu Sans Mono, Bitstream Vera Sans Mono"
 GUIDE = {
     "page": "#FFFFFF", "fg": "#2B1027", "title": "#4A1238", "h3": "#6B2252",
@@ -1944,6 +2151,21 @@ def _css_string(s):
     return '"' + s.replace("<", "\\3C ").replace(">", "\\3E ") + '"'
 
 
+_SERIF_NAMES = {"literata", "georgia", "eb garamond", "times new roman", "liberation serif"}
+
+
+def _generic_family(families):
+    """La famiglia generica CSS di ripiego per un elenco di famiglie: quella
+    del primo nome che si riconosce (Literata e i «… Serif» → serif)."""
+    for name in families.split(","):
+        low = name.strip().strip("\"'").lower()
+        if "sans" in low or "mono" in low:
+            return "sans-serif"
+        if "serif" in low or low in _SERIF_NAMES:
+            return "serif"
+    return "sans-serif"
+
+
 def _css_fonts(families, generic):
     """font-family CSS da un elenco di famiglie del tema."""
     return ", ".join([f'"{f.strip()}"' for f in families.split(",") if f.strip()] + [generic])
@@ -1983,7 +2205,7 @@ def footer_text(title, page, pages, t=None):
 def _page_footer_css(title, theme, t=None):
     """Le regole del piè di pagina in @page: centrato («titolo - pag. N / M»)
     o diviso (titolo a sinistra, «N / M» a destra)."""
-    c, font = theme, _css_fonts(theme["font"], "sans-serif")
+    c, font = theme, _css_fonts(theme["font"], _generic_family(theme["font"]))
     style = f"font-family: {font}; font-size: 8pt; color: {c['footer']};"
     if theme.get("footer_align") == "split":
         return (f"  @bottom-left {{ content: {_css_string(title)}; {style} }}\n"
@@ -2004,7 +2226,7 @@ def markdown_to_html(text, title, lang="en", img_src=None, t=None, theme=None):
     body = MarkdownDoc(text).to_html(img_src=img_src, t=t)
     return HTML_TEMPLATE.format(
         lang=html.escape(lang), title=html.escape(title), body=body, c=th,
-        font=_css_fonts(th["font"], "sans-serif"), mono=_css_fonts(th["mono"], "monospace"),
+        font=_css_fonts(th["font"], _generic_family(th["font"])), mono=_css_fonts(th["mono"], "monospace"),
         page_footer=_page_footer_css(title, th, t),
         h1_css=_H1_CSS.get(th["h1_style"], _H1_CSS["banner"]).format(c=th),
         pre_border=_css_bar(th["pre_bar_width"], th["pre_bar"]),
@@ -2742,6 +2964,16 @@ COMPONENTS = (
     # Regola dell'evidenziato ==testo==, nel file a sé markdown_it_mark.py
     ("markdown-it-mark", "MIT — Vitaly Puzrin, Alex Kocharin; ExecutableBookProject",
      "https://github.com/markdown-it/markdown-it-mark"),
+    # Carattere del testo, in fonts/ con il testo della licenza
+    ("Literata 3.103", "SIL Open Font License 1.1 — The Literata Project Authors",
+     "https://github.com/googlefonts/literata"),
+    # Motori della voce: pacchetti a parte, senza interfaccia
+    ("Vosk (ruscavosk-engine)", "Apache 2.0 — Alpha Cephei Inc.",
+     "https://github.com/alphacep/vosk-api"),
+    ("whisper.cpp (ruscawhisper-engine)", "MIT — The ggml authors",
+     "https://github.com/ggml-org/whisper.cpp"),
+    ("Piper (ruscapiper-engine)", "GPL-3.0 — Michael Hansen, Piper authors",
+     "https://github.com/OHF-Voice/piper1-gpl"),
 )
 
 
@@ -2900,6 +3132,14 @@ class RuscaWindow(Adw.ApplicationWindow):
         self._gspell_view = None
         self._spell_on = False
         self._spell_combo_loading = False
+        # Voce (rusca_voice.py): si crea al primo uso.
+        self.dictation = None
+        self.reader = None
+        self._voice_mode = None          # None | "dictation" | "reading"
+        self._suggested_name = None      # nome proposto dopo «Importa da audio»
+        self._import_job = None          # trascrizione di un file in corso
+        if voice is not None:
+            voice.clean_work_dirs()
         self.set_default_size(self.cfg.get("win_w", 1240), self.cfg.get("win_h", 800))
         self.set_size_request(360, 294)
         self._build_actions()
@@ -2914,6 +3154,7 @@ class RuscaWindow(Adw.ApplicationWindow):
         if not self.cfg.get("spell_panel_hidden", True):
             self.spell_revealer.set_reveal_child(True)
         self._sync_spell_ui()
+        self._build_voice_bar()
         self._build_statusbar()
         self._setup_accels()
         self._apply_text_direction()
@@ -2976,6 +3217,10 @@ class RuscaWindow(Adw.ApplicationWindow):
         plain("insert-link", self._insert_link)
         plain("insert-image", self._action_insert_image)
         plain("insert-table", self._table_action)
+        self.dictate_action = stateful("dictate", False, self._set_dictation)
+        plain("read-aloud", self._action_read_aloud)
+        plain("stop-voice", self._stop_voice)
+        plain("import-audio", self._action_import_audio)
         hd = Gio.SimpleAction.new("heading", GLib.VariantType.new("i"))
         hd.connect("activate", lambda _a, v: self._set_heading(v.get_int32()))
         self.add_action(hd)
@@ -2992,6 +3237,8 @@ class RuscaWindow(Adw.ApplicationWindow):
             "win.fmt-bold": ["<Primary>b"], "win.fmt-italic": ["<Primary>i"],
             "win.insert-link": ["<Primary>k"], "win.insert-image": ["<Primary><Shift>i"],
             "win.insert-table": ["<Primary><Shift>t"],
+            "win.dictate": ["<Primary><Shift>d"], "win.read-aloud": ["<Primary><Shift>r"],
+            "win.import-audio": ["<Primary><Shift>o"],
             "app.quit": ["<Primary>q"], "window.close": ["<Primary>w"],
             "win.preferences": ["<Primary>comma"], "win.shortcuts": ["<Primary>question"],
         }
@@ -3028,6 +3275,11 @@ class RuscaWindow(Adw.ApplicationWindow):
         self.preview_btn.set_active(self.cfg.get("show_preview", False))
         self.preview_btn.connect("toggled", self._on_preview_btn)
         self.hb.pack_end(self.preview_btn)
+        # Dettatura: il microfono accanto all'anteprima (Ctrl+Maiusc+D).
+        self.mic_btn = Gtk.ToggleButton(icon_name="audio-input-microphone-symbolic",
+                                        action_name="win.dictate")
+        self._hdr_tips.append((self.mic_btn, "tip_dictate"))
+        self.hb.pack_end(self.mic_btn)
         self._retranslate_header()
         self.paned = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
         self.paned.set_wide_handle(True)
@@ -3136,6 +3388,7 @@ class RuscaWindow(Adw.ApplicationWindow):
         menu = Gio.Menu()
         s1 = Gio.Menu()
         s1.append(self.t("mi_save_as"), "win.save-as")
+        s1.append(self.t("mi_import_audio"), "win.import-audio")
         s1.append(self.t("mi_export_html"), "win.export-html")
         s1.append(self.t("mi_export_pdf"), "win.export-pdf")
         menu.append_section(None, s1)
@@ -3162,6 +3415,10 @@ class RuscaWindow(Adw.ApplicationWindow):
         s3.append(self.t("mi_replace"), "win.replace")
         s3.append(self.t("mi_goal"), "win.goal")
         menu.append_section(None, s3)
+        sv = Gio.Menu()
+        sv.append(self.t("mi_dictate"), "win.dictate")
+        sv.append(self.t("mi_read_aloud"), "win.read-aloud")
+        menu.append_section(None, sv)
         s4 = Gio.Menu()
         s4.append(self.t("mi_preferences"), "win.preferences")
         s4.append(self.t("shortcuts"), "win.shortcuts")
@@ -3210,7 +3467,7 @@ class RuscaWindow(Adw.ApplicationWindow):
         c = self._palette()
         defs = "\n".join(f"@define-color {k} {v};" for k, v in c.items())
         css = defs + "\n" + CSS_TEMPLATE
-        css = css.replace("__FONT__", self.cfg.get("font", "Sans"))
+        css = css.replace("__FONT__", self.cfg.get("font", TEXT_FONT))
         css = css.replace("__SIZE__", str(self.cfg.get("font_size", 13)))
         if not dark:
             g = self._export_theme()
@@ -4360,6 +4617,7 @@ class RuscaWindow(Adw.ApplicationWindow):
             return False
         self._set_buffer_text(text)
         self.current_path = path
+        self._suggested_name = None
         self.buffer.set_modified(False)
         self._update_title()
         self._schedule_refresh()
@@ -4369,7 +4627,7 @@ class RuscaWindow(Adw.ApplicationWindow):
         if self.current_path and not as_new:
             return self._write_file(self.current_path)
         base = os.path.basename(self.current_path) if self.current_path \
-            else self.t("default_name") + ".md"
+            else (self._suggested_name or self.t("default_name") + ".md")
         if HAS_FILEDIALOG:
             fd = Gtk.FileDialog()
             fd.set_title(self.t("mi_save"))
@@ -4433,6 +4691,7 @@ class RuscaWindow(Adw.ApplicationWindow):
     def _reset_doc(self):
         self._set_buffer_text("")
         self.current_path = None
+        self._suggested_name = None
         self.buffer.set_modified(False)
         self._update_title(); self._schedule_refresh()
 
@@ -4659,6 +4918,9 @@ class RuscaWindow(Adw.ApplicationWindow):
                                   (t("mi_heading_n", n="1–6"), "<Primary>1"),
                                   (t("mi_paragraph"), "<Primary>0"),
                                   (t("mi_find"), "<Primary>f"), (t("mi_replace"), "<Primary>h"))),
+            (t("sc_group_voice"), ((t("mi_dictate"), "<Primary><Shift>d"),
+                                   (t("mi_read_aloud"), "<Primary><Shift>r"),
+                                   (t("mi_import_audio"), "<Primary><Shift>o"))),
             (t("sc_group_view"), ((t("mi_preview"), "<Primary>p"), (t("mi_live"), "<Primary>l"),
                                   (t("mi_spell"), "F7"), (t("mi_fullscreen"), "F11"),
                                   (t("mi_preferences"), "<Primary>comma"),
@@ -4691,11 +4953,554 @@ class RuscaWindow(Adw.ApplicationWindow):
             pass
         return False
 
+    # ------------------------------------------------------- voce
+    # Dettatura, lettura ad alta voce e trascrizione di file audio: il
+    # lavoro è in rusca_voice.py; qui ci sono i comandi, la barra della voce
+    # sopra la barra di stato e la pagina «Voce» delle Preferenze.
+    def _build_voice_bar(self):
+        box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10,
+                      margin_start=12, margin_end=6, margin_top=4, margin_bottom=4)
+        self.voice_icon = Gtk.Image(icon_name="audio-input-microphone-symbolic")
+        box.append(self.voice_icon)
+        self.voice_level = Gtk.LevelBar(min_value=0.0, max_value=1.0, valign=Gtk.Align.CENTER)
+        self.voice_level.set_size_request(64, -1)
+        box.append(self.voice_level)
+        self.voice_status = Gtk.Label(xalign=0, ellipsize=Pango.EllipsizeMode.END)
+        box.append(self.voice_status)
+        # Il testo che Vosk sta riconoscendo: si accorcia a sinistra, così
+        # restano visibili le ultime parole.
+        self.voice_partial = Gtk.Label(xalign=0, hexpand=True,
+                                       ellipsize=Pango.EllipsizeMode.START)
+        attrs = Pango.AttrList()
+        attrs.insert(Pango.attr_style_new(Pango.Style.ITALIC))
+        self.voice_partial.set_attributes(attrs)
+        box.append(self.voice_partial)
+        self.voice_stop_btn = Gtk.Button(label=self.t("btn_stop"), valign=Gtk.Align.CENTER)
+        self.voice_stop_btn.connect("clicked", lambda *_: self._stop_voice())
+        box.append(self.voice_stop_btn)
+        self.voice_revealer = Gtk.Revealer(transition_type=Gtk.RevealerTransitionType.SLIDE_UP,
+                                           child=box)
+        self.toolbar.add_bottom_bar(self.voice_revealer)
+
+    def _show_voice_bar(self, mode, status, detail=""):
+        self._voice_mode = mode
+        self.voice_icon.set_from_icon_name("audio-input-microphone-symbolic" if mode == "dictation"
+                                           else "audio-speakers-symbolic")
+        self.voice_level.set_visible(mode == "dictation")
+        self.voice_level.set_value(0.0)
+        self.voice_status.set_label(f"{status} · {detail}" if detail else status)
+        self.voice_partial.set_label("")
+        self.voice_revealer.set_reveal_child(True)
+
+    def _hide_voice_bar(self, mode):
+        if self._voice_mode == mode:
+            self._voice_mode = None
+            self.voice_revealer.set_reveal_child(False)
+
+    def _stop_voice(self):
+        if self.dictation is not None and self.dictation.running:
+            self.dictate_action.change_state(GLib.Variant.new_boolean(False))
+        if self.reader is not None and self.reader.reading:
+            self.reader.stop()
+
+    def _voice_missing(self):
+        self._message(self.t("err_voice_missing"))
+
+    def _voice_error(self, error):
+        """Errore della voce: il messaggio tradotto e, sotto, il dettaglio
+        del motore (le ultime righe, per chi deve capire che cosa è successo)."""
+        key = getattr(error, "key", "err_voice_internal")
+        text = self.t(key)
+        if text == key:
+            text = self.t("err_voice_internal")
+        detail = (getattr(error, "detail", "") or "").strip()
+        self._message(text, detail[-600:] if detail else None)
+
+    def _voice_lang(self, for_file=False):
+        """Lingua del parlato: quella del documento (il dizionario
+        ortografico) se non è scelta. Per un file da trascrivere «come il
+        documento» vuol dire «Automatica»: un audio in un'altra lingua,
+        trascritto come se fosse nella lingua del documento, diventa un testo
+        inventato (specifiche, sezione 1.3)."""
+        choice = self.cfg.get("voice_lang", "doc")
+        if choice == "doc":
+            return "auto" if for_file else voice.base_language(self._current_lang())
+        return choice if choice == "auto" or choice in voice.SPEECH_LANGUAGES else "auto"
+
+    def _voice_options(self, for_file=False):
+        found = voice.status()
+        lang = self._voice_lang(for_file)
+        model_lang = "" if lang == "auto" else lang
+        return {
+            "vosk_model": voice.pick_vosk_model(found["vosk_models"],
+                                                self.cfg.get("vosk_model", ""), model_lang),
+            "whisper_model": voice.pick_whisper_model(found["whisper_models"],
+                                                      self.cfg.get("whisper_model", "")),
+            "language": lang,
+            "gpu": bool(self.cfg.get("voice_gpu", False)),
+            "gpu_device": self.cfg.get("voice_gpu_device", ""),
+            "threads": None,
+        }
+
+    def _text_before_cursor(self, chars):
+        buf = self.buffer
+        it = buf.get_iter_at_mark(buf.get_insert())
+        start = buf.get_iter_at_offset(max(0, it.get_offset() - chars))
+        return buf.get_text(start, it, True)
+
+    # Dettatura ----------------------------------------------------------
+    def _set_dictation(self, on):
+        if not on:
+            if self.dictation is not None:
+                self.dictation.stop()
+            return
+        if voice is None:
+            self.dictate_action.set_state(GLib.Variant.new_boolean(False))
+            self._voice_missing()
+            return
+        if self.reader is not None and self.reader.reading:
+            self.reader.stop()          # il microfono sentirebbe la voce
+        if self.dictation is None:
+            self.dictation = voice.Dictation(
+                on_state=self._on_dictation_state, on_partial=self._on_dictation_partial,
+                on_text=self._on_dictation_text,
+                on_level=lambda x: self.voice_level.set_value(x),
+                on_error=self._on_dictation_error)
+        engine = self.cfg.get("voice_engine", "vosk")
+        if engine not in voice.ENGINES:
+            engine = "vosk"
+        opts = self._voice_options()
+        self.dictation.prompt = self._text_before_cursor(voice.PROMPT_CHARS) \
+            if engine == "whisper" else ""
+        try:
+            self.dictation.start(engine, opts)
+        except voice.VoiceError as e:
+            self.dictate_action.set_state(GLib.Variant.new_boolean(False))
+            self._voice_error(e)
+            return
+        model = opts["vosk_model" if engine == "vosk" else "whisper_model"]
+        where = ""
+        if engine == "whisper":
+            where = self.t("proc_vulkan") if opts["gpu"] else self.t("proc_cpu")
+        self._dictation_detail = " · ".join(p for p in (
+            "Vosk" if engine == "vosk" else "Whisper", voice.model_label(model), where) if p)
+        self._show_voice_bar("dictation", self.t("voice_starting"), self._dictation_detail)
+        self.view.grab_focus()
+
+    def _on_dictation_state(self, state):
+        if state == "stopped":
+            if self.dictate_action.get_state().get_boolean():
+                self.dictate_action.set_state(GLib.Variant.new_boolean(False))
+            self._hide_voice_bar("dictation")
+            return
+        if self._voice_mode != "dictation":
+            return
+        label = {"loading": "voice_loading", "listening": "voice_listening",
+                 "writing": "voice_writing"}.get(state, "voice_listening")
+        self.voice_status.set_label(f"{self.t(label)} · {self._dictation_detail}")
+
+    def _on_dictation_partial(self, text):
+        if self._voice_mode == "dictation":
+            self.voice_partial.set_label(text)
+
+    def _on_dictation_text(self, text):
+        engine = self.dictation.engine if self.dictation else "vosk"
+        lang = self._voice_lang()
+        buf = self.buffer
+        buf.begin_user_action()
+        buf.delete_selection(True, True)
+        out = voice.dictation_text(
+            text, self._text_before_cursor(400), "" if lang == "auto" else lang,
+            commands=engine == "vosk" and bool(self.cfg.get("voice_commands", True)))
+        if out:
+            buf.insert_at_cursor(out)
+        buf.end_user_action()
+        self.view.scroll_mark_onscreen(buf.get_insert())
+
+    def _on_dictation_error(self, error):
+        if self.dictate_action.get_state().get_boolean():
+            self.dictate_action.set_state(GLib.Variant.new_boolean(False))
+        self._voice_error(error)
+
+    # Lettura ad alta voce ---------------------------------------------
+    def _lexicon(self):
+        """Lessico delle pronunce: quello del pacchetto e quello dell'utente,
+        lo stesso di RuscaLLisse (la voce è la stessa)."""
+        system = next((p for p in (os.path.join(_PROGRAM_DIR, "pronunce.tsv"),
+                                   "/usr/share/ruscamark/pronunce.tsv") if os.path.isfile(p)), "")
+        user = os.path.join(GLib.get_user_data_dir(), "ruscallisse", "pronunce.tsv")
+        return speech_lexicon.load_lexicon(system, user)
+
+    def _action_read_aloud(self):
+        if voice is None:
+            self._voice_missing()
+            return
+        if self.reader is not None and self.reader.reading:
+            self.reader.stop()          # lo stesso comando la ferma
+            return
+        if self.dictation is not None and self.dictation.running:
+            self.dictate_action.change_state(GLib.Variant.new_boolean(False))
+        buf = self.buffer
+        if buf.get_has_selection():
+            start, end = buf.get_selection_bounds()
+        else:
+            # Dal paragrafo del cursore alla fine (all'apertura il cursore è
+            # in cima: tutto il documento).
+            start = buf.get_iter_at_mark(buf.get_insert())
+            start.set_line_offset(0)
+            end = buf.get_end_iter()
+        sentences = voice.reading_sentences(buf.get_text(start, end, True),
+                                            skip_code=not self.cfg.get("tts_code", False),
+                                            lexicon=self._lexicon())
+        if not sentences:
+            self.toasts.add_toast(Adw.Toast(title=self.t("read_nothing"), timeout=3))
+            return
+        voices = voice.status()["voices"]
+        chosen = voice.pick_voice(voices, self.cfg.get("tts_voice", ""),
+                                  voice.base_language(self._current_lang()))
+        if self.reader is None:
+            self.reader = voice.Reader(on_state=self._on_reader_state, on_error=self._voice_error)
+        self._reading_detail = "Piper · " + (voice.model_label(chosen)[:-5]
+                                             if chosen.endswith(".onnx") else chosen)
+        try:
+            self.reader.read(sentences, chosen, float(self.cfg.get("tts_speed", 1.0)))
+        except voice.VoiceError as e:
+            self._voice_error(e)
+
+    def _on_reader_state(self, state):
+        if state == "reading":
+            self._show_voice_bar("reading", self.t("voice_reading"), self._reading_detail)
+        else:
+            self._hide_voice_bar("reading")
+
+    # Importa da audio --------------------------------------------------
+    def _action_import_audio(self):
+        if voice is None:
+            self._voice_missing()
+            return
+
+        def proceed(ok):
+            if not ok:
+                return
+            media = Gtk.FileFilter()
+            media.set_name(self.t("filter_audio"))
+            for mime in ("audio/*", "video/*"):
+                media.add_mime_type(mime)
+            every = Gtk.FileFilter()
+            every.set_name(self.t("filter_all"))
+            every.add_pattern("*")
+            store = Gio.ListStore.new(Gtk.FileFilter)
+            store.append(media)
+            store.append(every)
+            fd = Gtk.FileDialog(title=self.t("mi_import_audio").rstrip("…"), filters=store)
+            fd.open(self, None, self._on_import_audio_chosen, None)
+        self._confirm_discard(proceed)
+
+    def _on_import_audio_chosen(self, fd, result, _user=None):
+        try:
+            gf = fd.open_finish(result)
+        except GLib.Error as e:
+            if not self._dismissed(e):
+                self._message(self.t("err_open", e=e.message))
+            return
+        if gf and gf.get_path():
+            self._start_import(gf.get_path())
+
+    def _start_import(self, path):
+        if self.dictation is not None and self.dictation.running:
+            self.dictate_action.change_state(GLib.Variant.new_boolean(False))
+        engine = self.cfg.get("voice_engine", "vosk")
+        if engine not in voice.ENGINES:
+            engine = "vosk"
+        opts = self._voice_options(for_file=True)
+        name = os.path.basename(path)
+        title = os.path.splitext(name)[0]
+        bar = Gtk.ProgressBar(show_text=True)
+        bar.set_text(self.t("import_stage_model"))
+        dlg = Adw.AlertDialog(heading=self.t("import_title"),
+                              body=self.t("import_body", name=name,
+                                          engine="Vosk" if engine == "vosk" else "Whisper"))
+        dlg.set_extra_child(bar)
+        dlg.add_response("cancel", self.t("btn_cancel"))
+        dlg.set_close_response("cancel")
+        state = {"done": False, "pulse": 0}
+
+        def pulse():
+            bar.pulse()
+            return True
+
+        def progress(fraction, stage):
+            if state["done"]:
+                return
+            bar.set_text(self.t({"audio": "import_stage_audio", "model": "import_stage_model"}
+                                .get(stage, "import_stage_speech")))
+            if fraction is None:
+                if not state["pulse"]:
+                    state["pulse"] = GLib.timeout_add(120, pulse)
+            else:
+                if state["pulse"]:
+                    GLib.source_remove(state["pulse"])
+                    state["pulse"] = 0
+                bar.set_fraction(max(0.0, min(1.0, fraction)))
+
+        def finish(error, markdown):
+            state["done"] = True
+            if state["pulse"]:
+                GLib.source_remove(state["pulse"])
+                state["pulse"] = 0
+            dlg.force_close()
+            if error == "cancelled":
+                return
+            if error is not None:
+                self._voice_error(error)
+                return
+            self._set_buffer_text(markdown)
+            self.current_path = None
+            self._suggested_name = title + ".md"
+            self.buffer.set_modified(True)
+            self._update_title()
+            self._schedule_refresh()
+            self.toasts.add_toast(Adw.Toast(title=self.t("import_done"), timeout=4))
+
+        job = voice.FileTranscriber(on_progress=progress, on_done=finish)
+        self._import_job = job
+        dlg.connect("response", lambda _d, _r: None if state["done"] else job.cancel())
+        borrowed = None
+        if engine == "vosk" and self.dictation is not None:
+            borrowed = self.dictation.borrow_recognizer(opts["vosk_model"])
+        try:
+            job.start(path, engine, opts, title, borrowed)
+        except voice.VoiceError as e:
+            self._voice_error(e)
+            return
+        progress(None, "model" if engine == "whisper" or borrowed is None else "audio")
+        dlg.present(self)
+
+    def _voice_prefs_page(self):
+        """Pagina «Voce» delle Preferenze: dettatura, Vosk, Whisper (con il
+        processore o la scheda grafica), lettura ad alta voce."""
+        t = self.t
+        page = Adw.PreferencesPage(title=t("pref_page_voice"),
+                                   icon_name="audio-input-microphone-symbolic")
+        if voice is None:
+            group = Adw.PreferencesGroup()
+            group.add(Adw.ActionRow(title=t("err_voice_missing")))
+            page.add(group)
+            return page
+        found = voice.status()
+
+        def save():
+            save_config(self.cfg)
+
+        def folder_row(title, path):
+            row = Adw.ActionRow(title=title, subtitle=GLib.markup_escape_text(
+                path.replace(os.path.expanduser("~"), "~", 1)))
+            btn = Gtk.Button(label=t("btn_open_folder"), valign=Gtk.Align.CENTER)
+
+            def open_folder(_b):
+                try:
+                    os.makedirs(path, exist_ok=True)
+                    Gtk.FileLauncher.new(Gio.File.new_for_path(path)).launch(self, None, None)
+                except Exception as e:
+                    self._message(str(e))
+            btn.connect("clicked", open_folder)
+            row.add_suffix(btn)
+            row.set_activatable_widget(btn)
+            return row
+
+        def missing_row(key):
+            row = Adw.ActionRow(title=t(key))
+            row.add_prefix(Gtk.Image(icon_name="dialog-warning-symbolic"))
+            return row
+
+        def model_row(title, models, key):
+            labels = [t("model_auto")] + [voice.model_label(m) for m in models]
+            row = Adw.ComboRow(title=title, model=Gtk.StringList.new(labels))
+            if not models:
+                row.set_subtitle(t("no_models"))
+                row.set_sensitive(False)
+            saved = self.cfg.get(key, "")
+            row.set_selected(models.index(saved) + 1 if saved in models else 0)
+
+            def on_model(r, _p):
+                i = r.get_selected()
+                self.cfg[key] = models[i - 1] if 0 < i <= len(models) else ""
+                save()
+            row.connect("notify::selected", on_model)
+            return row
+
+        # Dettatura
+        dictation = Adw.PreferencesGroup(title=t("pref_group_dictation"),
+                                         description=t("pref_dictation_desc"))
+        engines = list(voice.ENGINES)
+        engine_row = Adw.ComboRow(title=t("pref_voice_engine"), model=Gtk.StringList.new(
+            [t("engine_vosk"), t("engine_whisper")]))
+        current = self.cfg.get("voice_engine", "vosk")
+        engine_row.set_selected(engines.index(current) if current in engines else 0)
+        dictation.add(engine_row)
+        codes = ["doc", "auto"] + list(voice.SPEECH_LANGUAGES)
+        lang_labels = [t("voice_lang_doc"), t("voice_lang_auto")] + [
+            self.NATIVE_NAMES.get(c, c) for c in voice.SPEECH_LANGUAGES]
+        lang_row = Adw.ComboRow(title=t("pref_voice_lang"), subtitle=t("pref_voice_lang_sub"),
+                                model=Gtk.StringList.new(lang_labels), enable_search=True)
+        saved_lang = self.cfg.get("voice_lang", "doc")
+        lang_row.set_selected(codes.index(saved_lang) if saved_lang in codes else 0)
+
+        def on_lang(r, _p):
+            i = r.get_selected()
+            if 0 <= i < len(codes):
+                self.cfg["voice_lang"] = codes[i]
+                save()
+        lang_row.connect("notify::selected", on_lang)
+        dictation.add(lang_row)
+        commands_row = Adw.SwitchRow(title=t("pref_voice_commands"),
+                                     subtitle=t("pref_voice_commands_sub"),
+                                     active=bool(self.cfg.get("voice_commands", True)))
+
+        def on_commands(r, _p):
+            self.cfg["voice_commands"] = r.get_active()
+            save()
+        commands_row.connect("notify::active", on_commands)
+        dictation.add(commands_row)
+
+        def on_engine(r, _p):
+            i = r.get_selected()
+            if 0 <= i < len(engines):
+                self.cfg["voice_engine"] = engines[i]
+                commands_row.set_sensitive(engines[i] == "vosk")
+                save()
+        engine_row.connect("notify::selected", on_engine)
+        commands_row.set_sensitive(self.cfg.get("voice_engine", "vosk") == "vosk")
+        if not found["mic"]:
+            dictation.add(missing_row("err_no_mic"))
+        page.add(dictation)
+
+        # Vosk
+        vosk_group = Adw.PreferencesGroup(title="Vosk", description=t("pref_vosk_desc"))
+        if not found["vosk"]:
+            vosk_group.add(missing_row("err_no_vosk"))
+        vosk_group.add(model_row(t("pref_model"), found["vosk_models"], "vosk_model"))
+        vosk_group.add(folder_row(t("pref_models_folder"), voice.vosk.USER_MODEL_DIR))
+        page.add(vosk_group)
+
+        # Whisper
+        whisper_group = Adw.PreferencesGroup(title="Whisper", description=t("pref_whisper_desc"))
+        if not found["whisper"]:
+            whisper_group.add(missing_row("err_no_whisper"))
+        whisper_group.add(model_row(t("pref_model"), found["whisper_models"], "whisper_model"))
+        proc_row = Adw.ComboRow(title=t("pref_processor"), model=Gtk.StringList.new(
+            [t("proc_cpu"), t("proc_vulkan")]))
+        proc_row.set_selected(1 if self.cfg.get("voice_gpu", False) else 0)
+        whisper_group.add(proc_row)
+        device_row = Adw.ComboRow(title=t("gpu_device"), model=Gtk.StringList.new(
+            [t("gpu_device_auto")]), sensitive=bool(self.cfg.get("voice_gpu", False)))
+        whisper_group.add(device_row)
+        devices, device_labels = [], []
+        filling = [False]
+
+        def fill_devices():
+            labels = [d["label"] for d in devices]
+            saved = self.cfg.get("voice_gpu_device", "")
+            items = [t("gpu_device_auto")] + [
+                f"{d['label']} ({d['mib'] // 1024} GB)" if d.get("mib", 0) >= 1024 else d["label"]
+                for d in devices]
+            if saved and saved not in labels:
+                items.append(saved)            # salvata ma non trovata ora
+                labels.append(saved)
+            filling[0] = True
+            device_row.set_model(Gtk.StringList.new(items))
+            device_row.set_selected(labels.index(saved) + 1 if saved in labels else 0)
+            filling[0] = False
+            device_labels[:] = labels
+
+        def on_device(r, _p):
+            if filling[0]:
+                return
+            i = r.get_selected()
+            labels = device_labels
+            self.cfg["voice_gpu_device"] = labels[i - 1] if 0 < i <= len(labels) else ""
+            save()
+        device_row.connect("notify::selected", on_device)
+
+        def on_proc(r, _p):
+            self.cfg["voice_gpu"] = r.get_selected() == 1
+            device_row.set_sensitive(self.cfg["voice_gpu"])
+            save()
+        proc_row.connect("notify::selected", on_proc)
+
+        def load_devices():
+            # Le schede si chiedono al caricatore Vulkan in un processo a parte
+            # (rusca_whisper.list_devices): può servire un secondo.
+            found_devices = voice.whisper.list_devices()
+
+            def done():
+                devices[:] = found_devices
+                fill_devices()
+                return False
+            GLib.idle_add(done)
+        fill_devices()
+        threading.Thread(target=load_devices, daemon=True).start()
+        whisper_group.add(folder_row(t("pref_models_folder"), voice.whisper.USER_MODEL_DIR))
+        page.add(whisper_group)
+
+        # Lettura ad alta voce
+        reading = Adw.PreferencesGroup(title=t("pref_group_reading"),
+                                       description=t("pref_reading_desc"))
+        if not found["piper"]:
+            reading.add(missing_row("err_no_piper"))
+        voices = found["voices"]
+        voice_labels = [t("model_auto")] + [voice.model_label(v)[:-5] for v in voices]
+        voice_row = Adw.ComboRow(title=t("pref_tts_voice"), model=Gtk.StringList.new(voice_labels))
+        if not voices:
+            voice_row.set_subtitle(t("no_voices"))
+            voice_row.set_sensitive(False)
+        saved_voice = self.cfg.get("tts_voice", "")
+        voice_row.set_selected(voices.index(saved_voice) + 1 if saved_voice in voices else 0)
+        licence_row = Adw.ActionRow(title=t("pref_tts_licence"))
+
+        def show_licence():
+            chosen = voice.pick_voice(voices, self.cfg.get("tts_voice", ""),
+                                      voice.base_language(self._current_lang()))
+            info = voice.piper.voice_info(chosen) if chosen else {}
+            licence_row.set_subtitle(GLib.markup_escape_text(
+                info.get("licence") or t("licence_unknown")))
+
+        def on_voice(r, _p):
+            i = r.get_selected()
+            self.cfg["tts_voice"] = voices[i - 1] if 0 < i <= len(voices) else ""
+            show_licence()
+            save()
+        voice_row.connect("notify::selected", on_voice)
+        reading.add(voice_row)
+        show_licence()
+        reading.add(licence_row)
+        speed_row = Adw.SpinRow.new_with_range(0.7, 1.3, 0.05)
+        speed_row.set_digits(2)
+        speed_row.set_title(t("pref_tts_speed"))
+        speed_row.set_value(float(self.cfg.get("tts_speed", 1.0)))
+
+        def on_speed(r, _p):
+            self.cfg["tts_speed"] = round(r.get_value(), 2)
+            save()
+        speed_row.connect("notify::value", on_speed)
+        reading.add(speed_row)
+        code_row = Adw.SwitchRow(title=t("pref_tts_code"), active=bool(self.cfg.get("tts_code", False)))
+
+        def on_code(r, _p):
+            self.cfg["tts_code"] = r.get_active()
+            save()
+        code_row.connect("notify::active", on_code)
+        reading.add(code_row)
+        reading.add(folder_row(t("pref_voices_folder"), voice.piper.USER_VOICE_DIR))
+        page.add(reading)
+        return page
+
     # ------------------------------------------------------- preferenze
     def _action_preferences(self):
         """Preferenze nello stile GNOME: ogni modifica vale subito."""
         t = self.t
-        page = Adw.PreferencesPage()
+        page = Adw.PreferencesPage(title=t("pref_page_general"),
+                                   icon_name="preferences-system-symbolic")
 
         def changed():
             self._apply_theme()
@@ -4717,7 +5522,7 @@ class RuscaWindow(Adw.ApplicationWindow):
         font_row = Adw.ComboRow(title=t("pref_font"), model=Gtk.StringList.new(names),
                                 enable_search=True)
         try:
-            font_row.set_selected(names.index(self.cfg.get("font", "Sans")))
+            font_row.set_selected(names.index(self.cfg.get("font", TEXT_FONT)))
         except ValueError:
             font_row.set_selected(0)
 
@@ -4725,6 +5530,7 @@ class RuscaWindow(Adw.ApplicationWindow):
             i = r.get_selected()
             if 0 <= i < len(names):
                 self.cfg["font"] = names[i]
+                self.cfg["font_chosen"] = True
                 changed()
         font_row.connect("notify::selected", on_font)
         look.add(font_row)
@@ -4830,6 +5636,7 @@ class RuscaWindow(Adw.ApplicationWindow):
 
         dialog = Adw.PreferencesDialog(title=t("mi_preferences").rstrip("…"))
         dialog.add(page)
+        dialog.add(self._voice_prefs_page())
         dialog.present(self)
 
     def _apply_default_direction(self):
@@ -4863,6 +5670,7 @@ class RuscaWindow(Adw.ApplicationWindow):
         self.spell_title_label.set_label(self.t('spell_title'))
         self.spell_toggle_btn.set_tooltip_text(self.t("spell_toggle_tip"))
         self._spell_hide_btn.set_tooltip_text(self.t("spell_hide_tip"))
+        self.voice_stop_btn.set_label(self.t("btn_stop"))
         self._update_counts()
         self._update_title()
         self._sync_spell_ui()
@@ -5270,6 +6078,13 @@ class RuscaWindow(Adw.ApplicationWindow):
         self._ask_unsaved(self.t("unsaved_close"), self.t("btn_save_exit"), save, close)
 
     def _finalize(self):
+        # La voce si ferma prima di chiudere: microfono, motori e riproduzione.
+        if self.dictation is not None:
+            self.dictation.close()
+        if self.reader is not None:
+            self.reader.close()
+        if self._import_job is not None:
+            self._import_job.cancel()
         try:
             self.cfg["win_w"], self.cfg["win_h"] = self.get_width(), self.get_height()
             self.cfg["paned"] = self.paned.get_position()
@@ -5399,6 +6214,7 @@ def main():
     signal.signal(signal.SIGINT, signal.SIG_DFL)
     os.makedirs(CONFIG_DIR, exist_ok=True)
     ensure_style_schemes()
+    register_bundled_fonts()            # prima della mappa dei caratteri di GTK
     app = RuscaApplication()
     return app.run(sys.argv)
 

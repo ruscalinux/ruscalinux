@@ -53,19 +53,19 @@ Si trova nel repository in `docs/SPECIFICHE-RUSCALINUX-OS-APPS.md`. Durante lo s
 |---|---|---|---|---|---|
 | RuscaCleaner | Privacy e pulizia del desktop GNOME | Utility di sistema | `org.ruscalinux.RuscaCleaner` | `ruscacleaner` | No |
 | RuscaHub | Gestione AppImages | Gestore applicazioni | `org.ruscalinux.RuscaHub` | `ruscahub` | No |
-| RuscaMark | Editing Markdown | Editor di testo | `org.ruscalinux.RuscaMark` | `ruscamark` | Sì, se c’è il controllo ortografico |
+| RuscaMark | Editing Markdown, con dettatura, trascrizione di file audio e lettura ad alta voce | Editor di testo | `org.ruscalinux.RuscaMark` | `ruscamark` | Sì, se c’è il controllo ortografico |
 | RuscaWriter | Scrittura e impaginazione di libri | Word processor | `org.ruscalinux.RuscaWriter` | `ruscawriter` | Sì, sempre |
 | RuscaLLama | Chat con modelli linguistici locali e creazione di immagini e brevi video da una descrizione | Assistente IA | `org.ruscalinux.RuscaLLama` | `ruscallama` | No |
 | RuscaTranslator | Traduzione di documenti Markdown, con RAG ottimizzato per italiano ↔ inglese | Traduttore | `org.ruscalinux.RuscaTranslator` | `ruscatranslator` | No |
 | ruscallama-engine | Motore che esegue i modelli per RuscaLLama e RuscaTranslator: **llama.cpp, software esterno** | Componente di sistema, senza interfaccia | — | `ruscallama-engine` | — |
 | RuscaTranscriber | Trascrizione di video e audio in testo (Markdown) e sottotitoli (SRT) | Riconoscimento vocale | `org.ruscalinux.RuscaTranscriber` | `ruscatranscriber` | No |
-| ruscawhisper-engine | Motore di riconoscimento vocale di RuscaTranscriber: **whisper.cpp, software esterno** | Componente di sistema, senza interfaccia | — | `ruscawhisper-engine` | — |
+| ruscawhisper-engine | Motore di riconoscimento vocale di RuscaTranscriber, RuscaDubbing e RuscaMark: **whisper.cpp, software esterno** | Componente di sistema, senza interfaccia | — | `ruscawhisper-engine` | — |
 | ruscadiffusion-engine | Motore di generazione delle immagini e dei video di RuscaLLama: **stable-diffusion.cpp, software esterno** | Componente di sistema, senza interfaccia | — | `ruscadiffusion-engine` | — |
 | RuscaNarrator | Lettura ad alta voce di documenti Markdown e di sottotitoli SRT (rispettandone i tempi) | Sintesi vocale | `org.ruscalinux.RuscaNarrator` | `ruscanarrator` | No |
 | RuscaPinball | Flipper in stile anni ’80, con il tavolo «Amethyst» in prospettiva | Gioco | `org.ruscalinux.RuscaPinball` | `ruscapinball` | No |
 | RuscaLLisse | Conversazione a voce con un’entità digitale animata, con la personalità decisa dall’utente (la prima è Ellittica) | Assistente vocale | `org.ruscalinux.RuscaLLisse` | `ruscallisse` | No |
-| ruscavosk-engine | Motore di riconoscimento vocale in tempo reale di RuscaLLisse: **Vosk, software esterno** | Componente di sistema, senza interfaccia | — | `ruscavosk-engine` | — |
-| ruscapiper-engine | Motore di sintesi vocale di RuscaLLisse: **Piper (piper1-gpl), software esterno** | Componente di sistema, senza interfaccia | — | `ruscapiper-engine` | — |
+| ruscavosk-engine | Motore di riconoscimento vocale in tempo reale di RuscaLLisse, RuscaPallas e RuscaMark: **Vosk, software esterno** | Componente di sistema, senza interfaccia | — | `ruscavosk-engine` | — |
+| ruscapiper-engine | Motore di sintesi vocale di RuscaLLisse, RuscaPallas e RuscaMark: **Piper (piper1-gpl), software esterno** | Componente di sistema, senza interfaccia | — | `ruscapiper-engine` | — |
 | RuscaDubbing | Doppiaggio di un video in un’altra lingua: sottotitoli nelle due lingue, audio doppiato, video con due tracce audio e due di sottotitoli | Doppiaggio video | `org.ruscalinux.RuscaDubbing` | `ruscadubbing` | No |
 | RuscaPallas | Pallasio, un manul cinico con giacca, cravatta e occhialini, che cammina sul desktop e parla a voce con l’utente | Compagno del desktop (estensione di GNOME Shell) | `org.ruscalinux.RuscaPallas` | `ruscapallas` | No |
 
@@ -153,6 +153,39 @@ Durante lo sviluppo della 1.99.3 RuscaTranscriber si chiamava RuscaDubbing. Il n
 
 ```bash
 python3 -m unittest tests/test_ruscatranscriber.py
+```
+
+### 1.3.1 La voce di RuscaMark
+
+RuscaMark detta nel documento, trascrive un file audio o video in Markdown e legge ad alta voce, con i motori delle sezioni 1.3, 1.7 e 1.8. Nessun motore nuovo e nessuna modifica ai motori: solo `--prompt` si aggiunge alle opzioni di `whisper-cli` che la build di ruscawhisper-engine controlla (`OPZIONI_USATE`).
+
+| Funzione | Motore | Come lavora |
+|---|---|---|
+| Dettatura con **Vosk** | ruscavosk-engine (`libvosk.so` con `ctypes`) | Parola per parola mentre si parla: `pw-record` → Vosk in memoria. La frase entra nel testo quando Vosk la chiude o quando il testo parziale non cambia per 1 s (`VOSK_PAUSE`, la regola della sezione 1.7.3); il testo parziale si vede nella barra della voce |
+| Dettatura con **Whisper** | ruscawhisper-engine (`whisper-cli`) | Una frase per volta: un rilevatore di voce per energia (soglia che segue il rumore di fondo) taglia il parlato fra due silenzi di 0,7 s (`WHISPER_PAUSE`), con 0,3 s di audio prima della voce, al massimo 25 s; ogni frase è un WAV passato a `whisper-cli`, mentre il microfono continua ad ascoltare |
+| **Importa da audio** | Vosk o Whisper, come la dettatura | Whisper: `rusca_whisper.Transcriber` (ffmpeg → WAV → `whisper-cli`), con la cartella di lavoro spostata. Vosk: ffmpeg decodifica in s16le sullo standard output e il riconoscitore lavora sul flusso, senza file. Il risultato è `to_markdown()` di `rusca_whisper.py`: titolo dal nome del file e paragrafi |
+| **Leggi ad alta voce** | ruscapiper-engine (`ruscapiper-stream`) | `Speaker` di `rusca_piper.py`: la voce resta caricata finché non cambia; il testo viene da `speech_blocks()` del motore comune, tagliato in frasi da `speech_text.Sentences` e corretto con il lessico delle pronunce |
+
+**Moduli.** `rusca_voice.py` è di RuscaMark (GPL-3.0) e non importa GTK: dettatura (`Dictation`), trascrizione di un file (`FileTranscriber`), lettura (`Reader`), testo dettato (`dictation_text()`), frasi da leggere (`reading_sentences()`). `rusca_vosk.py`, `rusca_piper.py`, `speech_text.py` e `pronunce.tsv` sono **copie identiche** di quelli di RuscaLLisse, `rusca_whisper.py` di quello di RuscaTranscriber: `make-deb.sh` si rifiuta di costruire il pacchetto se una copia differisce, e il test lo controlla. Come RuscaDubbing, RuscaMark cambia solo la cartella di lavoro di `rusca_whisper.py` dopo l’import (`whisper.WORK_DIR` = `~/.cache/ruscamark/trascrizione/`).
+
+**Regole.**
+
+1. **Lo stesso comando accende e spegne.** Microfono nella barra del titolo e menu principale → Dettatura (Ctrl+Maiusc+D, azione con stato); Leggi ad alta voce (Ctrl+Maiusc+R) legge la selezione o il documento dal paragrafo del cursore alla fine, e la ferma; Importa da audio… (Ctrl+Maiusc+O) sostituisce il documento come Apri (con la domanda sulle modifiche non salvate) e propone il nome del file audio con `.md`. Durante la dettatura e la lettura una barra (`Gtk.Revealer` sopra la barra di stato) mostra stato, motore, modello e il pulsante **Ferma**. Dettatura e lettura non stanno mai accese insieme: il microfono sentirebbe la voce.
+2. **Ogni frase dettata è un passo di annullamento** e si inserisce al cursore, sostituendo la selezione.
+3. **Il parlato è testo.** I caratteri che il motore comune leggerebbe come formattazione si proteggono con `escape_markdown()` di `rusca_whisper.py`; la regola dell’inizio di riga («1.», «#», «-») vale solo se la frase comincia una riga. Spazi e maiuscole seguono il testo che precede il cursore.
+4. **Comandi di punteggiatura, solo con Vosk** (Preferenze, acceso se non cambiato), in italiano e in inglese (`COMMANDS`): «virgola», «punto», «due punti», «punto e virgola», «punto interrogativo», «punto esclamativo», «a capo», «nuovo paragrafo», «apri/chiudi parentesi», «apri/chiudi virgolette». Whisper scrive da sé punteggiatura e maiuscole, e i comandi non si applicano.
+5. **Lingua.** «Come il documento» (predefinita) è la lingua del dizionario ortografico per la dettatura e **«Automatica» per i file**, per la regola della sezione 1.3 (un audio in un’altra lingua trascritto con `-l` sbagliato diventa un testo inventato); si può scegliere una delle 24 lingue di Whisper o «Automatica». Con Vosk la lingua la decide il modello: con «Scelta automatica» il più grande della lingua parlata, altrimenti il più grande.
+6. **Processore o scheda grafica (Whisper).** «Esegui su: Processore (CPU) | Scheda grafica (Vulkan)», processore se non cambiato, come RuscaTranscriber. Sul processore `-ng` e driver Vulkan nascosti (`VK_DRIVER_FILES`, `VK_ICD_FILENAMES` = `/dev/null`); sulla scheda, «Scheda da usare» elenca le schede di `list_devices()` (processo a parte, con la memoria), si salva per nome e si passa con `GGML_VK_VISIBLE_DEVICES`. Vosk e Piper lavorano sempre sul processore, e le Preferenze lo dicono.
+7. **Whisper ricarica il modello a ogni frase** (`whisper-cli` legge un file ed esce: sezione 1.7, «Perché questi motori»). È il prezzo di non avere un server: con la scheda grafica e un modello grande una frase arriva in un paio di secondi; per dettare sul processore il manuale consiglia un modello piccolo. A ogni frase `whisper-cli` riceve con `--prompt` gli ultimi 200 caratteri già scritti, per la continuità di stile e punteggiatura. Valgono `-sns`, il VAD Silero se c’è, `collapse_repeats()` e la regola dell’uscita con errore dopo il lavoro della sezione 1.3.
+8. **Il modello Vosk resta caricato** fra una dettatura e l’altra e si libera alla chiusura della finestra, solo dopo che il thread si è fermato (sezione 1.7.3); la trascrizione di un file con lo stesso modello lo prende in prestito (`borrow_recognizer()`) invece di caricarlo di nuovo.
+9. **Motori mancanti.** Il pacchetto `ruscamark` **raccomanda** i motori, `pipewire-bin` e `ffmpeg`, non li richiede: senza, i comandi restano e un messaggio dice che cosa installare (`err_no_vosk`, `err_no_whisper`, `err_no_piper`, `err_no_mic`, `err_no_ffmpeg`…); la pagina «Voce» delle Preferenze mostra che cosa manca.
+
+**Preferenze** (pagina «Voce», chiavi di `~/.config/ruscamark/config.json`): Dettatura (`voice_engine`, `voice_lang`, `voice_commands`), Vosk (`vosk_model`, cartella dei modelli), Whisper (`whisper_model`, `voice_gpu`, `voice_gpu_device`, cartella dei modelli), Lettura ad alta voce (`tts_voice` con la licenza letta dal MODEL_CARD, `tts_speed` da 0,7 a 1,3, `tts_code`, cartella delle voci). Modelli e voci sono quelli degli altri tool: `~/.local/share/ruscavosk/models/`, `~/.local/share/ruscawhisper/models/`, `~/.local/share/ruscapiper/voices/` (e le cartelle di sistema in `/usr/share/`).
+
+**Test.** `tests/test_ruscamark_voice.py` controlla le copie identiche, l’assenza di moduli di rete, il testo dettato (comandi, spazi, maiuscole, protezione del Markdown), le frasi da leggere, la scelta di modelli e voci e i percorsi completi con programmi finti al posto di `pw-record`, `whisper-cli`, `ffmpeg`, `ruscapiper-stream` e `pw-play`, e con una `libvosk.so` finta compilata al momento (serve `gcc`, altrimenti quei test si saltano): dettatura con Whisper sul processore e sulla scheda scelta (argomenti e variabili passati al motore, nessun WAV rimasto), dettatura con Vosk (testo parziale, modello prestato), trascrizione di un file con i due motori, lettura con Piper.
+
+```bash
+python3 -m unittest tests/test_ruscamark_voice.py
 ```
 
 ### 1.4 La sintesi vocale
@@ -726,6 +759,7 @@ Regole:
 | Codice, percorsi | `monospace` |
 
 3. I caratteri del marchio (Syne, DM Sans) restano riservati a sito, logo e materiale grafico, non all’interfaccia delle applicazioni.
+4. Il **testo dei documenti** negli editor non è interfaccia: può avere un carattere proprio, incluso nel pacchetto con la sua licenza e registrato solo per il processo (`FcConfigAppFontAddFile`), mai installato nel sistema. RuscaWriter usa EB Garamond e Courier Prime; RuscaMark usa **Literata** (editor, anteprima, PDF e tema di export predefinito), disegnata per la lettura lunga sullo schermo e comoda anche stampata. Il PDF incorpora il carattere; l’HTML lo nomina con dei ripieghi (`"Literata", "DejaVu Serif", "Georgia", serif`). Fino alla 1.99.3 il carattere predefinito di RuscaMark era «Sans», salvato con le altre impostazioni anche se nessuno l’aveva scelto: chi non l’ha mai cambiato nelle Preferenze (`font_chosen`) passa a Literata.
 
 ### 3.6 Icone
 
@@ -1137,11 +1171,12 @@ Componenti esterni in uso:
 | Componente | Versione | Licenza | Dove | Usato da |
 |---|---|---|---|---|
 | EB Garamond e Courier Prime (caratteri tipografici) | inclusi nei sorgenti | SIL Open Font License 1.1 | `apps/ruscawriter/assets/`, installati in `/usr/share/ruscawriter/assets/` con il testo della licenza | RuscaWriter |
+| Literata (carattere tipografico, © The Literata Project Authors) | 3.103, file statici non modificati (commit `0c2761b` di googlefonts/literata) | SIL Open Font License 1.1 | `apps/ruscamark/fonts/`, installati in `/usr/share/ruscamark/fonts/` con il testo della licenza e la provenienza (`README.md`) | RuscaMark |
 | llama.cpp (con ggml e le librerie che include: nlohmann/json e cpp-httplib MIT, xxHash BSD-2-Clause, stb, miniaudio, sha1 e sha256 di pubblico dominio) | ultima release stabile al momento della build (1.99.2: 0.9.0; 1.99.3: 1.0.0), scritta nella descrizione del pacchetto e in `/usr/share/doc/ruscallama-engine/README.md.gz` | MIT | Compilato nel pacchetto `ruscallama-engine`, in `/usr/lib/ruscallama-engine/` | RuscaLLama, RuscaTranslator, RuscaNarrator (`llama-tts`) |
-| whisper.cpp (con ggml e le librerie compilate nei programmi impacchettati: sgemm di llamafile, MIT; miniaudio, pubblico dominio o MIT-0; stb_vorbis, pubblico dominio o MIT) | ultima release stabile al momento della build (1.99.3: 1.9.5), scritta nella descrizione del pacchetto e in `/usr/share/doc/ruscawhisper-engine/README.md.gz` | MIT | Compilato nel pacchetto `ruscawhisper-engine`, in `/usr/lib/ruscawhisper-engine/` | RuscaTranscriber |
+| whisper.cpp (con ggml e le librerie compilate nei programmi impacchettati: sgemm di llamafile, MIT; miniaudio, pubblico dominio o MIT-0; stb_vorbis, pubblico dominio o MIT) | ultima release stabile al momento della build (1.99.3: 1.9.5), scritta nella descrizione del pacchetto e in `/usr/share/doc/ruscawhisper-engine/README.md.gz` | MIT | Compilato nel pacchetto `ruscawhisper-engine`, in `/usr/lib/ruscawhisper-engine/` | RuscaTranscriber, RuscaDubbing, RuscaMark |
 | stable-diffusion.cpp (con la sua copia di ggml, leejet/ggml, e le librerie compilate in `sd-cli`: nlohmann/json, miniz e sgemm di llamafile, MIT; zip di kuba--, Unlicense; stb, pubblico dominio o MIT; darts-clone, BSD-3-Clause; Oniguruma, BSD-2-Clause; utf8proc, MIT e licenza dei dati Unicode) | ultima release al momento della build (tag `master-<numero>-<commit>`; 1.99.3: master-1106-532d2c1), scritta nella descrizione del pacchetto e in `/usr/share/doc/ruscadiffusion-engine/README.md.gz` | MIT | Compilato nel pacchetto `ruscadiffusion-engine`, in `/usr/lib/ruscadiffusion-engine/` | RuscaLLama (viste Immagini e Video) |
-| Vosk (vosk-api), con Kaldi (ramo `vosk`) e OpenFst di Alpha Cephei compilati in `libvosk.so`; OpenBLAS di Debian collegato dinamicamente | versioni fissate in `make-deb.sh` (Vosk 0.3.50, Kaldi `bc5baf142316`, OpenFst `18e94e63870e`), scritte nella descrizione del pacchetto e in `/usr/share/doc/ruscavosk-engine/README.md.gz` | Apache 2.0 (Vosk, Kaldi, OpenFst); OpenBLAS (BSD-3-Clause) è un pacchetto di Debian | Compilato nel pacchetto `ruscavosk-engine`, in `/usr/lib/ruscavosk-engine/` | RuscaLLisse |
-| Piper (piper1-gpl), con espeak-ng | ultima release stabile al momento della build, scritta nella descrizione del pacchetto e in `/usr/share/doc/ruscapiper-engine/README.md.gz` | GPL-3.0 | Compilato nel pacchetto `ruscapiper-engine`, in `/usr/lib/ruscapiper-engine/` | RuscaLLisse |
+| Vosk (vosk-api), con Kaldi (ramo `vosk`) e OpenFst di Alpha Cephei compilati in `libvosk.so`; OpenBLAS di Debian collegato dinamicamente | versioni fissate in `make-deb.sh` (Vosk 0.3.50, Kaldi `bc5baf142316`, OpenFst `18e94e63870e`), scritte nella descrizione del pacchetto e in `/usr/share/doc/ruscavosk-engine/README.md.gz` | Apache 2.0 (Vosk, Kaldi, OpenFst); OpenBLAS (BSD-3-Clause) è un pacchetto di Debian | Compilato nel pacchetto `ruscavosk-engine`, in `/usr/lib/ruscavosk-engine/` | RuscaLLisse, RuscaPallas, RuscaMark |
+| Piper (piper1-gpl), con espeak-ng | ultima release stabile al momento della build, scritta nella descrizione del pacchetto e in `/usr/share/doc/ruscapiper-engine/README.md.gz` | GPL-3.0 | Compilato nel pacchetto `ruscapiper-engine`, in `/usr/lib/ruscapiper-engine/` | RuscaLLisse, RuscaPallas, RuscaMark |
 | Regola dell’evidenziato, porting del plugin markdown-it-mark (© Vitaly Puzrin e Alex Kocharin) con la struttura della regola del barrato di markdown-it-py (© ExecutableBookProject) | — | MIT (Expat) | `markdown_it_mark.py`, file a sé accanto a `rusca_markdown.py`; dichiarato nel file `copyright` del pacchetto, nella finestra Informazioni e nei manuali | RuscaLLama, RuscaMark, RuscaWriter, RuscaTranslator, RuscaNarrator |
 | Esempi della specifica CommonMark (© John MacFarlane) | 0.30 | CC BY-SA 4.0 | `tests/data/commonmark-0.30-spec.json`, con `README.md`; solo per i test, non installati da nessun pacchetto | Test di `rusca_markdown.py` |
 
@@ -1471,6 +1506,18 @@ Regole aggiuntive per la sintesi vocale (RuscaNarrator):
 | Voci create | In `~/.local/share/ruscanarrator/voices/`, solo quando l’utente sceglie «Tieni questa voce»; le prove scartate si cancellano |
 | Voci altrui | Il manuale chiede di usare come voce di riferimento la propria, o una voce che si ha il permesso di usare |
 
+Regole aggiuntive per la voce di RuscaMark (sezione 1.3.1):
+
+| Regola | Come è applicata |
+|---|---|
+| Nessuna rete, nemmeno locale | Vosk lavora nel processo, `whisper-cli` e `ruscapiper-stream` leggono e scrivono solo i propri flussi e file; `rusca_voice.py` non usa moduli di rete (il test lo controlla) e non apre porte |
+| Il microfono | Aperto solo durante la dettatura; la barra della voce lo mostra finché resta aperto |
+| L’audio della dettatura | Con Vosk mai scritto su disco. Con Whisper ogni frase è un WAV in `$XDG_RUNTIME_DIR/ruscamark/` (0700, di solito in memoria), cancellato appena letto |
+| Audio di lavoro di un file | In `~/.cache/ruscamark/trascrizione/` (0700); cancellato alla fine di ogni trascrizione e all’avvio. Con Vosk nessun file: ffmpeg decodifica in memoria |
+| FFmpeg legge solo file locali | `-protocol_whitelist file`, come RuscaTranscriber |
+| Programmi esterni | `/usr/bin/pw-record`, `/usr/bin/pw-play`, `/usr/bin/ffmpeg`, `/usr/lib/ruscawhisper-engine/whisper-cli`, `/usr/lib/ruscapiper-engine/ruscapiper-stream`, con percorso assoluto e lista di argomenti; il testo da leggere passa a `ruscapiper-stream` dallo standard input |
+| Il testo dettato | Va solo nel documento, dove l’utente lo vede; si salva solo con Salva |
+
 Regole aggiuntive per la conversazione a voce (RuscaLLisse):
 
 | Regola | Come è applicata |
@@ -1637,7 +1684,14 @@ Editor Markdown.
 4. Salvare il documento (Ctrl+S).
 5. Esportare il documento, se la funzione è disponibile.
 
-Il controllo ortografico, se presente, usa solo dizionari locali (incluso `en_GB` tramite `hunspell-en-gb`) e non invia mai il testo online.
+Voce (servono i motori ruscavosk-engine o ruscawhisper-engine, e ruscapiper-engine per la lettura, con i loro modelli e voci):
+
+1. Premere il microfono nella barra del titolo (Ctrl+Maiusc+D) e parlare: il testo compare al cursore. **Ferma** smette di ascoltare.
+2. Per un file audio o video: menu principale → **Importa da audio…** (Ctrl+Maiusc+O).
+3. Per ascoltare il testo: menu principale → **Leggi ad alta voce** (Ctrl+Maiusc+R).
+4. Motore (Vosk in tempo reale, Whisper a frasi), lingua, processore o scheda grafica e voce si scelgono in Preferenze → Voce.
+
+Il controllo ortografico, se presente, usa solo dizionari locali (incluso `en_GB` tramite `hunspell-en-gb`) e non invia mai il testo online. Anche la voce lavora solo sul computer.
 
 ## ✍️ RuscaWriter
 
@@ -1781,7 +1835,7 @@ Tutti i dati elaborati dalle RuscaLinux OS Apps rimangono in locale. Nessun dato
 |---|---|
 | RuscaCleaner | GNOME desktop privacy and cleaning |
 | RuscaHub | AppImage management |
-| RuscaMark | Markdown editing |
+| RuscaMark | Markdown editing, with dictation, transcription of audio files and reading aloud |
 | RuscaWriter | Writing and typesetting books |
 | RuscaLLama | Chat with local language models and images from a description |
 | RuscaTranslator | Translation of Markdown documents, with a RAG optimized for Italian ↔ English |
@@ -1871,7 +1925,14 @@ Markdown editor.
 4. Save the document (Ctrl+S).
 5. Export the document if the feature is available.
 
-Spell checking, if present, uses only local dictionaries (including `en_GB` through `hunspell-en-gb`) and never sends text online.
+Voice (needs the ruscavosk-engine or ruscawhisper-engine engines, and ruscapiper-engine for reading, with their models and voices):
+
+1. Press the microphone in the header bar (Ctrl+Shift+D) and speak: the text appears at the cursor. **Stop** stops listening.
+2. For an audio or video file: main menu → **Import from Audio…** (Ctrl+Shift+O).
+3. To hear the text: main menu → **Read Aloud** (Ctrl+Shift+R).
+4. Engine (Vosk in real time, Whisper by sentence), language, processor or graphics card and voice are chosen in Preferences → Voice.
+
+Spell checking, if present, uses only local dictionaries (including `en_GB` through `hunspell-en-gb`) and never sends text online. The voice features also run only on the computer.
 
 ## ✍️ RuscaWriter
 
