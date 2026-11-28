@@ -207,6 +207,13 @@ _BUILTIN_STRINGS = {
         'spacing_compact': 'Compact',
         'spacing_normal': 'Normal',
         'spacing_airy': 'Airy',
+        'mi_voice_help': 'Voice Commands…',
+        'voice_help_punct': 'Punctuation — Vosk only',
+        'voice_help_lines': 'Lines and paragraphs',
+        'voice_help_blocks': 'Markdown — at the start of a sentence',
+        'voice_help_inline': 'Bold and italic',
+        'voice_help_langs': 'Voice commands exist in English and Italian: dictate in one of these languages to use them.',
+        'voice_help_off': 'Voice commands are off: turn them on in Preferences → Voice.',
         'pref_font': 'Text font',
         'mi_import_audio': 'Import from Audio…',
         'mi_dictate': 'Dictation',
@@ -238,8 +245,8 @@ _BUILTIN_STRINGS = {
         'pref_voice_lang_sub': 'For audio files, “Same as the document” means automatic',
         'voice_lang_doc': 'Same as the document',
         'voice_lang_auto': 'Automatic (Whisper only)',
-        'pref_voice_commands': 'Punctuation by voice',
-        'pref_voice_commands_sub': 'Vosk only, in English and Italian: say “comma”, “full stop”, “new line”, “new paragraph”',
+        'pref_voice_commands': 'Voice commands',
+        'pref_voice_commands_sub': 'Punctuation (Vosk only), headings, lists, bold and italic: the list is in the main menu → Voice Commands',
         'pref_vosk_desc': 'Recognises while you speak. It always runs on the processor.',
         'pref_whisper_desc': 'Writes each sentence after a pause, with punctuation. Much faster on the graphics card.',
         'pref_model': 'Model',
@@ -434,6 +441,13 @@ _BUILTIN_STRINGS = {
         'spacing_compact': 'Compatta',
         'spacing_normal': 'Normale',
         'spacing_airy': 'Ariosa',
+        'mi_voice_help': 'Comandi a voce…',
+        'voice_help_punct': 'Punteggiatura — solo Vosk',
+        'voice_help_lines': 'Righe e paragrafi',
+        'voice_help_blocks': 'Markdown — all’inizio della frase',
+        'voice_help_inline': 'Grassetto e corsivo',
+        'voice_help_langs': 'I comandi a voce esistono in italiano e in inglese: detta in una di queste lingue per usarli.',
+        'voice_help_off': 'I comandi a voce sono spenti: accendili in Preferenze → Voce.',
         'pref_font': 'Carattere del testo',
         'mi_import_audio': 'Importa da audio…',
         'mi_dictate': 'Dettatura',
@@ -465,8 +479,8 @@ _BUILTIN_STRINGS = {
         'pref_voice_lang_sub': 'Per i file audio «Come il documento» vale «Automatica»',
         'voice_lang_doc': 'Come il documento',
         'voice_lang_auto': 'Automatica (solo Whisper)',
-        'pref_voice_commands': 'Punteggiatura a voce',
-        'pref_voice_commands_sub': 'Solo Vosk, in italiano e in inglese: di’ «virgola», «punto», «a capo», «nuovo paragrafo»',
+        'pref_voice_commands': 'Comandi a voce',
+        'pref_voice_commands_sub': 'Punteggiatura (solo Vosk), titoli, elenchi, grassetto e corsivo: l’elenco è nel menu principale → Comandi a voce',
         'pref_vosk_desc': 'Riconosce mentre parli. Lavora sempre sul processore.',
         'pref_whisper_desc': 'Scrive ogni frase dopo una pausa, con la punteggiatura. Molto più veloce sulla scheda grafica.',
         'pref_model': 'Modello',
@@ -3221,6 +3235,7 @@ class RuscaWindow(Adw.ApplicationWindow):
         plain("read-aloud", self._action_read_aloud)
         plain("stop-voice", self._stop_voice)
         plain("import-audio", self._action_import_audio)
+        plain("voice-help", self._action_voice_help)
         hd = Gio.SimpleAction.new("heading", GLib.VariantType.new("i"))
         hd.connect("activate", lambda _a, v: self._set_heading(v.get_int32()))
         self.add_action(hd)
@@ -3417,6 +3432,7 @@ class RuscaWindow(Adw.ApplicationWindow):
         menu.append_section(None, s3)
         sv = Gio.Menu()
         sv.append(self.t("mi_dictate"), "win.dictate")
+        sv.append(self.t("mi_voice_help"), "win.voice-help")
         sv.append(self.t("mi_read_aloud"), "win.read-aloud")
         menu.append_section(None, sv)
         s4 = Gio.Menu()
@@ -4975,6 +4991,23 @@ class RuscaWindow(Adw.ApplicationWindow):
         attrs.insert(Pango.attr_style_new(Pango.Style.ITALIC))
         self.voice_partial.set_attributes(attrs)
         box.append(self.voice_partial)
+        # «?»: l'elenco dei comandi a voce, mentre si detta.
+        self.voice_help_btn = Gtk.MenuButton(icon_name="help-about-symbolic",
+                                             valign=Gtk.Align.CENTER)
+        self.voice_help_btn.add_css_class("flat")
+        self.voice_help_btn.set_tooltip_text(self.t("mi_voice_help").rstrip("…"))
+        self.voice_help_btn.update_property([Gtk.AccessibleProperty.LABEL],
+                                            [self.t("mi_voice_help").rstrip("…")])
+
+        def help_popover(button):
+            pop = Gtk.Popover()
+            scroller = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER,
+                                          propagate_natural_height=True, max_content_height=460,
+                                          child=self._voice_help_content())
+            pop.set_child(scroller)
+            button.set_popover(pop)
+        self.voice_help_btn.set_create_popup_func(help_popover)
+        box.append(self.voice_help_btn)
         self.voice_stop_btn = Gtk.Button(label=self.t("btn_stop"), valign=Gtk.Align.CENTER)
         self.voice_stop_btn.connect("clicked", lambda *_: self._stop_voice())
         box.append(self.voice_stop_btn)
@@ -4987,6 +5020,7 @@ class RuscaWindow(Adw.ApplicationWindow):
         self.voice_icon.set_from_icon_name("audio-input-microphone-symbolic" if mode == "dictation"
                                            else "audio-speakers-symbolic")
         self.voice_level.set_visible(mode == "dictation")
+        self.voice_help_btn.set_visible(mode == "dictation")
         self.voice_level.set_value(0.0)
         self.voice_status.set_label(f"{status} · {detail}" if detail else status)
         self.voice_partial.set_label("")
@@ -5002,6 +5036,57 @@ class RuscaWindow(Adw.ApplicationWindow):
             self.dictate_action.change_state(GLib.Variant.new_boolean(False))
         if self.reader is not None and self.reader.reading:
             self.reader.stop()
+
+    def _commands_language(self):
+        """La lingua dei comandi a voce: quella della dettatura (con
+        «Automatica», quella del documento)."""
+        lang = self._voice_lang()
+        return voice.base_language(self._current_lang()) if lang == "auto" else lang
+
+    def _voice_help_content(self):
+        """L'elenco dei comandi a voce, nella lingua della dettatura
+        (italiano o inglese, le lingue che hanno i comandi)."""
+        t = self.t
+        lang = self._commands_language()
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6, margin_top=12,
+                      margin_bottom=12, margin_start=12, margin_end=12)
+        notes = []
+        if not self.cfg.get("voice_commands", True):
+            notes.append(t("voice_help_off"))
+        if lang not in voice.COMMANDS:
+            notes.append(t("voice_help_langs"))
+        for note in notes:
+            label = Gtk.Label(label=note, wrap=True, xalign=0, max_width_chars=44)
+            label.add_css_class("dim-label")
+            box.append(label)
+        titles = {"punct": "voice_help_punct", "lines": "voice_help_lines",
+                  "blocks": "voice_help_blocks", "inline": "voice_help_inline"}
+        for group, rows in voice.command_help(lang):
+            head = Gtk.Label(label=t(titles[group]), xalign=0, margin_top=6, wrap=True)
+            head.add_css_class("heading")
+            box.append(head)
+            grid = Gtk.Grid(column_spacing=18, row_spacing=2)
+            for i, (words, sign) in enumerate(rows):
+                said = Gtk.Label(label=f"«{words}»" if lang == "it" else f"“{words}”",
+                                 xalign=0)
+                grid.attach(said, 0, i, 1, 1)
+                shown = Gtk.Label(label=sign, xalign=0)
+                shown.add_css_class("monospace")
+                grid.attach(shown, 1, i, 1, 1)
+            box.append(grid)
+        return box
+
+    def _action_voice_help(self):
+        if voice is None:
+            self._voice_missing()
+            return
+        scroller = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER,
+                                      propagate_natural_height=True,
+                                      child=self._voice_help_content())
+        view = Adw.ToolbarView(content=scroller)
+        view.add_top_bar(Adw.HeaderBar())
+        Adw.Dialog(title=self.t("mi_voice_help").rstrip("…"), content_width=420,
+                   content_height=560, child=view).present(self)
 
     def _voice_missing(self):
         self._message(self.t("err_voice_missing"))
@@ -5105,13 +5190,15 @@ class RuscaWindow(Adw.ApplicationWindow):
 
     def _on_dictation_text(self, text):
         engine = self.dictation.engine if self.dictation else "vosk"
-        lang = self._voice_lang()
+        on = bool(self.cfg.get("voice_commands", True))
         buf = self.buffer
         buf.begin_user_action()
         buf.delete_selection(True, True)
-        out = voice.dictation_text(
-            text, self._text_before_cursor(400), "" if lang == "auto" else lang,
-            commands=engine == "vosk" and bool(self.cfg.get("voice_commands", True)))
+        # Comandi di punteggiatura solo con Vosk (Whisper scrive i segni da
+        # sé); comandi Markdown con tutti e due i motori.
+        out = voice.dictation_text(text, self._text_before_cursor(400),
+                                   self._commands_language(),
+                                   commands=engine == "vosk" and on, markdown=on)
         if out:
             buf.insert_at_cursor(out)
         buf.end_user_action()
@@ -5362,15 +5449,17 @@ class RuscaWindow(Adw.ApplicationWindow):
             save()
         commands_row.connect("notify::active", on_commands)
         dictation.add(commands_row)
+        help_row = Adw.ActionRow(title=t("mi_voice_help").rstrip("…"), activatable=True)
+        help_row.add_suffix(Gtk.Image(icon_name="go-next-symbolic"))
+        help_row.connect("activated", lambda _r: self._action_voice_help())
+        dictation.add(help_row)
 
         def on_engine(r, _p):
             i = r.get_selected()
             if 0 <= i < len(engines):
                 self.cfg["voice_engine"] = engines[i]
-                commands_row.set_sensitive(engines[i] == "vosk")
                 save()
         engine_row.connect("notify::selected", on_engine)
-        commands_row.set_sensitive(self.cfg.get("voice_engine", "vosk") == "vosk")
         if not found["mic"]:
             dictation.add(missing_row("err_no_mic"))
         page.add(dictation)
@@ -5671,6 +5760,7 @@ class RuscaWindow(Adw.ApplicationWindow):
         self.spell_toggle_btn.set_tooltip_text(self.t("spell_toggle_tip"))
         self._spell_hide_btn.set_tooltip_text(self.t("spell_hide_tip"))
         self.voice_stop_btn.set_label(self.t("btn_stop"))
+        self.voice_help_btn.set_tooltip_text(self.t("mi_voice_help").rstrip("…"))
         self._update_counts()
         self._update_title()
         self._sync_spell_ui()

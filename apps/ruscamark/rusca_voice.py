@@ -46,10 +46,16 @@ import speech_text as st
 PW_RECORD = "/usr/bin/pw-record"
 RATE = 16000
 FRAME = 640                          # 20 ms a 16 kHz, 16 bit, mono
-PARTIAL_EVERY = 5                    # testo parziale di Vosk ogni 100 ms
-# Vosk: la frase finisce quando il testo parziale non cambia per tanto (con
-# un po' di rumore di fondo Vosk non la chiude da solo, sezione 1.7.3).
+VOSK_BLOCK = 5                       # Vosk riceve l'audio a blocchi di 100 ms
+PARTIAL_EVERY = 2                    # testo parziale ogni 2 blocchi (200 ms d'audio)
+# Vosk: la frase finisce quando il testo parziale non cambia per tanto
+# audio (con un po' di rumore di fondo Vosk non la chiude da solo, sezione
+# 1.7.3). Si conta l'audio e non l'orologio: se Vosk resta indietro rispetto
+# al parlato, una frase non si chiude mentre si sta ancora parlando.
 VOSK_PAUSE = 1.0
+# Dopo «Ferma» il microfono resta aperto ancora un poco: l'ultima parola
+# detta arriva da PipeWire con un piccolo ritardo.
+STOP_GRACE = 0.4
 # Whisper: una frase è il parlato fra due silenzi di almeno WHISPER_PAUSE.
 WHISPER_PAUSE = 0.7
 WHISPER_PREROLL = 0.3                # s di audio tenuti prima della voce
@@ -165,98 +171,235 @@ def pick_voice(voices, saved="", lang=""):
 
 
 # ── dal parlato al testo ───────────────────────────────────────────────────
-# Comandi di punteggiatura per Vosk, che scrive le parole e non i segni. Si
-# riconoscono parole intere; i più lunghi prima («punto e virgola» prima di
-# «punto»).
+# Comandi a voce. Si riconoscono come parole intere, senza maiuscole e senza
+# la punteggiatura che Whisper aggiunge; i più lunghi prima («punto e
+# virgola» prima di «punto»).
+#   punct  – i segni: solo con Vosk, che scrive le parole e non i segni;
+#   lines  – a capo e nuovo paragrafo;
+#   blocks – Markdown di riga (titoli, elenchi, citazione): valgono solo
+#            all'inizio di una frase o dopo un a capo, così «il titolo del
+#            libro» detto in mezzo a una frase resta testo;
+#   inline – grassetto e corsivo, con un comando per aprire e uno per
+#            chiudere (due parole, rare nel parlato).
 COMMANDS = {
-    "it": (("nuovo paragrafo", "\n\n"), ("a capo", "\n"), ("accapo", "\n"),
-           ("punto interrogativo", "?"), ("punto esclamativo", "!"),
-           ("punto e virgola", ";"), ("due punti", ":"), ("virgola", ","),
-           ("punto", "."), ("apri parentesi", "("), ("chiudi parentesi", ")"),
-           ("apri virgolette", "«"), ("chiudi virgolette", "»")),
-    "en": (("new paragraph", "\n\n"), ("new line", "\n"), ("question mark", "?"),
-           ("exclamation mark", "!"), ("exclamation point", "!"), ("semicolon", ";"),
-           ("colon", ":"), ("comma", ","), ("full stop", "."), ("period", "."),
-           ("open parenthesis", "("), ("close parenthesis", ")"),
-           ("open quote", "“"), ("close quote", "”")),
+    "it": {
+        "punct": (("punto interrogativo", "?"), ("punto esclamativo", "!"),
+                  ("punto e virgola", ";"), ("due punti", ":"), ("virgola", ","),
+                  ("punto", "."), ("apri parentesi", "("), ("chiudi parentesi", ")"),
+                  ("apri virgolette", "«"), ("chiudi virgolette", "»")),
+        "lines": (("nuovo paragrafo", "\n\n"), ("a capo", "\n"), ("accapo", "\n")),
+        "blocks": (("titolo uno", "# "), ("titolo due", "## "), ("titolo tre", "### "),
+                   ("titolo", "# "), ("sottotitolo", "## "), ("elenco numerato", "1. "),
+                   ("elenco", "- "), ("citazione", "> ")),
+        "inline": (("inizio grassetto", "**", "open"), ("fine grassetto", "**", "close"),
+                   ("inizio corsivo", "*", "open"), ("fine corsivo", "*", "close")),
+    },
+    "en": {
+        "punct": (("question mark", "?"), ("exclamation mark", "!"),
+                  ("exclamation point", "!"), ("semicolon", ";"), ("colon", ":"),
+                  ("comma", ","), ("full stop", "."), ("period", "."),
+                  ("open parenthesis", "("), ("close parenthesis", ")"),
+                  ("open quote", "“"), ("close quote", "”")),
+        "lines": (("new paragraph", "\n\n"), ("new line", "\n")),
+        "blocks": (("heading one", "# "), ("heading two", "## "), ("heading three", "### "),
+                   ("heading", "# "), ("subheading", "## "), ("numbered list", "1. "),
+                   ("bullet", "- "), ("quote", "> ")),
+        "inline": (("start bold", "**", "open"), ("end bold", "**", "close"),
+                   ("start italic", "*", "open"), ("end italic", "*", "close")),
+    },
 }
 _ATTACH_LEFT = set(".,;:?!)»”")          # senza spazio prima
 _ATTACH_RIGHT = set("(«“")               # senza spazio dopo
 _SENTENCE_END = (".", "?", "!", "…")
+_STRIP = ".,;:!?…«»“”\"'()"
+_BLOCK_LINE = re.compile(r"^(?:#{1,6} |[-*+] |\d{1,9}\. |> )")
+_NUMBERED = re.compile(r"^(\d{1,9})\. ")
+
+
+def command_language(lang):
+    """La lingua dei comandi: italiano o inglese (per le altre lingue i
+    comandi si dicono in inglese)."""
+    return lang if lang in COMMANDS else "en"
+
+
+def parse_commands(text, lang, punctuation=True, markdown=True):
+    """Il parlato riconosciuto come elenco di (tipo, valore): "word" (una
+    parola), "punct" (un segno), "nl" (a capo o paragrafo), "block" (il
+    marcatore di una riga Markdown), "open" e "close" (grassetto, corsivo).
+    Senza tabella dei comandi per la lingua, solo parole."""
+    words = text.split()
+    table = COMMANDS.get(lang)
+    if not table or not (punctuation or markdown):
+        return [("word", w) for w in words]
+    groups = []
+    if markdown:
+        groups += [("lines", "nl"), ("blocks", "block"), ("inline", None)]
+    if punctuation:
+        groups.append(("punct", "punct"))
+    norm = [w.strip(_STRIP).lower() for w in words]
+    out, i, line_start = [], 0, True
+    while i < len(words):
+        found = None
+        for group, kind in groups:
+            if group == "blocks" and not line_start:
+                continue
+            for entry in table[group]:
+                phrase = entry[0].split()
+                if norm[i:i + len(phrase)] == phrase:
+                    found = (entry[2] if kind is None else kind, entry[1], len(phrase))
+                    break
+            if found:
+                break
+        if found:
+            out.append(found[:2])
+            i += found[2]
+            line_start = found[0] == "nl"
+        else:
+            out.append(("word", words[i]))
+            i += 1
+            line_start = False
+    return out
 
 
 def apply_commands(text, lang):
-    """Sostituisce i comandi a voce con i segni: «ciao virgola come stai
-    punto interrogativo» → «ciao, come stai?». Restituisce una lista di
-    pezzi: parole e segni, nell'ordine."""
-    table = COMMANDS.get(lang)
-    words = text.split()
-    if not table:
-        return words
-    out, i = [], 0
-    while i < len(words):
-        for phrase, sign in table:
-            n = len(phrase.split())
-            if [w.lower() for w in words[i:i + n]] == phrase.split():
-                out.append(sign)
-                i += n
-                break
-        else:
-            out.append(words[i])
-            i += 1
-    return out
+    """Compatibilità: i pezzi come testo (parole e segni)."""
+    return [v for _k, v in parse_commands(text, lang)]
 
 
 def _capitalize(word):
     return word[:1].upper() + word[1:] if word else word
 
 
-def join_dictation(pieces, before):
-    """Unisce parole e segni nel testo da inserire dopo `before` (il testo
-    che precede il cursore): spazi giusti, maiuscola a inizio frase."""
+def _escape_word(word, line_start):
+    """Il parlato è testo e non Markdown (escape_markdown() di
+    rusca_whisper.py, come nelle trascrizioni). La regola dell'inizio di
+    riga («1.», «#», «-») vale solo per la prima parola di una riga."""
+    if line_start:
+        return whisper.escape_markdown(word)
+    return whisper.escape_markdown("a " + word)[2:]
+
+
+def render_dictation(items, before, escape=True):
+    """Gli elementi di parse_commands() come testo da inserire dopo `before`
+    (il testo che precede il cursore): spazi, maiuscole a inizio frase e
+    di riga, marcatori Markdown su una riga propria. Un titolo occupa la
+    sua frase: dopo, si va a un paragrafo nuovo."""
     out = ""
-    prev = before
-    for piece in pieces:
-        if not piece:
-            continue
-        tail = prev.rstrip(" \t")
-        at_start = (not tail or tail.endswith("\n") or tail.endswith(_SENTENCE_END))
-        if piece in ("\n", "\n\n"):
-            out = out.rstrip(" ") + piece
-        elif piece in _ATTACH_LEFT:
-            out = out.rstrip(" ") + piece
+    heading = False
+
+    def cur():
+        return before + out
+
+    def line_of(text):
+        return text[text.rfind("\n") + 1:]
+
+    def previous_line(text):
+        lines = text.split("\n")
+        return lines[-2] if len(lines) >= 2 else ""
+
+    for kind, value in items:
+        text = cur()
+        if kind == "nl":
+            out = out.rstrip(" ") + value
+            if (before + out).endswith("\n\n\n"):
+                out = out.rstrip("\n") + "\n\n"
+            heading = False
+        elif kind == "block":
+            if line_of(text).strip():
+                out = out.rstrip(" ") + "\n"
+            if value == "1. ":
+                m = _NUMBERED.match(previous_line(cur() if cur().endswith("\n") else cur() + "\n"))
+                if m and not line_of(cur()).strip():
+                    value = f"{int(m.group(1)) + 1}. "
+            if value.startswith("#"):
+                prev = previous_line(cur()) if cur().endswith("\n") else ""
+                if prev.strip():
+                    out += "\n"                      # una riga vuota prima del titolo
+                heading = True
+            out = out[:len(out) - len(line_of(cur()))] + value if not line_of(cur()).strip() \
+                else out + value
+        elif kind == "punct":
+            if value in _ATTACH_RIGHT:
+                sep = "" if not text or text[-1] in " \n\t" or text[-1] in _ATTACH_RIGHT else " "
+                out += sep + value
+            else:
+                out = out.rstrip(" ") + value
+        elif kind == "open":
+            sep = "" if not text or text[-1] in " \n\t" or text[-1] in _ATTACH_RIGHT else " "
+            out += sep + value
+        elif kind == "close":
+            out = out.rstrip(" ") + value
         else:
-            word = _capitalize(piece) if at_start and piece[:1].isalpha() else piece
-            sep = "" if not prev or prev[-1] in " \n\t" or prev[-1] in _ATTACH_RIGHT else " "
+            line = line_of(text)
+            at_line_start = not line.strip()
+            # Testo normale dopo un elenco o una citazione: riga vuota, se
+            # no il Markdown lo attacca all'ultima voce.
+            if at_line_start and text.endswith("\n") and _BLOCK_LINE.match(previous_line(text)) \
+                    and not previous_line(text).startswith("#"):
+                out += "\n"
+                text = cur()
+            # Inizio di frase: testo vuoto, a capo, fine frase, o solo il
+            # marcatore di una riga Markdown (anche con un grassetto aperto).
+            bare = re.sub(r"\*+$", "", text.rstrip(" "))
+            marker_only = re.fullmatch(r"\s*(?:#{1,6}|[-*+]|\d{1,9}\.|>)?\s*\**",
+                                       line_of(text))
+            starts = (not bare.strip() or bare.endswith("\n") or bare.endswith(_SENTENCE_END)
+                      or bool(marker_only))
+            word = _capitalize(value) if starts and value[:1].isalpha() else value
+            if escape:
+                word = _escape_word(word, at_line_start and not _BLOCK_LINE.match(line))
+            sep = "" if not text or text[-1] in " \n\t" or text[-1] in _ATTACH_RIGHT \
+                or text.endswith("*") and kind_before_open(text) else " "
             out += sep + word
-        prev = before + out
+    if heading:
+        out = out.rstrip(" ")
+        if out.endswith(".") and not out.endswith(".."):
+            out = out[:-1]                            # niente punto in fondo a un titolo
+        out += "\n\n"
     return out
 
 
-def dictation_text(text, before, lang="", commands=True, escape=True):
+def kind_before_open(text):
+    """Il testo finisce con un marcatore di grassetto o corsivo appena
+    aperto (preceduto da uno spazio o da un inizio di riga)?"""
+    return bool(re.search(r"(^|[\s(«“])\*{1,2}$", text))
+
+
+def join_dictation(pieces, before):
+    """Compatibilità: parole e segni già separati (senza comandi Markdown)."""
+    items = [("punct" if p in _ATTACH_LEFT or p in _ATTACH_RIGHT else
+              "nl" if p in ("\n", "\n\n") else "word", p) for p in pieces]
+    return render_dictation(items, before, escape=False)
+
+
+def dictation_text(text, before, lang="", commands=True, escape=True, markdown=None):
     """Il testo riconosciuto, pronto da inserire nel documento dopo `before`.
-    Con Vosk (commands=True) i comandi a voce diventano segni. Il parlato è
-    testo e non Markdown: i caratteri di formattazione si proteggono come
-    nelle trascrizioni (escape_markdown() di rusca_whisper.py); la regola
-    dell'inizio di riga («1.», «#», «-») vale solo se il testo comincia una
-    riga."""
-    pieces = apply_commands(text, lang) if commands else text.split()
-    joined = join_dictation(pieces, before)
-    if not escape or not joined.strip():
-        return joined
-    lead = joined[:len(joined) - len(joined.lstrip(" "))]
-    body = joined[len(lead):]
-    line_start = not before.rstrip(" \t") or before.rstrip(" \t").endswith("\n")
-    lines = body.split("\n")
-    safe = []
-    for n, line in enumerate(lines):
-        if not line.strip():
-            safe.append(line)
-        elif (n > 0 or line_start):
-            safe.append(whisper.escape_markdown(line))
-        else:
-            safe.append(whisper.escape_markdown("a " + line)[2:])
-    return lead + "\n".join(safe)
+    commands: i comandi di punteggiatura (Vosk); markdown: i comandi di riga
+    e di formattazione (se non indicato, come commands). Il parlato è testo
+    e non Markdown: le parole si proteggono, i comandi scrivono i marcatori."""
+    if markdown is None:
+        markdown = commands
+    items = parse_commands(text, lang, punctuation=commands, markdown=markdown)
+    return render_dictation(items, before, escape=escape)
+
+
+def command_help(lang):
+    """I comandi della lingua, per l'aiuto della barra della voce:
+    [(gruppo, [(parole, segno da mostrare)])]."""
+    table = COMMANDS[command_language(lang)]
+    shown = {"\n": "↵", "\n\n": "¶"}
+    return [(group, [(entry[0], shown.get(entry[1], entry[1].strip() or entry[1]))
+                     for entry in table[group]])
+            for group in ("punct", "lines", "blocks", "inline")]
+
+
+def longer(final, partial):
+    """Il testo della frase: quello finale di Vosk, se non ha perso parole
+    rispetto al parziale. Con il modello grande il risultato chiesto a metà
+    può arrivare vuoto o più corto (il rescoring di fine frase), mentre il
+    parziale è la frase intera (sezione 1.7.3)."""
+    final, partial = (final or "").strip(), (partial or "").strip()
+    return final if len(final.split()) >= len(partial.split()) else partial
 
 
 def _rms(data):
@@ -328,6 +471,7 @@ class Dictation:
         self._rec = None                 # (percorso del modello, vosk.Recognizer)
         self._proc = None                # whisper-cli in corso
         self.engine = ""
+        self._cancelled = False
         self.prompt = ""                 # testo prima del cursore (Whisper --prompt)
 
     @property
@@ -358,10 +502,13 @@ class Dictation:
         self._thread.start()
 
     def stop(self):
-        """Smette di ascoltare. Con Whisper la frase in corso e quelle in coda
-        si scrivono ancora; poi arriva "stopped"."""
+        """Smette di ascoltare. Tutto l'audio già registrato si riconosce
+        ancora (l'ultima frase non si perde), e con Whisper si scrivono le
+        frasi in coda; poi arriva "stopped"."""
         self._stop.set()
-        self._stop_mic()
+        timer = threading.Timer(STOP_GRACE, self._stop_mic)
+        timer.daemon = True
+        timer.start()
 
     def cancel(self):
         """Smette subito, senza scrivere ciò che resta (chiusura)."""
@@ -438,20 +585,46 @@ class Dictation:
             self._emit(self.on_partial, "")
             self._emit(self.on_state, "stopped")
 
-    def _frames(self):
-        """I blocchi di 20 ms del microfono, finché non si ferma."""
+    def _frames(self, per=1):
+        """L'audio del microfono a blocchi di per × 20 ms, finché non si
+        ferma. Il microfono si legge in un thread a parte che mette tutto in
+        coda: se il riconoscimento resta indietro rispetto al parlato
+        recupera dopo, e PipeWire non deve mai scartare l'audio perché il
+        tubo è pieno. Dopo lo stop si consuma l'audio rimasto nel tubo."""
         mic = self._start_mic()
-        n = 0
-        while not self._stop.is_set():
-            data = mic.stdout.read(FRAME)
-            if not data:
-                if not self._stop.is_set():
-                    raise VoiceError("err_mic", f"pw-record: {mic.poll()}")
-                return
-            n += 1
-            if n % 3 == 0:
-                self._emit(self.on_level, min(1.0, _rms(data) * 6.0))
-            yield data
+        frames = queue.Queue()
+
+        def read():
+            n = 0
+            try:
+                while True:
+                    data = mic.stdout.read(FRAME)
+                    if not data:
+                        break
+                    n += 1
+                    if n % 3 == 0:
+                        self._emit(self.on_level, min(1.0, _rms(data) * 6.0))
+                    frames.put(data)
+            except (OSError, ValueError):
+                pass
+            finally:
+                frames.put(None)
+        threading.Thread(target=read, daemon=True).start()
+        block = []
+        while True:
+            data = frames.get()
+            if data is None:
+                break
+            if self._cancelled:
+                continue                    # chiusura: si svuota senza riconoscere
+            block.append(data)
+            if len(block) >= per:
+                yield b"".join(block)
+                block = []
+        if block and not self._cancelled:
+            yield b"".join(block)
+        if not self._stop.is_set():
+            raise VoiceError("err_mic", f"pw-record: {mic.poll()}")
 
     # Vosk: parola per parola mentre si parla.
     def _run_vosk(self, options):
@@ -468,28 +641,25 @@ class Dictation:
         rec = self._rec[1]
         rec.reset()
         self._emit(self.on_state, "listening")
-        partial, since, count = "", time.monotonic(), 0
-        for data in self._frames():
+        partial, quiet, count = "", 0.0, 0
+        for data in self._frames(VOSK_BLOCK):
             if rec.accept(data):
                 self._final(rec.result().get("text", ""))
-                partial, since = "", time.monotonic()
+                partial, quiet = "", 0.0
                 continue
+            quiet += len(data) / (RATE * 2)              # secondi d'audio
             count += 1
             if count % PARTIAL_EVERY:
                 continue
-            now = time.monotonic()
             text = rec.partial()
             if text != partial:
-                partial, since = text, now
+                partial, quiet = text, 0.0
                 self._emit(self.on_partial, text)
-            elif partial and now - since >= VOSK_PAUSE:
-                # Con il modello grande il risultato chiesto così può
-                # arrivare vuoto: allora vale il parziale (sezione 1.7.3).
-                final = rec.final_result().get("text", "") or partial
-                self._final(final)
-                partial, since = "", now
+            elif partial and quiet >= VOSK_PAUSE:
+                self._final(longer(rec.final_result().get("text", ""), partial))
+                partial, quiet = "", 0.0
         if not self._cancelled:
-            self._final(rec.final_result().get("text", "") or partial)
+            self._final(longer(rec.final_result().get("text", ""), partial))
 
     def _final(self, text):
         text = " ".join((text or "").split())

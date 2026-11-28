@@ -18,11 +18,9 @@ import ast
 import json
 import os
 import shutil
-import struct
 import subprocess
 import sys
 import tempfile
-import textwrap
 import time
 import unittest
 
@@ -113,11 +111,15 @@ else:
     w.writeframes(pcm); w.close()
 """
 
-# libvosk.so finta: stessa API in C. Una frase finisce ogni 50 blocchi da
-# 20 ms (dettatura) o a ogni secondo d'audio (file).
+# libvosk.so finta: stessa API in C. Una frase finisce ogni 10 blocchi da
+# 100 ms (dettatura) o a ogni secondo d'audio (file). Con -DNEVER non finisce
+# mai da sola e il testo parziale conta i blocchi ricevuti: serve a vedere
+# che nessun pezzo d'audio si perde.
 FAKE_VOSK_C = r"""
+#include <stdio.h>
 #include <stdlib.h>
 static int calls = 0;
+static char partial[64];
 void vosk_set_log_level(int l) {}
 void *vosk_model_new(const char *p) { return malloc(1); }
 void vosk_model_free(void *m) { free(m); }
@@ -125,13 +127,24 @@ void *vosk_recognizer_new(void *m, float r) { return malloc(1); }
 void vosk_recognizer_free(void *r) { free(r); }
 void vosk_recognizer_set_words(void *r, int w) {}
 int vosk_recognizer_accept_waveform(void *r, const char *d, int n) {
-  return ++calls % 50 == 0 || n >= 32000; }
+#ifdef NEVER
+  calls += n / 3200; return 0;
+#else
+  return ++calls % 10 == 0 || n >= 32000;
+#endif
+}
 const char *vosk_recognizer_result(void *r) {
   return "{\"text\": \"ciao virgola come stai punto interrogativo\", \"result\": "
          "[{\"word\": \"ciao\", \"start\": 0.5, \"end\": 0.9, \"conf\": 1.0}]}"; }
 const char *vosk_recognizer_final_result(void *r) { return "{\"text\": \"\"}"; }
 void vosk_recognizer_reset(void *r) { calls = 0; }
-const char *vosk_recognizer_partial_result(void *r) { return "{\"partial\": \"ciao\"}"; }
+const char *vosk_recognizer_partial_result(void *r) {
+#ifdef NEVER
+  snprintf(partial, sizeof partial, "{\"partial\": \"blocchi %d\"}", calls); return partial;
+#else
+  return "{\"partial\": \"ciao\"}";
+#endif
+}
 """
 
 
@@ -189,6 +202,44 @@ class TestTestoDettato(unittest.TestCase):
         self.assertEqual(rv.dictation_text("virgola e poi", "Parola", "it"), ", e poi")
         self.assertEqual(rv.dictation_text("apri parentesi nota chiudi parentesi", "Testo", "it"),
                          " (nota)")
+
+    def test_comandi_markdown(self):
+        it = lambda t, b="": rv.dictation_text(t, b, "it")
+        self.assertEqual(it("titolo due introduzione", "Testo."), "\n\n## Introduzione\n\n")
+        self.assertEqual(it("questo è il testo", "## Introduzione\n\n"), "Questo è il testo")
+        self.assertEqual(it("elenco latte", "Lista:"), "\n- Latte")
+        self.assertEqual(it("elenco pane", "Lista:\n- Latte"), "\n- Pane")
+        self.assertEqual(it("poi si continua", "- Latte\n- Pane\n"), "\nPoi si continua")
+        self.assertEqual(it("elenco numerato secondo", "1. Primo\n"), "2. Secondo")
+        self.assertEqual(it("citazione essere o non essere"), "> Essere o non essere")
+        self.assertEqual(it("è inizio grassetto molto fine grassetto importante", "Questo"),
+                         " è **molto** importante")
+        self.assertEqual(it("inizio corsivo nota fine corsivo e basta"), "*Nota* e basta")
+        self.assertEqual(rv.dictation_text("heading one my notes", "", "en"), "# My notes\n\n")
+        # in mezzo a una frase «titolo» è una parola
+        self.assertEqual(it("il titolo del libro", "Leggo"), " il titolo del libro")
+
+    def test_comandi_markdown_con_whisper(self):
+        # Whisper aggiunge maiuscole e punti: i comandi si riconoscono lo
+        # stesso, la punteggiatura detta a parole no.
+        self.assertEqual(rv.dictation_text("Titolo due. Introduzione.", "Testo.\n", "it",
+                                           commands=False, markdown=True),
+                         "\n## Introduzione\n\n")
+        self.assertEqual(rv.dictation_text("Il punto è questo.", "", "it",
+                                           commands=False, markdown=True),
+                         "Il punto è questo.")
+
+    def test_finale_o_parziale(self):
+        self.assertEqual(rv.longer("", "ciao a tutti"), "ciao a tutti")
+        self.assertEqual(rv.longer("ciao", "ciao a tutti"), "ciao a tutti")
+        self.assertEqual(rv.longer("ciao a tutte", "ciao a tutti"), "ciao a tutte")
+
+    def test_aiuto_dei_comandi(self):
+        groups = dict(rv.command_help("it"))
+        self.assertIn(("virgola", ","), groups["punct"])
+        self.assertIn(("titolo due", "##"), groups["blocks"])
+        self.assertIn(("nuovo paragrafo", "¶"), groups["lines"])
+        self.assertEqual(rv.command_help("de"), rv.command_help("en"))
 
     def test_senza_comandi_whisper(self):
         # Whisper scrive già la punteggiatura: «punto» resta una parola.
@@ -266,15 +317,15 @@ class _Fakes(unittest.TestCase):
         except OSError:
             return []
 
-    def fake_vosk(self):
+    def fake_vosk(self, *flags):
         if not shutil.which("gcc"):
             self.skipTest("serve gcc per la libvosk.so finta")
         src = os.path.join(self.d, "vosk.c")
         open(src, "w").write(FAKE_VOSK_C)
         lib_dir = os.path.join(self.d, "vosk")
         os.mkdir(lib_dir)
-        subprocess.run(["gcc", "-shared", "-fPIC", "-o", os.path.join(lib_dir, "libvosk.so"), src],
-                       check=True)
+        subprocess.run(["gcc", "-shared", "-fPIC", *flags, "-o",
+                        os.path.join(lib_dir, "libvosk.so"), src], check=True)
         rv.vosk.LIB_DIRS = (lib_dir,)
         rv.vosk._lib = None
         model = os.path.join(self.d, "vosk-model-it-0.22")
@@ -363,6 +414,23 @@ class TestDettaturaVosk(_Fakes):
         self.assertIsNone(d.borrow_recognizer(model + "-altro"))
         self.assertTrue(d.close())
         self.assertIsNone(d.borrow_recognizer(model))
+
+    def test_nessuna_parola_persa(self):
+        """L'audio si legge in un thread a parte e dopo «Ferma» si riconosce
+        anche quello rimasto: 2,4 s di audio sono 24 blocchi da 100 ms, e il
+        testo finale (qui il parziale, perché il finale arriva vuoto) li ha
+        visti tutti."""
+        model = self.fake_vosk("-DNEVER")
+        texts, partials, states = [], [], []
+        d = rv.Dictation(on_state=states.append, on_text=texts.append,
+                         on_partial=partials.append)
+        d.start("vosk", {"vosk_model": model})
+        self.assertTrue(run_loop(lambda: "blocchi 24" in partials))
+        self.assertEqual(texts, [])           # il parziale cambia: la frase non è finita
+        d.stop()
+        self.assertTrue(run_loop(lambda: "stopped" in states))
+        self.assertEqual(texts, ["blocchi 24"])
+        d.close()
 
     def test_file_audio_con_vosk(self):
         model = self.fake_vosk()

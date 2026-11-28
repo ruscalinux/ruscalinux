@@ -347,17 +347,26 @@ Il motore si sceglie in Preferenze → Voce → *Motore*:
 
 Con Whisper ogni frase avvia il motore, che rilegge il modello: sulla scheda grafica un modello grande risponde in un paio di secondi, sul processore per dettare conviene un modello piccolo come `ggml-small.bin`. A Whisper si passano anche le ultime parole già scritte, così mantiene lo stesso stile e la stessa punteggiatura.
 
-**Punteggiatura a voce (solo Vosk).** Vosk scrive le parole, non i segni: in italiano e in inglese queste parole diventano segni.
+**Comandi a voce.** Mentre detti puoi dire dei comandi, in italiano o in inglese: l'elenco completo è nel menu principale → **Comandi a voce…**, nel pulsante **?** della barra della voce e in Preferenze → Voce. Si spengono da *Comandi a voce*.
 
-| Dici | Scrive |
-|---|---|
-| virgola · punto · due punti · punto e virgola | `,` `.` `:` `;` |
-| punto interrogativo · punto esclamativo | `?` `!` |
-| a capo · nuovo paragrafo | una riga nuova · una riga vuota |
-| apri parentesi · chiudi parentesi | `(` `)` |
-| apri virgolette · chiudi virgolette | `«` `»` |
+| Dici | Scrive | Quando |
+|---|---|---|
+| virgola · punto · due punti · punto e virgola | `,` `.` `:` `;` | Solo Vosk (Whisper scrive i segni da sé) |
+| punto interrogativo · punto esclamativo | `?` `!` | Solo Vosk |
+| apri parentesi · chiudi parentesi · apri virgolette · chiudi virgolette | `(` `)` `«` `»` | Solo Vosk |
+| a capo · nuovo paragrafo | una riga nuova · una riga vuota | Sempre |
+| titolo (o titolo uno) · titolo due (o sottotitolo) · titolo tre | `#` `##` `###` | All'inizio di una frase |
+| elenco · elenco numerato · citazione | `-` `1.` `>` | All'inizio di una frase |
+| inizio grassetto … fine grassetto | `**…**` | Sempre |
+| inizio corsivo … fine corsivo | `*…*` | Sempre |
 
-In inglese: *comma, full stop / period, colon, semicolon, question mark, exclamation mark, new line, new paragraph, open/close parenthesis, open/close quote*. Dopo punto, punto interrogativo, punto esclamativo e a capo la parola che segue prende la maiuscola. Un comando vale sempre, anche dentro una frase: «il punto è» diventa «il. È». Se ti capita spesso, spegni *Punteggiatura a voce* o usa Whisper.
+Esempi, facendo una piccola pausa tra una frase e l'altra:
+
+- «titolo due introduzione» → `## Introduzione`, poi si continua in un paragrafo nuovo;
+- «elenco latte» · «elenco pane» → due voci di elenco, `- Latte` e `- Pane`; con «elenco numerato» i numeri vanno avanti da soli (`1.`, `2.`…);
+- «è inizio grassetto molto fine grassetto importante» → `è **molto** importante`.
+
+I comandi Markdown di riga valgono solo all'inizio di una frase (cioè dopo una pausa) o dopo «a capo»: così «il titolo del libro», detto in mezzo a una frase, resta testo. Dopo punto, punto interrogativo, punto esclamativo, a capo e un marcatore Markdown la parola che segue prende la maiuscola. Con Vosk «punto» vale sempre come segno, anche dentro una frase: «il punto è» diventa «il. È». Se ti capita spesso, usa Whisper o spegni i comandi. In inglese: *comma, full stop / period, question mark, new line, new paragraph, heading one/two/three, subheading, bullet, numbered list, quote, start/end bold, start/end italic*; nelle altre lingue i comandi non ci sono.
 
 Il parlato è testo: se dici qualcosa che il Markdown leggerebbe come formattazione (un asterisco, «1.» a inizio riga), RuscaMark lo protegge con la barra rovesciata, come fa RuscaTranscriber.
 
@@ -398,7 +407,7 @@ Dal menu principale → **Preferenze…** (Ctrl+,). Ogni modifica vale subito. L
 | Esportazione | Tema di PDF e HTML | Colori, caratteri e titoli degli export e dell'anteprima: vedi sezione 11. |
 | Esportazione | Temi personali | *Apri la cartella* apre `~/.local/share/ruscamark/themes/`, dove mettere i propri temi `.css`. |
 | Esportazione | Incorpora le immagini nell'export HTML | Vedi sezione 11. |
-| Voce → Dettatura | Motore, Lingua parlata, Punteggiatura a voce | Vedi sezione 12. |
+| Voce → Dettatura | Motore, Lingua parlata, Comandi a voce | Vedi sezione 12. |
 | Voce → Vosk | Modello, Cartella dei modelli | *Scelta automatica* usa il modello più grande della lingua parlata. |
 | Voce → Whisper | Modello, Esegui su, Scheda da usare, Cartella dei modelli | Processore o scheda grafica (Vulkan) e quale scheda: vedi sezione 12. |
 | Voce → Lettura ad alta voce | Voce, Licenza della voce, Velocità, Leggi anche i blocchi di codice, Cartella delle voci | Vedi sezione 12. |
@@ -504,7 +513,8 @@ Il dizionario personale in `~/.config/enchant/` è condiviso con altri programmi
 | La barra della voce resta «In ascolto» ma non scrive nulla | Controlla il microfono in Impostazioni → Audio. Con Vosk la frase entra dopo un secondo di pausa; con Whisper dopo circa 0,7 secondi. |
 | Whisper è lento | Usa un modello più piccolo, oppure *Scheda grafica (Vulkan)* in Preferenze → Voce. |
 | Whisper si ferma con un errore sulla scheda grafica | Scegli un'altra scheda in *Scheda da usare*, oppure *Processore (CPU)*. |
-| Vosk scrive «.» al posto della parola «punto» | È un comando a voce: spegni *Punteggiatura a voce* o usa Whisper. |
+| Vosk scrive «.» al posto della parola «punto» | È un comando a voce: spegni *Comandi a voce* o usa Whisper. |
+| Non so che cosa dire per la punteggiatura o i titoli | Menu principale → *Comandi a voce…*, o il pulsante **?** nella barra della voce. |
 | La lettura ad alta voce non parte | Installa `ruscapiper-engine` e copia una voce (`.onnx` con il suo `.onnx.json`) nella cartella delle voci. |
 
 Assistenza: info@ruscalinux.org

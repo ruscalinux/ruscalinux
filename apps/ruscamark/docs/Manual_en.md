@@ -347,17 +347,26 @@ Choose the engine in Preferences → Voice → *Engine*:
 
 With Whisper each sentence starts the engine, which reloads the model: on the graphics card a large model answers in a couple of seconds; for dictating on the processor a small model such as `ggml-small.bin` is better. Whisper also receives the last words already written, so it keeps the same style and punctuation.
 
-**Punctuation by voice (Vosk only).** Vosk writes words, not signs: in English and Italian these words become signs.
+**Voice commands.** While dictating you can say commands, in English or Italian: the full list is in the main menu → **Voice Commands…**, in the **?** button of the voice bar and in Preferences → Voice. Turn them off with *Voice commands*.
 
-| You say | It writes |
-|---|---|
-| comma · full stop / period · colon · semicolon | `,` `.` `:` `;` |
-| question mark · exclamation mark / exclamation point | `?` `!` |
-| new line · new paragraph | a new line · an empty line |
-| open parenthesis · close parenthesis | `(` `)` |
-| open quote · close quote | `“` `”` |
+| You say | It writes | When |
+|---|---|---|
+| comma · full stop / period · colon · semicolon | `,` `.` `:` `;` | Vosk only (Whisper writes signs itself) |
+| question mark · exclamation mark / exclamation point | `?` `!` | Vosk only |
+| open parenthesis · close parenthesis · open quote · close quote | `(` `)` `“` `”` | Vosk only |
+| new line · new paragraph | a new line · an empty line | Always |
+| heading (or heading one) · heading two (or subheading) · heading three | `#` `##` `###` | At the start of a sentence |
+| bullet · numbered list · quote | `-` `1.` `>` | At the start of a sentence |
+| start bold … end bold | `**…**` | Always |
+| start italic … end italic | `*…*` | Always |
 
-In Italian: *virgola, punto, due punti, punto e virgola, punto interrogativo, punto esclamativo, a capo, nuovo paragrafo, apri/chiudi parentesi, apri/chiudi virgolette*. After a full stop, question mark, exclamation mark or new line the next word gets a capital letter. A command always counts, even inside a sentence: "the period of" becomes "the. Of". If that happens often, turn off *Punctuation by voice* or use Whisper.
+Examples, with a short pause between sentences:
+
+- "heading two introduction" → `## Introduction`, then you continue in a new paragraph;
+- "bullet milk" · "bullet bread" → two list items, `- Milk` and `- Bread`; with "numbered list" the numbers go on by themselves (`1.`, `2.`…);
+- "it is start bold very end bold important" → `it is **very** important`.
+
+Line Markdown commands count only at the start of a sentence (that is, after a pause) or after "new line": so "the heading of the page", said in the middle of a sentence, stays text. After a full stop, question mark, exclamation mark, new line and a Markdown marker the next word gets a capital letter. With Vosk "period" always counts as a sign, even inside a sentence: "the period of" becomes "the. Of". If that happens often, use Whisper or turn the commands off. In Italian: *virgola, punto, punto interrogativo, a capo, nuovo paragrafo, titolo uno/due/tre, sottotitolo, elenco, elenco numerato, citazione, inizio/fine grassetto, inizio/fine corsivo*; other languages have no commands.
 
 Speech is text: if you say something Markdown would read as formatting (an asterisk, "1." at the start of a line), RuscaMark protects it with a backslash, as RuscaTranscriber does.
 
@@ -398,7 +407,7 @@ Main menu → **Preferences…** (Ctrl+,). Every change applies immediately. Pre
 | Export | PDF and HTML theme | Colours, typefaces and headings of exports and preview: see section 11. |
 | Export | Personal themes | *Open Folder* opens `~/.local/share/ruscamark/themes/`, where your own `.css` themes go. |
 | Export | Embed images in HTML export | See section 11. |
-| Voice → Dictation | Engine, Spoken language, Punctuation by voice | See section 12. |
+| Voice → Dictation | Engine, Spoken language, Voice commands | See section 12. |
 | Voice → Vosk | Model, Models folder | *Automatic choice* uses the largest model for the spoken language. |
 | Voice → Whisper | Model, Run on, Card to use, Models folder | Processor or graphics card (Vulkan) and which card: see section 12. |
 | Voice → Read aloud | Voice, Voice licence, Speed, Read code blocks too, Voices folder | See section 12. |
@@ -504,7 +513,8 @@ The personal dictionary in `~/.config/enchant/` is shared with other programs: i
 | The voice bar stays on "Listening" but writes nothing | Check the microphone in Settings → Sound. With Vosk the sentence enters after a one-second pause; with Whisper after about 0.7 seconds. |
 | Whisper is slow | Use a smaller model, or *Graphics card (Vulkan)* in Preferences → Voice. |
 | Whisper stops with an error on the graphics card | Choose another card in *Card to use*, or *Processor (CPU)*. |
-| Vosk writes "." instead of the word "period" | It is a voice command: turn off *Punctuation by voice* or use Whisper. |
+| Vosk writes "." instead of the word "period" | It is a voice command: turn off *Voice commands* or use Whisper. |
+| I don't know what to say for punctuation or headings | Main menu → *Voice Commands…*, or the **?** button in the voice bar. |
 | Reading aloud does not start | Install `ruscapiper-engine` and copy a voice (`.onnx` with its `.onnx.json`) into the voices folder. |
 
 Support: info@ruscalinux.org
